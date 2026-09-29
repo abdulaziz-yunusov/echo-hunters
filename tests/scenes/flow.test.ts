@@ -13,6 +13,7 @@ import { newRun } from '@/scenes/run';
 import type { AppContext, SceneArgs, SceneId } from '@/scenes/scene';
 import { SceneManager } from '@/scenes/sceneManager';
 import { ROW_HEIGHT } from '@/ui/menuList';
+import { createLoopbackPair } from '@/net/loopback';
 
 const DT = 1 / 60;
 
@@ -104,7 +105,7 @@ describe('screen flow', () => {
   it('menu → settings → controls, and back with ESC each time', () => {
     const t = testApp();
     t.app.goTo('menu');
-    t.choose(3); // PLAY, DIFFICULTY, HOW TO PLAY, SETTINGS (DUEL is skipped)
+    t.choose(4); // PLAY, DUEL, DIFFICULTY, HOW TO PLAY, SETTINGS
     expect(t.current()).toBe('Settings');
     t.choose(4); // CONTROLS
     expect(t.current()).toBe('Controls');
@@ -114,10 +115,10 @@ describe('screen flow', () => {
     expect(t.current()).toBe('Menu');
   });
 
-  it('menu → how to play → back, by clicking', () => {
+  it('menu → how to play → back', () => {
     const t = testApp();
     t.app.goTo('menu');
-    t.choose(2);
+    t.choose(3); // HOW TO PLAY
     expect(t.current()).toBe('HowToPlay');
     t.press({ back: true });
     expect(t.current()).toBe('Menu');
@@ -206,6 +207,10 @@ describe('screen flow', () => {
       ['pause'],
       ['levelEnd', { run, score, seconds: 71 }],
       ['gameOver', { run, score }],
+      ['duelLobby'],
+      ['duel', { transport: createLoopbackPair().a, role: 'host', seed: 5 }],
+      ['duel', { transport: createLoopbackPair().b, role: 'client', seed: 5 }],
+      ['duelEnd', { outcome: 'won' }],
     ];
     for (const [id, params] of screens) {
       (t.app.goTo as (id: SceneId, p?: unknown) => void)(id, params);

@@ -9,6 +9,11 @@ export interface Core {
   collected: boolean;
   /** Seconds until the next hum. */
   humTimer: number;
+  /** Duel: dropped by a player who was hit (not one of the map's own cores). */
+  dropped?: boolean;
+  /** Duel: the player who dropped it may not take it back before `lockedUntil` (sim time). */
+  lockedFor?: number;
+  lockedUntil?: number;
 }
 
 /** The Extraction Beacon. Silent until every core is collected, then loud. */

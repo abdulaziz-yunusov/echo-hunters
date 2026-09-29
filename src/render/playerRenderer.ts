@@ -88,3 +88,31 @@ export function drawAimReticle(
   ctx.stroke();
   ctx.restore();
 }
+
+export const RIVAL_KEY = 'rival';
+
+/**
+ * The duel rival is never drawn directly (GDD §8), only as a pale outline
+ * where one of *your* sounds touched them, fading like a hunter's silhouette.
+ */
+export function drawRivalOutline(
+  ctx: CanvasRenderingContext2D,
+  seen: { time: number; x: number; y: number } | undefined,
+  now: number,
+  fadeSeconds: number,
+  pixel: number,
+): void {
+  if (!seen) return;
+  const a = 1 - (now - seen.time) / fadeSeconds;
+  if (a <= 0) return;
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.strokeStyle = THEME.colors.white;
+  ctx.shadowColor = THEME.colors.white;
+  ctx.shadowBlur = THEME.glowBlur;
+  ctx.lineWidth = 2 * pixel;
+  ctx.beginPath();
+  ctx.arc(seen.x, seen.y, GAME.player.radius + 3, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+}

@@ -9,9 +9,9 @@ import { setHunterState, updateHunters } from './ai/hunterBrain';
 import { createHunter } from './entities/hunter';
 import { createBeacon, createCores } from './entities/objectives';
 import { createPlayer } from './entities/player';
-import { PLAYER_ID, type EntityId } from './entities/entity';
+import { GUEST_ID, PLAYER_ID, type EntityId } from './entities/entity';
 import type { GameEvents } from './events';
-import type { GameState, SimContext } from './gameState';
+import type { GameState, SimContext, SimMode } from './gameState';
 import { levelDef, levelMapScale } from './level';
 import type { PlayerInput } from './playerInput';
 import { deliverHearings, scheduleHearing } from './sound/hearing';
@@ -36,6 +36,8 @@ export interface SimulationOptions {
   hunters?: readonly HunterTypeId[];
   /** Pickups to place (counts per type); defaults to the level's. */
   pickups?: LevelDef['pickups'];
+  /** Solo (default), or which side of a duel this machine is. */
+  mode?: SimMode;
 }
 
 /**
@@ -49,8 +51,13 @@ export class Simulation implements SimContext {
 
   constructor(layout: MapLayout, walls: WallGeometry, options: SimulationOptions = {}) {
     const level = options.level ?? 1;
+    const mode = options.mode ?? 'solo';
+    const duel = mode !== 'solo';
     const { tiles } = layout;
-    const spawn = tiles.center(layout.spawns[0]);
+    // Ids and spawns match on both duel machines: the host is 1 (spawn 0), the guest 2 (spawn 1).
+    const localId = mode === 'client' ? GUEST_ID : PLAYER_ID;
+    const spawnOf = (id: EntityId) =>
+      tiles.center(layout.spawns[Math.min(id - 1, layout.spawns.length - 1)]);
     const def = levelDef(level);
     const hunterTypes = options.hunters ?? def.hunters;
 
@@ -61,7 +68,24 @@ export class Simulation implements SimContext {
       tick: 0,
       layout,
       walls,
-      player: createPlayer(PLAYER_ID, spawn.x, spawn.y),
+      player: createPlayer(localId, spawnOf(localId).x, spawnOf(localId).y),
+      rival: duel
+        ? (() => {
+            const id = localId === PLAYER_ID ? GUEST_ID : PLAYER_ID;
+            return createPlayer(id, spawnOf(id).x, spawnOf(id).y);
+          })()
+        : null,
+      mode,
+      duel: duel
+        ? {
+            coresToWin: GAME.duel.coresToWin,
+            hitsToDrop: GAME.duel.hitsToDropCores,
+            hits: {},
+            winner: null,
+            pending: [],
+            extractPending: false,
+          }
+        : null,
       hunters: hunterTypes.slice(0, layout.hunterSpawns.length).map((type, i) => {
         const at = tiles.center(layout.hunterSpawns[i]);
         return createHunter(FIRST_HUNTER_ID + i, type, at.x, at.y);
@@ -93,8 +117,10 @@ export class Simulation implements SimContext {
     s.time += dt;
 
     // Remember where things were, so renderers can draw between ticks.
-    s.player.prevX = s.player.x;
-    s.player.prevY = s.player.y;
+    for (const p of s.rival ? [s.player, s.rival] : [s.player]) {
+      p.prevX = p.x;
+      p.prevY = p.y;
+    }
     for (const h of s.hunters) {
       h.prevX = h.x;
       h.prevY = h.y;
@@ -107,10 +133,13 @@ export class Simulation implements SimContext {
       updateStones(this, dt);
       updatePickups(this, s.player, dt);
       updateObjectives(this, s.player, dt);
-      updateHunters(this, dt);
-      updateCombat(this, dt);
+      // A duel client copies the host's hunters and hits instead of running them.
+      if (s.mode !== 'client') {
+        updateHunters(this, dt);
+        updateCombat(this, dt);
+      }
     }
-    if (playing) deliverHearings(this);
+    if (playing && s.mode !== 'client') deliverHearings(this);
     growWaves(s.waves, dt);
     s.waves = pruneWaves(s.waves);
   }
@@ -119,7 +148,7 @@ export class Simulation implements SimContext {
     const s = this.state;
     const wave = createWave(s.walls, s.nextWaveId++, kind, x, y, owner, s.time, focus);
     s.waves.push(wave);
-    if (s.status === 'playing') scheduleHearing(s, wave);
+    if (s.status === 'playing' && s.mode !== 'client') scheduleHearing(s, wave);
     this.events.emit('soundEmitted', { kind, x, y, owner, time: s.time, wave });
   }
 }
@@ -146,4 +175,25 @@ export function createSimulation({
   const options = mapOptionsFromConfig(levelSeed(seed, level), { scale: levelMapScale(level) });
   const layout = generateMap(options);
   return new Simulation(layout, buildWallGeometry(layout.tiles), { level, hunters });
+}
+
+/**
+ * Start one side of a duel (GDD §8): the shared seed gives both machines the
+ * same two-spawn map, the same hunters and the same pickups.
+ */
+export function createDuelSimulation({
+  seed,
+  role,
+  hunters = GAME.duel.hunters,
+}: {
+  seed: number;
+  role: 'host' | 'client';
+  hunters?: readonly HunterTypeId[];
+}): Simulation {
+  const layout = generateMap(mapOptionsFromConfig(seed, { players: 2 }));
+  return new Simulation(layout, buildWallGeometry(layout.tiles), {
+    mode: role,
+    hunters,
+    pickups: GAME.duel.pickups,
+  });
 }

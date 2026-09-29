@@ -1,9 +1,8 @@
 import { GAME } from '@/config/game';
-import { setHunterState } from '../ai/hunterBrain';
 import type { Player } from '../entities/player';
 import type { SimContext } from '../gameState';
 import type { PlayerInput } from '../playerInput';
-import { hasLineOfSight } from '../world/visibility';
+import { resolveShockwave } from './duel';
 
 /** The player's three tools (GDD §3): sonar ping, decoy stone, shockwave. */
 export function updateAbilities(
@@ -72,20 +71,8 @@ function throwStone(ctx: SimContext, player: Player, input: PlayerInput): void {
  * again earns nothing.
  */
 function shockwave(ctx: SimContext, player: Player): void {
-  const { state } = ctx;
   ctx.emitSound('shockwave', player.x, player.y, player.id);
   player.shockCooldown = GAME.abilities.shockwave.cooldown;
-
-  for (const h of state.hunters) {
-    const distance = Math.hypot(h.x - player.x, h.y - player.y);
-    if (distance > GAME.abilities.shockwave.effectRadius + h.radius) continue;
-    if (!hasLineOfSight(state.walls, player.x, player.y, h.x, h.y)) continue;
-    setHunterState(ctx, h, 'stunned');
-    const scored = !h.stunScored;
-    if (scored) {
-      h.stunScored = true;
-      state.stats.huntersStunned++;
-    }
-    ctx.events.emit('hunterStunned', { hunterId: h.id, x: h.x, y: h.y, scored });
-  }
+  // A duel client only makes the sound; the host resolves what it hits.
+  if (ctx.state.mode !== 'client') resolveShockwave(ctx, player.x, player.y, player.id);
 }

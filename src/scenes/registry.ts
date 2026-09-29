@@ -1,4 +1,7 @@
 import { ControlsScene } from './controlsScene';
+import { DuelEndScene } from './duelEndScene';
+import { DuelLobbyScene } from './duelLobbyScene';
+import { DuelScene } from './duelScene';
 import { GameOverScene } from './gameOverScene';
 import { HowToPlayScene } from './howToPlayScene';
 import { LevelEndScene } from './levelEndScene';
@@ -20,6 +23,9 @@ const FACTORIES: { [K in SceneId]: SceneFactory<K> } = {
   settings: (app) => new SettingsScene(app),
   controls: (app) => new ControlsScene(app),
   pause: (app) => new PauseScene(app),
+  duelLobby: (app) => new DuelLobbyScene(app),
+  duel: (app, params) => new DuelScene(app, params),
+  duelEnd: (app, params) => new DuelEndScene(app, params),
 };
 
 export function createScene<K extends SceneId>(

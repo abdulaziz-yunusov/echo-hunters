@@ -3,13 +3,13 @@ import { DIFFICULTIES } from '@/config/difficulty';
 import { GAME } from '@/config/game';
 import { THEME } from '@/config/theme';
 import type { InputFrame } from '@/input/inputFrame';
+import { toPlayerInput } from '@/input/toPlayerInput';
 import { randomSeed } from '@/platform/seed';
 import { Camera } from '@/render/camera';
 import { drawHud } from '@/render/hud';
 import { drawAimReticle, playerDrawPosition } from '@/render/playerRenderer';
 import { drawText } from '@/render/text';
 import { WorldRenderer } from '@/render/worldRenderer';
-import type { PlayerInput } from '@/sim/playerInput';
 import { roundResult, scoreRound } from '@/sim/scoring';
 import { levelDef } from '@/sim/level';
 import { createSimulation, type Simulation } from '@/sim/simulation';
@@ -66,7 +66,10 @@ export class PlayScene implements Scene {
     }
 
     this.aimScreen = input.aim;
-    this.sim.step(this.toPlayerInput(input), dt);
+    this.sim.step(
+      toPlayerInput(input, (x, y) => this.camera.screenToWorld(x, y)),
+      dt,
+    );
     this.world.tick(dt);
     this.audio?.tick();
     this.tutorial?.tick(dt);
@@ -259,17 +262,5 @@ export class PlayScene implements Scene {
       )[0] ?? beacon;
     player.x = player.prevX = target.x;
     player.y = player.prevY = target.y;
-  }
-
-  private toPlayerInput(input: InputFrame): PlayerInput {
-    return {
-      moveX: input.moveX,
-      moveY: input.moveY,
-      sneak: input.sneak,
-      ping: input.ping,
-      throwStone: input.throwStone,
-      shockwave: input.shockwave,
-      aim: input.aim ? this.camera.screenToWorld(input.aim.x, input.aim.y) : null,
-    };
   }
 }

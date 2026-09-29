@@ -20,8 +20,31 @@ export interface LevelRules {
   pingCooldown: number;
 }
 
-/** How a round stands: running, or over and why. */
-export type RoundStatus = 'playing' | 'extracted' | 'dead';
+/** How a round stands: running, or over and why ('lost' = the duel rival extracted first). */
+export type RoundStatus = 'playing' | 'extracted' | 'dead' | 'lost';
+
+/**
+ * Who runs what. Solo: everything. Duel host: everything, and it is the
+ * referee for the client. Duel client: only its own player; it asks the
+ * host for anything contested and copies the host's hunters and objectives.
+ */
+export type SimMode = 'solo' | 'host' | 'client';
+
+/** Something that can be grabbed by only one player. */
+export type TakeKind = 'core' | 'pickup';
+
+/** Duel-only rules and bookkeeping (GDD §8). */
+export interface DuelState {
+  coresToWin: number;
+  hitsToDrop: number;
+  /** Hits taken since the last drop, by player id. */
+  hits: Record<number, number>;
+  winner: EntityId | null;
+  /** Client: takes asked of the host, not answered yet ("core:3"). */
+  pending: string[];
+  /** Client: extraction asked of the host, not answered yet. */
+  extractPending: boolean;
+}
 
 /** Everything that describes one round. Plain data, the single source of truth. */
 export interface GameState {
@@ -33,7 +56,12 @@ export interface GameState {
   tick: number;
   layout: MapLayout;
   walls: WallGeometry;
+  /** The player on this machine. */
   player: Player;
+  /** Duel: the other player, positioned from the network (never controlled here). */
+  rival: Player | null;
+  mode: SimMode;
+  duel: DuelState | null;
   hunters: Hunter[];
   cores: Core[];
   beacon: Beacon;

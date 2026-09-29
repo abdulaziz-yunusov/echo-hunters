@@ -1,3 +1,5 @@
+import type { HunterTypeId } from './hunters';
+
 /**
  * All general tunables. Logic must read numbers from here (or the other
  * config files), never hard-code them.
@@ -111,12 +113,30 @@ export const GAME = {
   },
 
   duel: {
+    /** Carry this many cores to wake the beacon; extract with them to win (GDD §8). */
     coresToWin: 2,
+    /** Hits (rival shockwave or hunter) before you drop the cores you carry. */
     hitsToDropCores: 2,
+    /** Seconds before the player who dropped cores may take them back (the attacker can at once). */
+    dropLockSeconds: 2,
     /** Most tile steps one player may be closer to the beacon than the other. */
     beaconMaxStepDifference: 2,
+    /** AI hunters that threaten both players (GDD: "optional 1–2"). */
+    hunters: ['stalker'] as HunterTypeId[],
+    /** No hearts: duels have no HP. */
+    pickups: { stoneBag: 2, silentBoots: 1 },
+    /** Own position sent this often (Hz). */
     positionSendHz: 15,
-    hunterSendHz: 10,
+    /** Host's authoritative snapshot (cores, hunters, …) sent this often (Hz). */
+    snapshotHz: 10,
+    /** Remote things are drawn this far in the past, to glide between updates (s). */
+    interpolationDelay: 0.12,
+    /** Give up connecting after this long (s). */
     connectTimeout: 8,
+    /** PeerJS ids are global: prefix room codes so they don't collide with other apps. */
+    peerPrefix: 'pulse-echo-hunters-',
+    /** Room code length and alphabet (no look-alike characters). */
+    codeLength: 5,
+    codeAlphabet: 'ABCDEFGHJKMNPQRSTUVWXYZ23456789',
   },
 };

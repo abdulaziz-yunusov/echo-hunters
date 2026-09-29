@@ -29,11 +29,11 @@ export class AudioDirector {
     const centered = (e: keyof typeof AUDIO_EVENTS) => () => this.playCentered(e);
     this.unsubscribe = [
       on('soundEmitted', (s) => this.playSpatial(s)),
-      on('coreCollected', centered('coreCollected')),
+      on('coreCollected', (e) => this.ifMine(e.by, 'coreCollected')),
       on('beaconActivated', centered('beaconActivated')),
-      on('playerHit', centered('playerHit')),
+      on('playerHit', (e) => this.ifMine(e.target, 'playerHit')),
       on('hunterStunned', centered('hunterStunned')),
-      on('pickupCollected', centered('pickupCollected')),
+      on('pickupCollected', (e) => this.ifMine(e.by, 'pickupCollected')),
       on('stoneThrown', centered('stoneThrown')),
       on('roundEnded', (e) => {
         this.out.stopDrone();
@@ -75,6 +75,11 @@ export class AudioDirector {
       muffled,
       pitch: isStep ? 1 + (this.jitter() * 2 - 1) * STEP_PITCH_JITTER : 1,
     });
+  }
+
+  /** Personal feedback plays only for this machine's player (a duel rival's is secret). */
+  private ifMine(who: number, event: keyof typeof AUDIO_EVENTS): void {
+    if (who === this.sim.state.player.id) this.playCentered(event);
   }
 
   private playCentered(event: keyof typeof AUDIO_EVENTS): void {

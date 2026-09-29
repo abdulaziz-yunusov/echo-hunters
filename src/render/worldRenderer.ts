@@ -14,7 +14,7 @@ import {
   drawPickups,
   pickupKey,
 } from './objectRenderer';
-import { drawPlayer, drawStones } from './playerRenderer';
+import { drawPlayer, drawRivalOutline, drawStones, RIVAL_KEY } from './playerRenderer';
 import { RevealMap, type RevealableObject } from './revealMap';
 import { WallLayer } from './wallLayer';
 import { drawWavePolygons, drawWaves } from './waveLayer';
@@ -43,17 +43,21 @@ export class WorldRenderer {
     this.wallLayer = new WallLayer(sim.state.walls);
 
     sim.events.on('soundEmitted', (s) => this.reveal.addWave(s.wave));
-    sim.events.on('coreCollected', (e) => this.fx.flash(e.x, e.y, 'cyan'));
+    // Personal flashes only: in a duel they must not give the rival's position away.
+    const mine = (id: number) => id === sim.state.player.id;
+    sim.events.on('coreCollected', (e) => {
+      if (mine(e.by)) this.fx.flash(e.x, e.y, 'cyan');
+    });
     sim.events.on('beaconActivated', (e) => this.fx.flash(e.x, e.y, 'green', 48, 0.9));
-    sim.events.on('playerHit', (e) => this.fx.flash(e.x, e.y, 'red', 34, 0.5));
+    sim.events.on('playerHit', (e) => {
+      if (mine(e.target)) this.fx.flash(e.x, e.y, 'red', 34, 0.5);
+    });
     sim.events.on('hunterStunned', (e) => this.fx.flash(e.x, e.y, 'orange', 22, 0.6));
-    sim.events.on('pickupCollected', (e) =>
-      this.fx.flash(
-        e.x,
-        e.y,
-        e.type === 'heart' ? 'red' : e.type === 'silentBoots' ? 'cyan' : 'white',
-      ),
-    );
+    sim.events.on('pickupCollected', (e) => {
+      if (!mine(e.by)) return;
+      const color = e.type === 'heart' ? 'red' : e.type === 'silentBoots' ? 'cyan' : 'white';
+      this.fx.flash(e.x, e.y, color);
+    });
   }
 
   /** Waves still revealing walls (debug). */
@@ -91,6 +95,7 @@ export class WorldRenderer {
     );
     this.drawObjects(ctx, pixel);
     drawHunterSilhouettes(ctx, state.hunters, this.reveal, time, this.silhouetteSeconds);
+    drawRivalOutline(ctx, this.reveal.objectReveal(RIVAL_KEY), time, this.silhouetteSeconds, pixel);
     drawWaves(ctx, state.waves, alpha / GAME.loop.tickRate, pixel);
     if (debug) {
       drawWavePolygons(ctx, state.waves, pixel);
@@ -130,4 +135,6 @@ function* revealables(state: GameState): Generator<RevealableObject> {
     if (!p.collected) yield { key: pickupKey(p), x: p.x, y: p.y };
   }
   for (const h of state.hunters) yield { key: hunterKey(h), x: h.x, y: h.y, owner: h.id };
+  const rival = state.rival;
+  if (rival) yield { key: RIVAL_KEY, x: rival.x, y: rival.y, owner: rival.id };
 }

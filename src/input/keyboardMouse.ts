@@ -14,8 +14,8 @@ export interface RawInputHandlers {
  */
 export function attachKeyboardMouse(canvas: HTMLCanvasElement, h: RawInputHandlers): () => void {
   const onKeyDown = (e: KeyboardEvent): void => {
-    // Leave browser shortcuts (Ctrl+R, Alt+Tab, …) alone.
-    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    // Leave browser shortcuts (Ctrl+R, Alt+Tab, …) and typing in text fields alone.
+    if (e.ctrlKey || e.metaKey || e.altKey || isTextField(e.target)) return;
     if (h.down(e.code)) e.preventDefault();
   };
   const onKeyUp = (e: KeyboardEvent): void => h.up(e.code);
@@ -55,4 +55,8 @@ export function attachKeyboardMouse(canvas: HTMLCanvasElement, h: RawInputHandle
     canvas.removeEventListener('mousedown', onMouseDown);
     canvas.removeEventListener('contextmenu', onContextMenu);
   };
+}
+
+function isTextField(target: EventTarget | null): boolean {
+  return target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
 }

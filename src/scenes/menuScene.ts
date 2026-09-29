@@ -30,13 +30,7 @@ export class MenuScene implements Scene {
     this.difficulty = save.difficulty;
     this.menu = new MenuList([
       { kind: 'action', label: 'PLAY SOLO', onSelect: () => this.play() },
-      {
-        kind: 'action',
-        label: 'DUEL (1v1 ONLINE)',
-        onSelect: () => {},
-        disabled: true,
-        note: 'COMING SOON',
-      },
+      { kind: 'action', label: 'DUEL (1v1 ONLINE)', onSelect: () => app.goTo('duelLobby') },
       {
         kind: 'adjust',
         label: 'DIFFICULTY',

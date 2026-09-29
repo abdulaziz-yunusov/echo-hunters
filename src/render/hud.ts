@@ -33,9 +33,18 @@ export function drawHud(ctx: CanvasRenderingContext2D, state: GameState): void {
   };
   ctx.font = `${SIZE}px ${THEME.font}`; // for measureText
 
-  part(`HP ${'●'.repeat(player.hp)}${'○'.repeat(player.maxHp - player.hp)}`, THEME.colors.red);
-  const collected = cores.filter((c) => c.collected).length;
-  part(`CORES ${collected}/${cores.length}`, THEME.colors.cyan, collected > 0 ? 1 : 0.6);
+  const duel = state.duel;
+  if (duel) {
+    // Duel (GDD §8): no HP; the shield is the hits left before you drop your cores.
+    const left = duel.hitsToDrop - (duel.hits[player.id] ?? 0);
+    part(`SHIELD ${'●'.repeat(left)}${'○'.repeat(duel.hitsToDrop - left)}`, THEME.colors.red);
+    part(`CORES ${player.cores}/${duel.coresToWin}`, THEME.colors.cyan, player.cores > 0 ? 1 : 0.6);
+    part(`RIVAL ${state.rival?.cores ?? 0}/${duel.coresToWin}`, THEME.colors.orange, 0.8);
+  } else {
+    part(`HP ${'●'.repeat(player.hp)}${'○'.repeat(player.maxHp - player.hp)}`, THEME.colors.red);
+    const collected = cores.filter((c) => c.collected).length;
+    part(`CORES ${collected}/${cores.length}`, THEME.colors.cyan, collected > 0 ? 1 : 0.6);
+  }
   part(`STONES ${player.stones}`, white, player.stones > 0 ? 0.8 : 0.4);
   cooldown('PING', player.pingCooldown, state.rules.pingCooldown, THEME.colors.cyan);
   cooldown('SHOCK', player.shockCooldown, GAME.abilities.shockwave.cooldown, THEME.colors.red);
@@ -50,10 +59,17 @@ export function drawHud(ctx: CanvasRenderingContext2D, state: GameState): void {
     line += 18;
   }
   if (beacon.active) {
-    drawText(ctx, 'BEACON ACTIVE: GET TO EXTRACTION', 12, line, {
-      size: 12,
-      color: THEME.colors.green,
-      glow: 6,
-    });
+    const rivalCarries = duel && player.cores < duel.coresToWin;
+    drawText(
+      ctx,
+      rivalCarries ? 'RIVAL CARRIES THE CORES: STOP THEM!' : 'BEACON ACTIVE: GET TO EXTRACTION',
+      12,
+      line,
+      {
+        size: 12,
+        color: THEME.colors.green,
+        glow: 6,
+      },
+    );
   }
 }
