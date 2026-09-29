@@ -20,6 +20,10 @@ export interface Player {
   touchingWall: boolean;
   /** Seconds until another wall bump can make a sound. */
   bumpCooldown: number;
+  /** Seconds until the sonar ping is ready. */
+  pingCooldown: number;
+  /** Pings this round (the ghost bonus needs zero). */
+  pingsUsed: number;
 }
 
 export function createPlayer(id: EntityId, x: number, y: number): Player {
@@ -36,5 +40,7 @@ export function createPlayer(id: EntityId, x: number, y: number): Player {
     stride: 0,
     touchingWall: false,
     bumpCooldown: 0,
+    pingCooldown: 0,
+    pingsUsed: 0,
   };
 }

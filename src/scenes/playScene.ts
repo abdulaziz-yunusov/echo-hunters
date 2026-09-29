@@ -1,34 +1,35 @@
-import { SOUND_KINDS } from '@/config/sounds';
+import { DEFAULT_DIFFICULTY, DIFFICULTIES } from '@/config/difficulty';
+import { GAME } from '@/config/game';
 import { THEME } from '@/config/theme';
 import type { InputFrame } from '@/input/inputFrame';
 import { randomSeed } from '@/platform/seed';
 import { Camera } from '@/render/camera';
+import { drawHud } from '@/render/hud';
 import { drawFullMap } from '@/render/mapDebug';
 import { drawPlayer, playerDrawPosition } from '@/render/playerRenderer';
+import { RevealMap } from '@/render/revealMap';
 import { drawText } from '@/render/text';
-import type { SoundEmitted } from '@/sim/events';
+import { WallLayer } from '@/render/wallLayer';
+import { drawWavePolygons, drawWaves } from '@/render/waveLayer';
 import type { PlayerInput } from '@/sim/playerInput';
 import { createSimulation, type Simulation } from '@/sim/simulation';
 import type { AppContext, Scene } from './scene';
 
-/** Debug sound markers stay visible this long (s). Real sound rings arrive in Phase 4. */
-const DEBUG_SOUND_LIFETIME = 0.6;
 /** Share of the screen the debug overview map may fill. */
 const OVERVIEW_MARGIN = 0.92;
+/** Opacity of the full map under the debug view, so real reveals stay visible on top. */
+const DEBUG_MAP_ALPHA = 0.3;
 
-/**
- * Gameplay. Phase 3: the player walks the dark maze. Walls only become
- * visible through sound in Phase 4; until then F1 shows the map.
- */
+/** Gameplay. Phase 4: the dark maze is seen only through sound. */
 export class PlayScene implements Scene {
   readonly name = 'Play';
   private readonly app: AppContext;
   private readonly camera: Camera;
   private sim!: Simulation;
+  private reveal!: RevealMap;
+  private wallLayer!: WallLayer;
   private overview = false;
-  private debugSounds: SoundEmitted[] = [];
-  private stepCount = 0;
-  private bumpCount = 0;
+  private readonly ghostAlpha = DIFFICULTIES[DEFAULT_DIFFICULTY].ghostAlpha;
 
   constructor(app: AppContext, params: { seed: number }) {
     this.app = app;
@@ -46,19 +47,21 @@ export class PlayScene implements Scene {
     if (debug.enabled && input.debugOverview) this.overview = !this.overview;
 
     this.sim.step(this.toPlayerInput(input), dt);
+    this.reveal.update(this.sim.state.time);
 
-    const { player, time } = this.sim.state;
-    this.debugSounds = this.debugSounds.filter((s) => time - s.time < DEBUG_SOUND_LIFETIME);
+    const { player, waves } = this.sim.state;
     const tiles = this.sim.state.layout.tiles;
     debug.watch('pos', `${player.x.toFixed(0)}, ${player.y.toFixed(0)}`);
     debug.watch('tile', `${tiles.toTile(player.x)}, ${tiles.toTile(player.y)}`);
     debug.watch('speed', Math.round(Math.hypot(player.vx, player.vy)));
     debug.watch('mode', player.sneaking ? 'sneak' : 'walk');
-    debug.watch('sounds', `${this.stepCount} steps, ${this.bumpCount} bumps`);
+    debug.watch('waves', `${waves.length} active, ${this.reveal.activeWaves} revealing`);
+    debug.watch('pings', player.pingsUsed);
   }
 
   render(ctx: CanvasRenderingContext2D, alpha: number): void {
-    const { player, layout, walls } = this.sim.state;
+    const { state } = this.sim;
+    const { player, layout, walls, waves } = state;
     const { tiles } = layout;
     const debug = this.app.debug.enabled;
     const { width, height } = this.app.viewport;
@@ -73,24 +76,44 @@ export class PlayScene implements Scene {
       );
       ctx.scale(scale, scale);
       drawFullMap(ctx, layout, walls, 1 / scale, true);
+      drawWavePolygons(ctx, waves, 1 / scale);
+      drawPlayer(ctx, player, alpha);
     } else {
       const focus = playerDrawPosition(player, alpha);
       this.camera.follow(focus.x, focus.y, tiles.worldWidth, tiles.worldHeight);
       this.camera.apply(ctx);
-      if (debug) drawFullMap(ctx, layout, walls, this.camera.pixel, true);
+      const pixel = this.camera.pixel;
+
+      if (debug) {
+        ctx.globalAlpha = DEBUG_MAP_ALPHA;
+        drawFullMap(ctx, layout, walls, pixel, true);
+        ctx.globalAlpha = 1;
+      }
+      this.wallLayer.draw(
+        ctx,
+        this.reveal,
+        state.time,
+        this.camera.visibleBounds(),
+        pixel,
+        GAME.reveal.fadeMs / 1000,
+        this.ghostAlpha,
+      );
+      drawWaves(ctx, waves, alpha / GAME.loop.tickRate, pixel);
+      if (debug) drawWavePolygons(ctx, waves, pixel);
+      drawPlayer(ctx, player, alpha);
     }
-    if (debug) this.drawDebugSounds(ctx);
-    drawPlayer(ctx, player, alpha);
     ctx.restore();
 
-    drawText(ctx, `SEED ${layout.seed}`, 12, 20, {
-      size: 12,
+    drawHud(ctx, state);
+    drawText(ctx, `SEED ${layout.seed}`, width - 12, height - 12, {
+      size: 11,
       color: THEME.colors.white,
-      alpha: 0.5,
+      align: 'right',
+      alpha: 0.35,
     });
     const hint = debug
       ? 'M overview · N new map · F1 hide debug · ESC menu'
-      : 'WASD move · SHIFT sneak · F1 debug view (walls appear with sound in Phase 4) · ESC menu';
+      : 'WASD move · SHIFT sneak · SPACE ping · F1 debug · ESC menu';
     drawText(ctx, hint, width / 2, height - 12, {
       size: 12,
       color: THEME.colors.white,
@@ -101,14 +124,9 @@ export class PlayScene implements Scene {
 
   private start(seed: number): void {
     this.sim = createSimulation(seed);
-    this.debugSounds = [];
-    this.stepCount = 0;
-    this.bumpCount = 0;
-    this.sim.events.on('soundEmitted', (sound) => {
-      this.debugSounds.push(sound);
-      if (sound.kind === 'step') this.stepCount++;
-      if (sound.kind === 'wallBump') this.bumpCount++;
-    });
+    this.reveal = new RevealMap(this.sim.state.walls);
+    this.wallLayer = new WallLayer(this.sim.state.walls);
+    this.sim.events.on('soundEmitted', (sound) => this.reveal.addWave(sound.wave));
     this.app.debug.watch('seed', this.sim.state.layout.seed);
   }
 
@@ -122,21 +140,5 @@ export class PlayScene implements Scene {
       shockwave: input.shockwave,
       aim: input.aim ? this.camera.screenToWorld(input.aim.x, input.aim.y) : null,
     };
-  }
-
-  /** Placeholder rings so footsteps and bumps can be checked before Phase 4. */
-  private drawDebugSounds(ctx: CanvasRenderingContext2D): void {
-    const now = this.sim.state.time;
-    ctx.lineWidth = this.camera.pixel * 1.5;
-    for (const s of this.debugSounds) {
-      const age = (now - s.time) / DEBUG_SOUND_LIFETIME;
-      const kind = SOUND_KINDS[s.kind];
-      ctx.globalAlpha = 1 - age;
-      ctx.strokeStyle = THEME.colors[kind.color];
-      ctx.beginPath();
-      ctx.arc(s.x, s.y, kind.maxRadius * age, 0, Math.PI * 2);
-      ctx.stroke();
-    }
-    ctx.globalAlpha = 1;
   }
 }

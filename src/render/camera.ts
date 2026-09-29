@@ -1,4 +1,4 @@
-import type { Vec2 } from '@/core/geometry';
+import type { Bounds, Vec2 } from '@/core/geometry';
 import type { Viewport } from '@/platform/viewport';
 
 /**
@@ -33,6 +33,18 @@ export class Camera {
     const snap = (v: number) => Math.round(v * dpr) / dpr;
     ctx.translate(snap(width / 2 - this.x * worldScale), snap(height / 2 - this.y * worldScale));
     ctx.scale(worldScale, worldScale);
+  }
+
+  /** World area currently on screen, for culling. */
+  visibleBounds(): Bounds {
+    const halfW = this.viewport.worldWidth / 2;
+    const halfH = this.viewport.worldHeight / 2;
+    return {
+      minX: this.x - halfW,
+      minY: this.y - halfH,
+      maxX: this.x + halfW,
+      maxY: this.y + halfH,
+    };
   }
 
   screenToWorld(sx: number, sy: number): Vec2 {

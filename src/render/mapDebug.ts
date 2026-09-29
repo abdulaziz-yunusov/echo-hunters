@@ -16,6 +16,7 @@ export function drawFullMap(
   detailed: boolean,
 ): void {
   const { tiles } = layout;
+  const baseAlpha = ctx.globalAlpha;
   const ts = tiles.tileSize;
 
   if (detailed) {
@@ -51,9 +52,9 @@ export function drawFullMap(
     }
 
     ctx.fillStyle = THEME.colors.orange;
-    ctx.globalAlpha = 0.35;
+    ctx.globalAlpha = baseAlpha * 0.35;
     for (const h of layout.hunterSpawns) dot(ctx, h, ts, ts * 0.08);
-    ctx.globalAlpha = 1;
+    ctx.globalAlpha = baseAlpha;
   }
 
   ctx.strokeStyle = THEME.colors.cyan;

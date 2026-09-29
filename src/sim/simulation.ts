@@ -5,6 +5,8 @@ import { PLAYER_ID, type EntityId } from './entities/entity';
 import type { GameEvents } from './events';
 import type { GameState, SimContext } from './gameState';
 import type { PlayerInput } from './playerInput';
+import { createWave, updateWaves } from './sound/soundWave';
+import { updateAbilities } from './systems/abilities';
 import { updatePlayerMovement } from './systems/playerMovement';
 import { buildWallGeometry, type WallGeometry } from './world/edges';
 import { generateMap, mapOptionsFromConfig, type MapLayout } from './world/mapGen';
@@ -26,6 +28,8 @@ export class Simulation implements SimContext {
       layout,
       walls,
       player: createPlayer(PLAYER_ID, spawn.x, spawn.y),
+      waves: [],
+      nextWaveId: 1,
     };
   }
 
@@ -40,10 +44,15 @@ export class Simulation implements SimContext {
     s.player.prevY = s.player.y;
 
     updatePlayerMovement(this, s.player, input, dt);
+    updateAbilities(this, s.player, input, dt);
+    s.waves = updateWaves(s.waves, dt);
   }
 
   emitSound(kind: SoundKindId, x: number, y: number, owner: EntityId | null): void {
-    this.events.emit('soundEmitted', { kind, x, y, owner, time: this.state.time });
+    const s = this.state;
+    const wave = createWave(s.walls, s.nextWaveId++, kind, x, y, owner, s.time);
+    s.waves.push(wave);
+    this.events.emit('soundEmitted', { kind, x, y, owner, time: s.time, wave });
   }
 }
 

@@ -40,3 +40,41 @@ export function segmentBounds(s: Segment): Bounds {
 export function segmentLength(s: Segment): number {
   return Math.hypot(s.bx - s.ax, s.by - s.ay);
 }
+
+/** Shortest distance from a point to a segment. */
+export function pointSegmentDistance(px: number, py: number, s: Segment): number {
+  const sx = s.bx - s.ax;
+  const sy = s.by - s.ay;
+  const len2 = sx * sx + sy * sy;
+  const t = len2 > 0 ? Math.min(1, Math.max(0, ((px - s.ax) * sx + (py - s.ay) * sy) / len2)) : 0;
+  return Math.hypot(px - (s.ax + sx * t), py - (s.ay + sy * t));
+}
+
+/**
+ * Where a ray from (x, y) along (dx, dy) crosses a segment, as a multiple
+ * of (dx, dy); -1 if it misses. Parallel segments count as a miss.
+ */
+export function raySegment(x: number, y: number, dx: number, dy: number, s: Segment): number {
+  const sx = s.bx - s.ax;
+  const sy = s.by - s.ay;
+  const denom = dx * sy - dy * sx;
+  if (Math.abs(denom) < 1e-12) return -1;
+  const qx = s.ax - x;
+  const qy = s.ay - y;
+  const t = (qx * sy - qy * sx) / denom;
+  const u = (qx * dy - qy * dx) / denom;
+  return t >= 0 && u >= 0 && u <= 1 ? t : -1;
+}
+
+/** Even-odd test against a polygon stored as x0, y0, x1, y1, … */
+export function pointInPolygon(px: number, py: number, points: ArrayLike<number>): boolean {
+  let inside = false;
+  for (let i = 0, j = points.length - 2; i < points.length; j = i, i += 2) {
+    const xi = points[i];
+    const yi = points[i + 1];
+    const xj = points[j];
+    const yj = points[j + 1];
+    if (yi > py !== yj > py && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}

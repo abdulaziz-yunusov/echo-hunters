@@ -101,7 +101,7 @@ describe('wall bump', () => {
     run({ moveX: 1 }, 5);
     expect(count('wallBump')).toBe(1);
     const bump = sounds.find((s) => s.kind === 'wallBump')!;
-    expect(bump.x).toBeCloseTo(20 * TS); // on the wall face
+    expect(bump.x).toBeCloseTo(20 * TS - 1); // 1 px in front of the wall face
   });
 
   it('the player stops at the wall with its edge touching it', () => {

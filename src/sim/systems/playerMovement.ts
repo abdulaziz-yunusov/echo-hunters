@@ -59,10 +59,12 @@ export function updatePlayerMovement(
   if (moved.hit && !player.touchingWall && player.bumpCooldown === 0) {
     const impactSpeed = -(wantX * moved.nx + wantY * moved.ny);
     if (impactSpeed >= GAME.wallBump.minImpactSpeed) {
+      // At the contact point, 1 px off the wall face (a sound needs open floor to start in).
+      const reach = player.radius - 1;
       ctx.emitSound(
         'wallBump',
-        player.x - moved.nx * player.radius,
-        player.y - moved.ny * player.radius,
+        player.x - moved.nx * reach,
+        player.y - moved.ny * reach,
         player.id,
       );
       player.bumpCooldown = GAME.wallBump.cooldown;
