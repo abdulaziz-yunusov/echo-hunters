@@ -14,8 +14,16 @@ export const GAME = {
   },
 
   camera: {
-    /** World pixels visible vertically on every screen, for fairness. */
-    viewHeight: 520,
+    /**
+     * World pixels visible along the shorter screen side, so every screen
+     * (desktop, phone in portrait or landscape) sees the same amount of map.
+     */
+    viewSize: 520,
+  },
+
+  render: {
+    /** Cap on devicePixelRatio: 3x phones cost 2.25x the pixels of 2x for little gain. */
+    maxDpr: 2,
   },
 
   map: {
@@ -23,9 +31,12 @@ export const GAME = {
     /** Maze cells; tiles = cells * 2 + 1 (odd sizes are required by the backtracker). */
     cellsX: 20,
     cellsY: 12,
-    /** Share of removable interior walls knocked out to create loops. */
+    /** Share of the maze's remaining inner walls (between two cells) knocked out to create loops. */
     loopRatio: 0.15,
+    /** Rooms are size x size tiles; size must be odd so rooms line up with maze cells. */
     rooms: { min: 3, max: 5, size: 5, minTilesFromSpawn: 8 },
+    /** Seeds tried (seed, seed+1, …) before map generation gives up. */
+    maxAttempts: 20,
   },
 
   player: {
@@ -33,6 +44,11 @@ export const GAME = {
     radius: 8,
     speed: 140,
     sneakSpeed: 70,
+    /**
+     * Seconds between footsteps at walking speed. Steps are counted by
+     * distance (stride = speed x interval = 49 px), so tapping the move key
+     * cannot dodge them.
+     */
     footstepInterval: 0.35,
     startStones: 2,
     invulnerableTime: 1,
@@ -91,6 +107,8 @@ export const GAME = {
   duel: {
     coresToWin: 2,
     hitsToDropCores: 2,
+    /** Most tile steps one player may be closer to the beacon than the other. */
+    beaconMaxStepDifference: 2,
     positionSendHz: 15,
     hunterSendHz: 10,
     connectTimeout: 8,
