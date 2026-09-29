@@ -13,6 +13,7 @@ describe('config integrity', () => {
       expect(THEME.colors, id).toHaveProperty(kind.color);
       expect(kind.maxRadius, id).toBeGreaterThan(0);
       expect(kind.speed, id).toBeGreaterThan(0);
+      expect(kind.hearRadius, id).toBeGreaterThan(0);
       expect(kind.tags.length, id).toBeGreaterThan(0);
     }
   });

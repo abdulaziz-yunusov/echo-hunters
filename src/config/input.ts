@@ -14,6 +14,8 @@ export const ACTIONS = [
   'toggleDebug',
   'debugNewMap',
   'debugOverview',
+  'debugWarp',
+  'debugHearing',
 ] as const;
 
 export type Action = (typeof ACTIONS)[number];
@@ -39,4 +41,6 @@ export const DEFAULT_BINDINGS: Readonly<Record<Action, readonly string[]>> = {
   toggleDebug: ['F1', 'Backquote'],
   debugNewMap: ['KeyN'],
   debugOverview: ['KeyM'],
+  debugWarp: ['KeyT'],
+  debugHearing: ['KeyH'],
 };

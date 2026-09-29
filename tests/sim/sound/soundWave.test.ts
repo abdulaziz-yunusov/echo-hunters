@@ -3,10 +3,12 @@ import { GAME } from '@/config/game';
 import { SOUND_KINDS } from '@/config/sounds';
 import type { SoundEmitted } from '@/sim/events';
 import { IDLE_INPUT, type PlayerInput } from '@/sim/playerInput';
+import type { Simulation } from '@/sim/simulation';
 import { polygonArea } from '../../helpers/geometry';
 import { simFromAscii } from '../../helpers/maps';
 
 const DT = 1 / 60;
+const pings = (sim: Simulation) => sim.state.waves.filter((w) => w.kind === 'ping');
 const ROOM = [
   '#####################',
   '#...................#',
@@ -20,7 +22,8 @@ const ROOM = [
 function setup() {
   const sim = simFromAscii(ROOM);
   const sounds: SoundEmitted[] = [];
-  sim.events.on('soundEmitted', (s) => sounds.push(s));
+  // Only the player's own noise; the (unreachable) beacon of test maps pulses too.
+  sim.events.on('soundEmitted', (s) => s.owner === sim.state.player.id && sounds.push(s));
   const step = (input: Partial<PlayerInput> = {}) => sim.step({ ...IDLE_INPUT, ...input }, DT);
   const wait = (seconds: number) => {
     for (let i = 0; i < Math.round(seconds / DT); i++) step();
@@ -32,7 +35,7 @@ describe('sound waves', () => {
   it('a ping starts a wave at the player that grows at the ping speed', () => {
     const { sim, step } = setup();
     step({ ping: true });
-    const [wave] = sim.state.waves;
+    const [wave] = pings(sim);
     expect(wave).toMatchObject({ kind: 'ping', x: sim.state.player.x, y: sim.state.player.y });
     expect(wave.radius).toBeCloseTo(SOUND_KINDS.ping.speed * DT, 9);
   });
@@ -42,9 +45,9 @@ describe('sound waves', () => {
     step({ ping: true });
     const { maxRadius, speed } = SOUND_KINDS.ping;
     wait(maxRadius / speed - 2 * DT);
-    expect(sim.state.waves).toHaveLength(1);
+    expect(pings(sim)).toHaveLength(1);
     wait(3 * DT);
-    expect(sim.state.waves).toHaveLength(0);
+    expect(pings(sim)).toHaveLength(0);
   });
 
   it('ping has a cooldown', () => {

@@ -1,7 +1,9 @@
 import { THEME } from '@/config/theme';
 import type { InputFrame } from '@/input/inputFrame';
 import { randomSeed, seedFromUrl } from '@/platform/seed';
+import { loadSave } from '@/platform/storage';
 import { drawText } from '@/render/text';
+import { newRun } from './run';
 import type { AppContext, Scene } from './scene';
 
 /** Seconds between decorative title pulses. */
@@ -11,6 +13,7 @@ const PULSE_PERIOD = 2.2;
 export class MenuScene implements Scene {
   readonly name = 'Menu';
   private readonly app: AppContext;
+  private readonly highScore = loadSave().highScore;
   private time = 0;
 
   constructor(app: AppContext) {
@@ -19,7 +22,7 @@ export class MenuScene implements Scene {
 
   update(dt: number, input: InputFrame): void {
     this.time += dt;
-    if (input.confirm) this.app.goTo('play', { seed: seedFromUrl() ?? randomSeed() });
+    if (input.confirm) this.app.goTo('play', { run: newRun(seedFromUrl() ?? randomSeed()) });
   }
 
   render(ctx: CanvasRenderingContext2D): void {
@@ -58,5 +61,14 @@ export class MenuScene implements Scene {
       align: 'center',
       alpha: blink,
     });
+
+    if (this.highScore > 0) {
+      drawText(ctx, `HIGH SCORE ${this.highScore}`, cx, cy + 128, {
+        size: 12,
+        color: THEME.colors.cyan,
+        align: 'center',
+        alpha: 0.7,
+      });
+    }
   }
 }

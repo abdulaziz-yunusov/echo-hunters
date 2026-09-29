@@ -64,3 +64,44 @@ describe('RevealMap', () => {
     expect(reveal.activeWaves).toBe(0);
   });
 });
+
+describe('RevealMap objects', () => {
+  // Object in the top corridor (in line of sight) and one in the hidden lower corridor.
+  const seen = { key: 'seen', x: 9.5 * TS, y: 1.5 * TS };
+  const hidden = { key: 'hidden', x: 1.5 * TS, y: 3.5 * TS };
+
+  function run(seconds: number) {
+    const sim = simFromAscii(MAP);
+    const reveal = new RevealMap(sim.state.walls);
+    sim.events.on('soundEmitted', (s) => reveal.addWave(s.wave));
+    const times: number[] = [];
+    for (let i = 0; i < Math.round(seconds / DT); i++) {
+      sim.step({ ...IDLE_INPUT, ping: i === 0 }, DT);
+      reveal.update(sim.state.time);
+      const before = reveal.objectRevealTime('seen');
+      reveal.revealObjects(sim.state.waves, [seen, hidden], sim.state.time, DT);
+      if (reveal.objectRevealTime('seen') !== before) times.push(sim.state.time);
+    }
+    return { sim, reveal, times };
+  }
+
+  it('lights an object once, when the ring front passes it', () => {
+    const { times } = run(1.5);
+    expect(times).toHaveLength(1);
+    const distance = seen.x - 1.5 * TS;
+    expect(times[0]).toBeCloseTo(distance / 350, 1);
+  });
+
+  it('never lights an object hidden behind walls', () => {
+    const { reveal } = run(1.5);
+    expect(reveal.objectRevealTime('hidden')).toBe(-Infinity);
+  });
+
+  it("lights a sound's own source on its first tick", () => {
+    const { sim } = run(DT);
+    const p = sim.state.player;
+    const reveal = new RevealMap(sim.state.walls);
+    reveal.revealObjects(sim.state.waves, [{ key: 'src', x: p.x, y: p.y }], sim.state.time, DT);
+    expect(reveal.objectRevealTime('src')).toBe(sim.state.time);
+  });
+});

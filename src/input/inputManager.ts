@@ -65,6 +65,8 @@ export class InputManager {
       toggleDebug: s.wasPressed('toggleDebug'),
       debugNewMap: s.wasPressed('debugNewMap'),
       debugOverview: s.wasPressed('debugOverview'),
+      debugWarp: s.wasPressed('debugWarp'),
+      debugHearing: s.wasPressed('debugHearing'),
       aim: this.aim,
     };
     s.endTick();

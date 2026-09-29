@@ -14,6 +14,10 @@ export const THEME = {
   wall: '#bff6ff',
   player: { color: '#ffffff', auraRadius: 20 },
   hunterSilhouette: '#ff2a4a',
+  /** Screen shake: peak offset (CSS px) and length (s). */
+  shake: {
+    hit: { strength: 7, duration: 0.35 },
+  },
 } as const;
 
 export type ColorKey = keyof typeof THEME.colors;

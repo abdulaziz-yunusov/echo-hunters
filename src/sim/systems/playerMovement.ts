@@ -25,8 +25,13 @@ export function updatePlayerMovement(
     mx /= length;
     my /= length;
   }
-  const wantX = mx * speed;
-  const wantY = my * speed;
+  // Knockback from a hit adds to the walk and fades out quickly.
+  const wantX = mx * speed + player.knockVx;
+  const wantY = my * speed + player.knockVy;
+  const fade = Math.exp(-dt / cfg.knockbackDecay);
+  player.knockVx *= fade;
+  player.knockVy *= fade;
+  if (Math.hypot(player.knockVx, player.knockVy) < 1) player.knockVx = player.knockVy = 0;
 
   const moved = moveCircle(
     ctx.state.layout.tiles,

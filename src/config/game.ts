@@ -53,6 +53,8 @@ export const GAME = {
     startStones: 2,
     invulnerableTime: 1,
     knockbackSpeed: 220,
+    /** Knockback fades out with this time constant (s): ~95% gone after 3x. */
+    knockbackDecay: 0.1,
   },
 
   abilities: {

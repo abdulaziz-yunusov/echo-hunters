@@ -46,8 +46,12 @@ export function createWave(
   };
 }
 
-/** Grow every wave; drop the ones that reached their full size. */
-export function updateWaves(waves: SoundWave[], dt: number): SoundWave[] {
+/** Grow every wave by one tick. */
+export function growWaves(waves: readonly SoundWave[], dt: number): void {
   for (const w of waves) w.radius = Math.min(w.maxRadius, w.radius + w.speed * dt);
+}
+
+/** Waves still growing (the ones at full size are done). */
+export function pruneWaves(waves: readonly SoundWave[]): SoundWave[] {
   return waves.filter((w) => w.radius < w.maxRadius);
 }

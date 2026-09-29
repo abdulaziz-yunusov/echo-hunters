@@ -14,8 +14,10 @@ export function drawPlayer(ctx: CanvasRenderingContext2D, player: Player, alpha:
   ctx.arc(x, y, auraRadius, 0, Math.PI * 2);
   ctx.fill();
 
-  // Sneaking dims the dot a little, so the player can see they are silent.
-  ctx.globalAlpha = player.sneaking ? 0.6 : 1;
+  // Sneaking dims the dot a little, so the player can see they are silent;
+  // after a hit it blinks while the player cannot be hurt.
+  const blink = player.invulnerable > 0 && Math.floor(player.invulnerable * 12) % 2 === 0;
+  ctx.globalAlpha = blink ? 0.25 : player.sneaking ? 0.6 : 1;
   ctx.fillStyle = THEME.player.color;
   ctx.beginPath();
   ctx.arc(x, y, player.radius, 0, Math.PI * 2);

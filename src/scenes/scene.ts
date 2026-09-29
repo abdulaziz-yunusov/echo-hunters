@@ -1,6 +1,8 @@
 import type { InputFrame } from '@/input/inputFrame';
 import type { Viewport } from '@/platform/viewport';
 import type { DebugLayer } from '@/render/debugLayer';
+import type { ScoreBreakdown } from '@/sim/scoring';
+import type { RunState } from './run';
 
 /** A screen of the game: menu, gameplay, level end, … */
 export interface Scene {
@@ -22,7 +24,9 @@ export interface Scene {
  */
 export interface SceneParams {
   menu: undefined;
-  play: { seed: number };
+  play: { run: RunState };
+  levelEnd: { run: RunState; score: ScoreBreakdown; seconds: number };
+  gameOver: { run: RunState; score: ScoreBreakdown };
 }
 
 export type SceneId = keyof SceneParams;

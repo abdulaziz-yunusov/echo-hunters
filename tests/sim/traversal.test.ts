@@ -30,24 +30,31 @@ function walkTo(sim: Simulation, target: TileCoord): number | null {
     const dx = goal.x - p.x;
     const dy = goal.y - p.y;
     const d = Math.hypot(dx, dy);
-    if (here === 0 && d < 2) return t;
+    // Arrived, or the round ended on the way (extraction stops the player).
+    if ((here === 0 && d < 2) || sim.state.status !== 'playing') return t;
     if (d < 2) tile = next;
     sim.step({ ...IDLE_INPUT, moveX: d > 0 ? dx / d : 0, moveY: d > 0 ? dy / d : 0 }, DT);
   }
   return null;
 }
 
-describe('walking the generated maze', () => {
-  it.each([0, 1, 2, 3, 4, 5, 6, 7])('seed %i: spawn → every core → beacon', (seed) => {
-    const sim = createSimulation(seed);
-    const { cores, beacon } = sim.state.layout;
-    for (const target of [...cores, beacon]) {
-      expect(walkTo(sim, target), `stuck on the way to ${target.tx},${target.ty}`).not.toBeNull();
-    }
-  });
+describe('a full solo round on generated maps', () => {
+  it.each([0, 1, 2, 3, 4, 5, 6, 7])(
+    'seed %i: collect every core, reach the beacon, extract',
+    (seed) => {
+      const sim = createSimulation({ seed, level: 1, hunters: [] });
+      const { cores, beacon } = sim.state.layout;
+      for (const target of [...cores, beacon]) {
+        expect(walkTo(sim, target), `stuck on the way to ${target.tx},${target.ty}`).not.toBeNull();
+      }
+      expect(sim.state.player.cores).toBe(cores.length);
+      expect(sim.state.beacon.active).toBe(true);
+      expect(sim.state.status).toBe('extracted');
+    },
+  );
 
   it('random input for 2 minutes never lets the player overlap a wall', () => {
-    const sim = createSimulation(123);
+    const sim = createSimulation({ seed: 123, level: 1, hunters: [] });
     const rng = new Rng(9);
     const { tiles } = sim.state.layout;
     const p = sim.state.player;

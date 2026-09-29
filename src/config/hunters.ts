@@ -26,7 +26,8 @@ export const HUNTER_TYPES = {
   stalker: {
     behaviour: 'stalker',
     speed: 90,
-    hears: ['footstep', 'ping', 'impact', 'shockwave', 'scream'],
+    // The beacon too: "it is loud, so everyone knows where it is" (GDD §2).
+    hears: ['footstep', 'ping', 'impact', 'shockwave', 'scream', 'beacon'],
     searchTime: 4,
     searchRadius: 100,
     footstepInterval: 0.45,
@@ -62,4 +63,12 @@ export const HUNTER_COMMON = {
   /** Pause after a successful hit before searching again (s). */
   attackRecover: 0.6,
   stunTime: 3,
+  /** Idle wandering: how far a hunter strolls (tiles), how fast (x speed), pauses between strolls (s). */
+  wanderRangeTiles: 6,
+  wanderSpeedFactor: 0.55,
+  idlePause: { min: 0.6, max: 2 },
+  /** Searching around a sound moves this much slower than a chase (x speed). */
+  searchSpeedFactor: 0.8,
+  /** Give up on a goal after this long without making progress (s). */
+  stuckTimeout: 1.5,
 };

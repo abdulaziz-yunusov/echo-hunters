@@ -23,7 +23,8 @@ const ROOM = [
 function setup(rows = ROOM) {
   const sim = simFromAscii(rows);
   const sounds: SoundEmitted[] = [];
-  sim.events.on('soundEmitted', (s) => sounds.push(s));
+  // Only the player's own noise; the (unreachable) beacon of test maps pulses too.
+  sim.events.on('soundEmitted', (s) => s.owner === sim.state.player.id && sounds.push(s));
   const run = (input: Partial<PlayerInput>, seconds: number) => {
     for (let i = 0; i < Math.round(seconds / DT); i++) sim.step({ ...IDLE_INPUT, ...input }, DT);
   };

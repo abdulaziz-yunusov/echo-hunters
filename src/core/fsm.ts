@@ -1,5 +1,5 @@
 /**
- * One state of a StateMachine. State objects hold no per-instance data:
+ * One state of a state machine. State objects hold no per-instance data:
  * everything lives in the context, so one set of hunter states serves every hunter.
  */
 export interface State<Ctx, Id extends string> {
@@ -11,46 +11,75 @@ export interface State<Ctx, Id extends string> {
 
 export type StateTable<Ctx, Id extends string> = Readonly<Record<Id, State<Ctx, Id>>>;
 
-/** Minimal finite state machine (hunter AI and other small behaviours). */
+/**
+ * Where a machine is, as plain data. Entities carry this themselves so they
+ * stay plain data (easy to send over the network, record or copy).
+ */
+export interface MachineState<Id extends string> {
+  state: Id;
+  /** Seconds since the current state was entered. */
+  stateTime: number;
+}
+
+/** Switch now: exit the current state, enter `to`. Switching to the current state restarts it. */
+export function enterState<Ctx, Id extends string>(
+  table: StateTable<Ctx, Id>,
+  host: MachineState<Id>,
+  ctx: Ctx,
+  to: Id,
+): void {
+  const from = host.state;
+  table[from].exit?.(ctx, to);
+  host.state = to;
+  host.stateTime = 0;
+  table[to].enter?.(ctx, from);
+}
+
+/** Run the current state for one step and follow the switch it asks for, if any. */
+export function updateState<Ctx, Id extends string>(
+  table: StateTable<Ctx, Id>,
+  host: MachineState<Id>,
+  ctx: Ctx,
+  dt: number,
+): void {
+  host.stateTime += dt;
+  const next = table[host.state].update?.(ctx, dt, host.stateTime);
+  if (next && next !== host.state) enterState(table, host, ctx, next);
+}
+
+/** A self-contained state machine, for things that don't need to be plain data. */
 export class StateMachine<Ctx, Id extends string> {
-  private readonly states: StateTable<Ctx, Id>;
+  private readonly table: StateTable<Ctx, Id>;
   private readonly ctx: Ctx;
-  private currentId: Id;
-  private elapsed = 0;
+  private readonly host: MachineState<Id>;
 
   /** Enters the initial state immediately. */
-  constructor(states: StateTable<Ctx, Id>, initial: Id, ctx: Ctx) {
-    this.states = states;
+  constructor(table: StateTable<Ctx, Id>, initial: Id, ctx: Ctx) {
+    this.table = table;
     this.ctx = ctx;
-    this.currentId = initial;
-    this.states[initial].enter?.(ctx, null);
+    this.host = { state: initial, stateTime: 0 };
+    table[initial].enter?.(ctx, null);
   }
 
   get current(): Id {
-    return this.currentId;
+    return this.host.state;
   }
 
   /** Seconds since the current state was entered. */
   get timeInState(): number {
-    return this.elapsed;
+    return this.host.stateTime;
   }
 
   is(id: Id): boolean {
-    return this.currentId === id;
+    return this.host.state === id;
   }
 
   /** Switch now. Switching to the current state re-enters it (a restart). */
   transition(to: Id): void {
-    const from = this.currentId;
-    this.states[from].exit?.(this.ctx, to);
-    this.currentId = to;
-    this.elapsed = 0;
-    this.states[to].enter?.(this.ctx, from);
+    enterState(this.table, this.host, this.ctx, to);
   }
 
   update(dt: number): void {
-    this.elapsed += dt;
-    const next = this.states[this.currentId].update?.(this.ctx, dt, this.elapsed);
-    if (next && next !== this.currentId) this.transition(next);
+    updateState(this.table, this.host, this.ctx, dt);
   }
 }

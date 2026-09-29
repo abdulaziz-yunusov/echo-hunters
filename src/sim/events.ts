@@ -1,5 +1,6 @@
 import type { SoundKindId } from '@/config/sounds';
 import type { EntityId } from './entities/entity';
+import type { RoundStatus } from './gameState';
 import type { SoundWave } from './sound/soundWave';
 
 export interface SoundEmitted {
@@ -20,4 +21,9 @@ export interface SoundEmitted {
  */
 export interface GameEvents {
   soundEmitted: SoundEmitted;
+  coreCollected: { coreId: number; by: EntityId; x: number; y: number };
+  beaconActivated: { x: number; y: number };
+  playerHit: { x: number; y: number; hp: number; by: EntityId };
+  hunterHeard: { hunterId: EntityId; x: number; y: number };
+  roundEnded: { status: Exclude<RoundStatus, 'playing'>; time: number };
 }

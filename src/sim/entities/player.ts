@@ -24,6 +24,17 @@ export interface Player {
   pingCooldown: number;
   /** Pings this round (the ghost bonus needs zero). */
   pingsUsed: number;
+  hp: number;
+  readonly maxHp: number;
+  /** Decoy stones carried (thrown in Phase 7). */
+  stones: number;
+  /** Signal Cores carried. */
+  cores: number;
+  /** Seconds of protection left after being hit. */
+  invulnerable: number;
+  /** Knockback velocity (px/s), fading out. */
+  knockVx: number;
+  knockVy: number;
 }
 
 export function createPlayer(id: EntityId, x: number, y: number): Player {
@@ -42,5 +53,12 @@ export function createPlayer(id: EntityId, x: number, y: number): Player {
     bumpCooldown: 0,
     pingCooldown: 0,
     pingsUsed: 0,
+    hp: GAME.player.hp,
+    maxHp: GAME.player.hp,
+    stones: GAME.player.startStones,
+    cores: 0,
+    invulnerable: 0,
+    knockVx: 0,
+    knockVy: 0,
   };
 }

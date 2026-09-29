@@ -20,6 +20,8 @@ export interface InputFrame {
   toggleDebug: boolean;
   debugNewMap: boolean;
   debugOverview: boolean;
+  debugWarp: boolean;
+  debugHearing: boolean;
 
   /** Pointer position in screen CSS pixels, or null until the pointer has been seen. */
   aim: Readonly<{ x: number; y: number }> | null;
@@ -38,5 +40,7 @@ export const EMPTY_INPUT: Readonly<InputFrame> = {
   toggleDebug: false,
   debugNewMap: false,
   debugOverview: false,
+  debugWarp: false,
+  debugHearing: false,
   aim: null,
 };

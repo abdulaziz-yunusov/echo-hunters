@@ -3,13 +3,16 @@ import type { Viewport } from '@/platform/viewport';
 
 /**
  * Follows a point in the world and converts between screen and world
- * coordinates. Screen shake is added in Phase 6.
+ * coordinates, and shakes the view on impacts.
  */
 export class Camera {
   /** World point shown at the center of the screen. */
   x = 0;
   y = 0;
   private readonly viewport: Viewport;
+  private shakeStrength = 0;
+  private shakeDuration = 0;
+  private shakeLeft = 0;
 
   constructor(viewport: Viewport) {
     this.viewport = viewport;
@@ -26,13 +29,38 @@ export class Camera {
     this.y = clampCenter(targetY, this.viewport.worldHeight, worldHeight);
   }
 
+  /** Shake the view (screen pixels), fading out over `duration` seconds. Stronger shakes win. */
+  shake(strength: number, duration: number): void {
+    if (this.currentShake() > strength) return;
+    this.shakeStrength = strength;
+    this.shakeDuration = duration;
+    this.shakeLeft = duration;
+  }
+
+  /** Advance effects such as shake (s). */
+  update(dt: number): void {
+    this.shakeLeft = Math.max(0, this.shakeLeft - dt);
+  }
+
   /** Switch ctx from CSS pixels to world pixels. Wrap in save()/restore(). */
   apply(ctx: CanvasRenderingContext2D): void {
     const { width, height, worldScale, dpr } = this.viewport;
     // Snap to whole device pixels so thin lines don't shimmer while scrolling.
     const snap = (v: number) => Math.round(v * dpr) / dpr;
-    ctx.translate(snap(width / 2 - this.x * worldScale), snap(height / 2 - this.y * worldScale));
+    const amount = this.currentShake();
+    // Visual only, so plain Math.random is fine here (the simulation never sees it).
+    const sx = (Math.random() * 2 - 1) * amount;
+    const sy = (Math.random() * 2 - 1) * amount;
+    ctx.translate(
+      snap(width / 2 - this.x * worldScale + sx),
+      snap(height / 2 - this.y * worldScale + sy),
+    );
     ctx.scale(worldScale, worldScale);
+  }
+
+  /** How strong the shake is right now (it fades linearly to 0). */
+  private currentShake(): number {
+    return this.shakeDuration > 0 ? this.shakeStrength * (this.shakeLeft / this.shakeDuration) : 0;
   }
 
   /** World area currently on screen, for culling. */

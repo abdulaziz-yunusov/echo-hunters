@@ -1,4 +1,5 @@
-import { pointSegmentDistance } from '@/core/geometry';
+import { pointInPolygon, pointSegmentDistance } from '@/core/geometry';
+import type { EntityId } from '@/sim/entities/entity';
 import type { SoundWave } from '@/sim/sound/soundWave';
 import type { WallGeometry } from '@/sim/world/edges';
 import { hasLineOfSight } from '@/sim/world/visibility';
@@ -7,6 +8,23 @@ import { hasLineOfSight } from '@/sim/world/visibility';
 const SAMPLES = [0.1, 0.5, 0.9];
 /** Test points sit this far in front of the wall, so the wall itself never blocks them (px). */
 const FACE_OFFSET = 0.5;
+
+/** Something small that sound can reveal, identified by a stable key. */
+export interface RevealableObject {
+  key: string;
+  x: number;
+  y: number;
+  /** The entity itself, if it makes sounds: its own sounds never reveal it. */
+  owner?: EntityId;
+}
+
+export interface ObjectReveal {
+  /** Simulation time of the reveal. */
+  time: number;
+  /** Where the object was at that moment. */
+  x: number;
+  y: number;
+}
 
 interface TrackedWave {
   wave: SoundWave;
@@ -30,6 +48,47 @@ export class RevealMap {
   readonly revealTime: Float64Array;
   private readonly walls: WallGeometry;
   private tracked: TrackedWave[] = [];
+  private readonly objectReveals = new Map<string, ObjectReveal>();
+
+  /**
+   * Light up small things (cores, beacon, hunters) when a ring front passes
+   * over them this tick with nothing blocking the way. Only the front counts:
+   * a thing standing inside an old ring is not lit again. Where it stood is
+   * remembered, so a moving hunter's silhouette stays where it was seen.
+   */
+  revealObjects(
+    waves: readonly SoundWave[],
+    objects: Iterable<RevealableObject>,
+    now: number,
+    dt: number,
+  ): void {
+    for (const o of objects) {
+      for (const w of waves) {
+        // A hunter's own footsteps do not show it.
+        if (o.owner !== undefined && w.owner === o.owner) continue;
+        // Between where the front was last tick and where it is now.
+        // (Strict `<` so a sound's own source, at distance 0, is lit on its first tick.)
+        const d = Math.hypot(o.x - w.x, o.y - w.y);
+        const front = w.radius;
+        const before = front - w.speed * dt;
+        if (d > front || d < before) continue;
+        if (pointInPolygon(o.x, o.y, w.polygon)) {
+          this.objectReveals.set(o.key, { time: now, x: o.x, y: o.y });
+          break;
+        }
+      }
+    }
+  }
+
+  /** When and where an object was last revealed, if ever. */
+  objectReveal(key: string): ObjectReveal | undefined {
+    return this.objectReveals.get(key);
+  }
+
+  /** When an object was last revealed; -Infinity = never. */
+  objectRevealTime(key: string): number {
+    return this.objectReveals.get(key)?.time ?? -Infinity;
+  }
 
   constructor(walls: WallGeometry) {
     this.walls = walls;
