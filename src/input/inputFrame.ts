@@ -7,6 +7,14 @@ export interface InputFrame {
   moveX: number;
   moveY: number;
 
+  /**
+   * Menu navigation: -1 / 1 for a left / right press this tick, else 0. Latched
+   * like other presses, so a tap shorter than one tick still counts once.
+   */
+  navX: number;
+  /** Menu navigation: -1 / 1 for an up / down press this tick, else 0. */
+  navY: number;
+
   /** Held for as long as the button is down. */
   sneak: boolean;
 
@@ -15,9 +23,12 @@ export interface InputFrame {
   throwStone: boolean;
   shockwave: boolean;
   confirm: boolean;
+  /** Mouse button pressed this tick (also sets confirm); menus use it with `aim`. */
+  click: boolean;
   back: boolean;
   pause: boolean;
   toggleDebug: boolean;
+  toggleMute: boolean;
   debugNewMap: boolean;
   debugOverview: boolean;
   debugWarp: boolean;
@@ -30,14 +41,18 @@ export interface InputFrame {
 export const EMPTY_INPUT: Readonly<InputFrame> = {
   moveX: 0,
   moveY: 0,
+  navX: 0,
+  navY: 0,
   sneak: false,
   ping: false,
   throwStone: false,
   shockwave: false,
   confirm: false,
+  click: false,
   back: false,
   pause: false,
   toggleDebug: false,
+  toggleMute: false,
   debugNewMap: false,
   debugOverview: false,
   debugWarp: false,

@@ -33,6 +33,10 @@ export interface Hunter extends MachineState<HunterStateId> {
   stride: number;
   /** Facing angle (radians), for the Listener's slow turn. */
   facing: number;
+  /** Already scored a stun this level (stun points are given once per hunter). */
+  stunScored: boolean;
+  /** Seconds until the hunter's special ability (the Listener's scream) is ready. */
+  cooldown: number;
 }
 
 export function createHunter(id: EntityId, type: HunterTypeId, x: number, y: number): Hunter {
@@ -55,5 +59,7 @@ export function createHunter(id: EntityId, type: HunterTypeId, x: number, y: num
     stuckTime: 0,
     stride: 0,
     facing: 0,
+    stunScored: false,
+    cooldown: 0,
   };
 }

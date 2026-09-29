@@ -19,6 +19,8 @@ export interface HunterTypeDef {
   hearRange?: number;
   /** Listener only: degrees per second of idle rotation. */
   turnSpeed?: number;
+  /** Listener only: seconds between screams. */
+  screamCooldown?: number;
 }
 
 /** GDD §5 hunter types. */
@@ -49,6 +51,7 @@ export const HUNTER_TYPES = {
     footstepInterval: 0,
     hearRange: 300,
     turnSpeed: 30,
+    screamCooldown: 4,
   },
 } as const satisfies Record<string, HunterTypeDef>;
 

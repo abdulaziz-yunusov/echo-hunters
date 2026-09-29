@@ -14,9 +14,16 @@ export const THEME = {
   wall: '#bff6ff',
   player: { color: '#ffffff', auraRadius: 20 },
   hunterSilhouette: '#ff2a4a',
+  /** Silhouette spikes per hunter type, so each kind is recognisable at a glance. */
+  hunterShapes: {
+    stalker: { spikes: 11, outer: 15, inner: 8 },
+    sprinter: { spikes: 6, outer: 18, inner: 6 },
+    listener: { spikes: 18, outer: 15, inner: 12 },
+  },
   /** Screen shake: peak offset (CSS px) and length (s). */
   shake: {
     hit: { strength: 7, duration: 0.35 },
+    shockwave: { strength: 4, duration: 0.25 },
   },
 } as const;
 

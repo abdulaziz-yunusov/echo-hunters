@@ -1,0 +1,89 @@
+import type { HunterTypeId } from '@/config/hunters';
+import type { Action } from '@/config/input';
+import { THEME } from '@/config/theme';
+import { inputLabel, withOverrides } from '@/input/bindings';
+import type { InputFrame } from '@/input/inputFrame';
+import { loadSave } from '@/platform/storage';
+import { drawHunterShape } from '@/render/hunterRenderer';
+import { drawText } from '@/render/text';
+import { MenuList } from '@/ui/menuList';
+import { drawMenu, drawTitle } from '@/ui/menuRenderer';
+import type { AppContext, Scene } from './scene';
+
+const HUNTERS: readonly [HunterTypeId, string][] = [
+  ['stalker', 'Slow. Walks to any sound it hears, then searches the spot.'],
+  ['sprinter', 'Faster than you. Reacts only to pings, stones and shockwaves.'],
+  ['listener', 'Never moves. Screams when it hears you, calling the others.'],
+];
+
+const TIPS = [
+  'Sneaking is silent. Walking leaves footsteps; hitting a wall is loud.',
+  'A stone lands with a fake ping: hunters go there, not to you.',
+  'The drone rises when a hunter is near. Headphones help: steps come from their side.',
+];
+
+/** Rules, controls (as currently bound), the three hunters, and a few tips. */
+export class HowToPlayScene implements Scene {
+  readonly name = 'HowToPlay';
+  private readonly app: AppContext;
+  private readonly menu: MenuList;
+  private readonly keys: (action: Action) => string;
+
+  constructor(app: AppContext) {
+    this.app = app;
+    const bindings = withOverrides(loadSave().bindings);
+    this.keys = (action) => bindings[action].map(inputLabel).join('/');
+    this.menu = new MenuList([{ kind: 'action', label: 'BACK', onSelect: () => app.close() }]);
+  }
+
+  update(_dt: number, input: InputFrame): void {
+    if (input.back || input.pause) {
+      this.app.close();
+      return;
+    }
+    this.menu.update(input);
+  }
+
+  render(ctx: CanvasRenderingContext2D): void {
+    const { width, height } = this.app.viewport;
+    ctx.fillStyle = THEME.background;
+    ctx.fillRect(0, 0, width, height);
+    const cx = width / 2;
+    const left = Math.max(16, cx - 300);
+    const white = THEME.colors.white;
+    const k = this.keys;
+    let y = Math.max(56, height * 0.09);
+
+    drawTitle(ctx, 'HOW TO PLAY', cx, y);
+    y += 40;
+    const line = (text: string, color: string = white, alpha = 0.85, size = 13) => {
+      drawText(ctx, text, left, y, { size, color, alpha });
+      y += size + 9;
+    };
+
+    line('It is pitch dark. You only see what sound touches.', THEME.colors.cyan, 1, 14);
+    line('Find the 3 Signal Cores, then reach the Extraction Beacon.');
+    y += 8;
+    line('CONTROLS', THEME.colors.cyan, 1, 14);
+    line(
+      `Move ${k('moveUp')} ${k('moveLeft')} ${k('moveDown')} ${k('moveRight')}   ·   Sneak ${k('sneak')}`,
+    );
+    line(
+      `Ping ${k('ping')}   ·   Stone ${k('throwStone')} (aim with mouse)   ·   Shockwave ${k('shockwave')}`,
+    );
+    line('Pause ESC   ·   Mute M');
+    y += 8;
+    line('HUNTERS', THEME.colors.cyan, 1, 14);
+    for (const [type, text] of HUNTERS) {
+      drawHunterShape(ctx, left + 14, y - 5, type, 0.8);
+      drawText(ctx, type.toUpperCase(), left + 40, y, { size: 13, color: THEME.colors.red });
+      drawText(ctx, text, left + 130, y, { size: 13, color: white, alpha: 0.85 });
+      y += 30;
+    }
+    y += 4;
+    line('TIPS', THEME.colors.cyan, 1, 14);
+    for (const tip of TIPS) line(`· ${tip}`, white, 0.7, 12);
+
+    drawMenu(ctx, this.menu, cx, Math.min(height - 40, y + 30), 200);
+  }
+}

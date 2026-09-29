@@ -51,5 +51,6 @@ export function layoutFromAscii(rows: string[]): MapLayout {
  */
 export function simFromAscii(rows: string[], options: SimulationOptions = {}): Simulation {
   const layout = layoutFromAscii(rows);
-  return new Simulation(layout, buildWallGeometry(layout.tiles), options);
+  // No random pickups on hand-drawn maps unless a test asks for them.
+  return new Simulation(layout, buildWallGeometry(layout.tiles), { pickups: {}, ...options });
 }

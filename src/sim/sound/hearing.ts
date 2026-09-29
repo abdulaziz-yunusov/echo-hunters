@@ -10,7 +10,7 @@ import type { SoundWave } from './soundWave';
 /** A sound on its way to a hunter: it arrives at `at`. */
 export interface PendingHearing {
   hunterId: EntityId;
-  /** Where the sound came from. */
+  /** Where the hunter should go (the sound's focus, usually its origin). */
   x: number;
   y: number;
   /** Simulation time the sound reaches the hunter. */
@@ -56,8 +56,8 @@ export function scheduleHearing(state: GameState, wave: SoundWave): void {
 
     state.hearings.push({
       hunterId: hunter.id,
-      x: wave.x,
-      y: wave.y,
+      x: wave.focusX,
+      y: wave.focusY,
       at: wave.startTime + distance / wave.speed,
     });
   }

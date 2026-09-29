@@ -13,6 +13,7 @@ function contextFor(sim: SimContext, hunter: Hunter): HunterContext {
 export function updateHunters(sim: SimContext, dt: number): void {
   for (const hunter of sim.state.hunters) {
     const c = contextFor(sim, hunter);
+    hunter.cooldown = Math.max(0, hunter.cooldown - dt);
     updateState(BEHAVIOURS[c.def.behaviour], hunter, c, dt);
     hunter.heard = null;
   }

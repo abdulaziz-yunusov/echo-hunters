@@ -1,5 +1,7 @@
-import { THEME } from '@/config/theme';
+import type { PickupTypeId } from '@/config/pickups';
+import { THEME, type ColorKey } from '@/config/theme';
 import type { Beacon, Core } from '@/sim/entities/objectives';
+import type { Pickup } from '@/sim/entities/pickup';
 import type { RevealMap } from './revealMap';
 
 export const coreKey = (core: Core): string => `core:${core.id}`;
@@ -78,3 +80,82 @@ export function drawBeacon(
   }
   ctx.restore();
 }
+
+export const pickupKey = (p: Pickup): string => `pickup:${p.id}`;
+
+/** Pickups (GDD §5): small icons, seen only when sound touches them. */
+export function drawPickups(
+  ctx: CanvasRenderingContext2D,
+  pickups: readonly Pickup[],
+  reveal: RevealMap,
+  now: number,
+  fadeSeconds: number,
+  ghostAlpha: number,
+  pixel: number,
+): void {
+  drawPickupIcons(ctx, pickups, pixel, (p) =>
+    revealAlpha(reveal.objectRevealTime(pickupKey(p)), now, fadeSeconds, ghostAlpha),
+  );
+}
+
+/** Draw pickup icons at the brightness `alphaOf` gives each (debug: always 1). */
+export function drawPickupIcons(
+  ctx: CanvasRenderingContext2D,
+  pickups: readonly Pickup[],
+  pixel: number,
+  alphaOf: (p: Pickup) => number,
+): void {
+  ctx.save();
+  ctx.shadowBlur = THEME.glowBlur;
+  ctx.lineWidth = 2 * pixel;
+  for (const p of pickups) {
+    if (p.collected) continue;
+    const a = alphaOf(p);
+    if (a <= 0) continue;
+    ctx.globalAlpha = a;
+    const color = THEME.colors[PICKUP_COLORS[p.type]];
+    ctx.fillStyle = color;
+    ctx.strokeStyle = color;
+    ctx.shadowColor = color;
+    ctx.beginPath();
+    PICKUP_SHAPES[p.type](ctx, p.x, p.y);
+    if (p.type === 'silentBoots') ctx.stroke();
+    else ctx.fill();
+  }
+  ctx.restore();
+}
+
+const PICKUP_COLORS: Record<PickupTypeId, ColorKey> = {
+  stoneBag: 'white',
+  heart: 'red',
+  silentBoots: 'cyan',
+};
+
+type Shape = (ctx: CanvasRenderingContext2D, x: number, y: number) => void;
+
+const PICKUP_SHAPES: Record<PickupTypeId, Shape> = {
+  // A little pile of stones.
+  stoneBag: (ctx, x, y) => {
+    for (const [dx, dy] of [
+      [-3.5, 2],
+      [3.5, 2],
+      [0, -3],
+    ]) {
+      ctx.moveTo(x + dx + 2.6, y + dy);
+      ctx.arc(x + dx, y + dy, 2.6, 0, Math.PI * 2);
+    }
+  },
+  heart: (ctx, x, y) => {
+    ctx.moveTo(x, y + 6);
+    ctx.bezierCurveTo(x - 9, y, x - 5, y - 8, x, y - 3);
+    ctx.bezierCurveTo(x + 5, y - 8, x + 9, y, x, y + 6);
+  },
+  // Two chevrons: quick and quiet.
+  silentBoots: (ctx, x, y) => {
+    for (const dx of [-3, 3]) {
+      ctx.moveTo(x + dx - 3, y - 5);
+      ctx.lineTo(x + dx + 2, y);
+      ctx.lineTo(x + dx - 3, y + 5);
+    }
+  },
+};

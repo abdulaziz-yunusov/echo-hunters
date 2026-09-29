@@ -1,9 +1,8 @@
 import { DEFAULT_BINDINGS, type Action } from '@/config/input';
 import { ActionState } from './actionState';
+import type { Bindings } from './bindings';
 import type { InputFrame } from './inputFrame';
 import { attachKeyboardMouse } from './keyboardMouse';
-
-export type Bindings = Readonly<Record<Action, readonly string[]>>;
 
 /**
  * Owns all input devices and turns them into one InputFrame per simulation
@@ -13,6 +12,8 @@ export class InputManager {
   private readonly state = new ActionState();
   private readonly byInput = new Map<string, Action[]>();
   private aim: { x: number; y: number } | null = null;
+  /** Set while waiting for a key to rebind: the next input goes here, not to actions. */
+  private capture: ((inputId: string) => void) | null = null;
   private readonly detach: () => void;
 
   constructor(canvas: HTMLCanvasElement, bindings: Bindings = DEFAULT_BINDINGS) {
@@ -25,6 +26,18 @@ export class InputManager {
       },
       lost: () => this.state.releaseAll(),
     });
+  }
+
+  /**
+   * Hand the next key or mouse button pressed to `callback` instead of the
+   * game (for rebinding controls). Replaces any capture already waiting.
+   */
+  captureNextInput(callback: (inputId: string) => void): void {
+    this.capture = callback;
+  }
+
+  cancelCapture(): void {
+    this.capture = null;
   }
 
   /** Replace key bindings (settings / remapping). */
@@ -55,14 +68,18 @@ export class InputManager {
     const frame: InputFrame = {
       moveX,
       moveY,
+      navX: (s.wasPressed('moveRight') ? 1 : 0) - (s.wasPressed('moveLeft') ? 1 : 0),
+      navY: (s.wasPressed('moveDown') ? 1 : 0) - (s.wasPressed('moveUp') ? 1 : 0),
       sneak: s.isDown('sneak'),
       ping: s.wasPressed('ping'),
       throwStone: s.wasPressed('throwStone'),
       shockwave: s.wasPressed('shockwave'),
       confirm: s.wasPressed('confirm'),
+      click: s.wasPressed('click'),
       back: s.wasPressed('back'),
       pause: s.wasPressed('pause'),
       toggleDebug: s.wasPressed('toggleDebug'),
+      toggleMute: s.wasPressed('toggleMute'),
       debugNewMap: s.wasPressed('debugNewMap'),
       debugOverview: s.wasPressed('debugOverview'),
       debugWarp: s.wasPressed('debugWarp'),
@@ -79,6 +96,12 @@ export class InputManager {
   }
 
   private inputDown(id: string): boolean {
+    if (this.capture) {
+      const callback = this.capture;
+      this.capture = null;
+      callback(id);
+      return true;
+    }
     const actions = this.byInput.get(id);
     if (!actions) return false;
     for (const action of actions) this.state.press(action, id);

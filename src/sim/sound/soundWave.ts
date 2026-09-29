@@ -1,4 +1,5 @@
 import { SOUND_KINDS, type SoundKindId } from '@/config/sounds';
+import type { Vec2 } from '@/core/geometry';
 import type { EntityId } from '../entities/entity';
 import type { WallGeometry } from '../world/edges';
 import { visibilityPolygon } from '../world/visibility';
@@ -20,6 +21,12 @@ export interface SoundWave {
   radius: number;
   /** Area the wave can ever reach: visibility polygon, x0, y0, x1, y1, … */
   readonly polygon: Float32Array;
+  /**
+   * Where a hunter that hears it goes. Usually the origin; a Listener's
+   * scream points at the noise that set it off.
+   */
+  readonly focusX: number;
+  readonly focusY: number;
 }
 
 export function createWave(
@@ -30,6 +37,7 @@ export function createWave(
   y: number,
   owner: EntityId | null,
   time: number,
+  focus: Vec2 = { x, y },
 ): SoundWave {
   const def = SOUND_KINDS[kind];
   return {
@@ -43,6 +51,8 @@ export function createWave(
     speed: def.speed,
     radius: 0,
     polygon: visibilityPolygon(walls, x, y, def.maxRadius),
+    focusX: focus.x,
+    focusY: focus.y,
   };
 }
 

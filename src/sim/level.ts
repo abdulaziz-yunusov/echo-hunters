@@ -2,8 +2,8 @@ import { ENDLESS, LEVELS, type LevelDef } from '@/config/levels';
 
 /**
  * What a level contains (GDD §7). Levels 1–4 come from the table; after
- * that each level adds a hunter (from the pool, in turn) up to the cap.
- * Map growth and per-level overrides are wired in Phase 9.
+ * that each level adds a hunter (from the pool, in turn) up to the cap,
+ * and keeps the last table level's rule overrides.
  */
 export function levelDef(level: number): LevelDef {
   if (level <= LEVELS.length) return LEVELS[Math.max(1, level) - 1];
@@ -15,4 +15,10 @@ export function levelDef(level: number): LevelDef {
     hunters.push(ENDLESS.hunterPool[i % ENDLESS.hunterPool.length]);
   }
   return { hunters, pickups: ENDLESS.pickups, overrides: last.overrides };
+}
+
+/** Map size multiplier (both sides): 1 for the table levels, then +10% per level, capped. */
+export function levelMapScale(level: number): number {
+  const beyond = Math.max(0, level - LEVELS.length);
+  return Math.min(ENDLESS.maxMapScale, 1 + beyond * ENDLESS.mapGrowthPerLevel);
 }

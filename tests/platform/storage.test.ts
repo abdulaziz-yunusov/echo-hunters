@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { AUDIO } from '@/config/audio';
 import { loadSave, submitScore, updateSave } from '@/platform/storage';
 
 function fakeStorage(initial: Record<string, string> = {}) {
@@ -15,7 +16,68 @@ afterEach(() => vi.unstubAllGlobals());
 describe('save data', () => {
   it('starts from defaults', () => {
     vi.stubGlobal('localStorage', fakeStorage());
-    expect(loadSave()).toEqual({ version: 1, highScore: 0 });
+    expect(loadSave()).toEqual({
+      version: 2,
+      highScore: 0,
+      audio: { muted: false, ...AUDIO.volumes },
+      difficulty: 'easy',
+      bindings: {},
+    });
+  });
+
+  it('remembers rebound keys, keeping only valid ones', () => {
+    vi.stubGlobal('localStorage', fakeStorage());
+    updateSave({ bindings: { ping: ['KeyF'] } });
+    expect(loadSave().bindings).toEqual({ ping: ['KeyF'] });
+    vi.stubGlobal(
+      'localStorage',
+      fakeStorage({
+        'pulse-echo-hunters': JSON.stringify({
+          version: 2,
+          bindings: { ping: ['KeyF'], fly: ['KeyZ'], sneak: [], shockwave: [42] },
+        }),
+      }),
+    );
+    expect(loadSave().bindings).toEqual({ ping: ['KeyF'] });
+  });
+
+  it('remembers the difficulty, and ignores unknown ones', () => {
+    vi.stubGlobal('localStorage', fakeStorage());
+    updateSave({ difficulty: 'hard' });
+    expect(loadSave().difficulty).toBe('hard');
+    vi.stubGlobal(
+      'localStorage',
+      fakeStorage({
+        'pulse-echo-hunters': JSON.stringify({ version: 2, difficulty: 'nightmare' }),
+      }),
+    );
+    expect(loadSave().difficulty).toBe('easy');
+  });
+
+  it('upgrades a version 1 save, keeping the high score', () => {
+    vi.stubGlobal(
+      'localStorage',
+      fakeStorage({ 'pulse-echo-hunters': JSON.stringify({ version: 1, highScore: 4200 }) }),
+    );
+    const save = loadSave();
+    expect(save.version).toBe(2);
+    expect(save.highScore).toBe(4200);
+    expect(save.audio.muted).toBe(false);
+  });
+
+  it('remembers audio settings, and ignores broken ones', () => {
+    vi.stubGlobal('localStorage', fakeStorage());
+    updateSave({ audio: { muted: true, master: 0.3, sfx: 1, ambient: 0.2 } });
+    expect(loadSave().audio).toEqual({ muted: true, master: 0.3, sfx: 1, ambient: 0.2 });
+
+    vi.stubGlobal(
+      'localStorage',
+      fakeStorage({
+        'pulse-echo-hunters': JSON.stringify({ version: 2, highScore: 1, audio: { master: 7 } }),
+      }),
+    );
+    expect(loadSave().audio).toEqual({ muted: false, ...AUDIO.volumes });
+    expect(loadSave().highScore).toBe(1);
   });
 
   it('keeps a high score only when it is beaten', () => {

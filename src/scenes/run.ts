@@ -1,3 +1,5 @@
+import type { DifficultyId } from '@/config/difficulty';
+
 /** One play-through: levels in a row until the player dies or quits. */
 export interface RunState {
   /** All level maps follow from this seed (see levelSeed). */
@@ -6,10 +8,12 @@ export interface RunState {
   level: number;
   /** Score banked from finished levels. */
   score: number;
+  /** Fixed for the whole run. */
+  difficulty: DifficultyId;
 }
 
-export function newRun(seed: number): RunState {
-  return { seed, level: 1, score: 0 };
+export function newRun(seed: number, difficulty: DifficultyId): RunState {
+  return { seed, level: 1, score: 0, difficulty };
 }
 
 /** The run after finishing a level worth `levelScore`. */

@@ -3,6 +3,8 @@ import type { InputFrame } from '@/input/inputFrame';
 import { randomSeed } from '@/platform/seed';
 import { submitScore } from '@/platform/storage';
 import { drawText } from '@/render/text';
+import { MenuList } from '@/ui/menuList';
+import { drawMenu } from '@/ui/menuRenderer';
 import type { ScoreBreakdown } from '@/sim/scoring';
 import { newRun, type RunState } from './run';
 import type { AppContext, Scene } from './scene';
@@ -18,6 +20,7 @@ export class GameOverScene implements Scene {
   private readonly finalScore: number;
   private readonly highScore: number;
   private readonly isNewHigh: boolean;
+  private readonly menu: MenuList;
   private time = 0;
 
   constructor(app: AppContext, params: { run: RunState; score: ScoreBreakdown }) {
@@ -28,13 +31,21 @@ export class GameOverScene implements Scene {
     const high = submitScore(this.finalScore);
     this.highScore = high.highScore;
     this.isNewHigh = high.isNew;
+    this.menu = new MenuList([
+      {
+        kind: 'action',
+        label: 'NEW RUN',
+        onSelect: () => app.goTo('play', { run: newRun(randomSeed(), this.run.difficulty) }),
+      },
+      { kind: 'action', label: 'MAIN MENU', onSelect: () => app.goTo('menu') },
+    ]);
   }
 
   update(dt: number, input: InputFrame): void {
     this.time += dt;
     if (this.time < INPUT_GRACE) return;
-    if (input.confirm) this.app.goTo('play', { run: newRun(randomSeed()) });
-    else if (input.back) this.app.goTo('menu');
+    if (input.back) this.app.goTo('menu');
+    else this.menu.update(input);
   }
 
   render(ctx: CanvasRenderingContext2D): void {
@@ -73,14 +84,6 @@ export class GameOverScene implements Scene {
       },
     );
 
-    if (this.time >= INPUT_GRACE) {
-      const blink = 0.35 + 0.65 * Math.abs(Math.sin(this.time * 2.5));
-      drawText(ctx, 'ENTER: NEW RUN · ESC: MENU', cx, cy + 96, {
-        size: 13,
-        color: white,
-        align: 'center',
-        alpha: blink,
-      });
-    }
+    if (this.time >= INPUT_GRACE) drawMenu(ctx, this.menu, cx, cy + 96, 260);
   }
 }

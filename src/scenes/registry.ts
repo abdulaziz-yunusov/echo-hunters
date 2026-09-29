@@ -1,8 +1,12 @@
+import { ControlsScene } from './controlsScene';
 import { GameOverScene } from './gameOverScene';
+import { HowToPlayScene } from './howToPlayScene';
 import { LevelEndScene } from './levelEndScene';
 import { MenuScene } from './menuScene';
+import { PauseScene } from './pauseScene';
 import { PlayScene } from './playScene';
 import type { AppContext, Scene, SceneArgs, SceneId } from './scene';
+import { SettingsScene } from './settingsScene';
 
 type SceneFactory<K extends SceneId> = (app: AppContext, ...args: SceneArgs<K>) => Scene;
 
@@ -12,6 +16,10 @@ const FACTORIES: { [K in SceneId]: SceneFactory<K> } = {
   play: (app, params) => new PlayScene(app, params),
   levelEnd: (app, params) => new LevelEndScene(app, params),
   gameOver: (app, params) => new GameOverScene(app, params),
+  howToPlay: (app) => new HowToPlayScene(app),
+  settings: (app) => new SettingsScene(app),
+  controls: (app) => new ControlsScene(app),
+  pause: (app) => new PauseScene(app),
 };
 
 export function createScene<K extends SceneId>(

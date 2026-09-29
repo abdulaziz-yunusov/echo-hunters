@@ -1,13 +1,10 @@
+import type { HunterTypeId } from '@/config/hunters';
 import { THEME } from '@/config/theme';
 import type { Hunter } from '@/sim/entities/hunter';
 import type { RevealMap } from './revealMap';
 import { drawText } from './text';
 
 export const hunterKey = (h: Hunter): string => `hunter:${h.id}`;
-
-const SPIKES = 11;
-const OUTER = 15;
-const INNER = 8;
 
 /**
  * Jagged red silhouettes (GDD §9), drawn where a ring last touched each
@@ -31,7 +28,7 @@ export function drawHunterSilhouettes(
     const a = 1 - (now - seen.time) / fadeSeconds;
     if (a <= 0) continue;
     ctx.globalAlpha = a;
-    jagged(ctx, seen.x, seen.y, h.id);
+    jagged(ctx, seen.x, seen.y, h.type, h.id);
     ctx.fill();
   }
   ctx.restore();
@@ -90,13 +87,42 @@ export function drawHunterDebug(
   ctx.restore();
 }
 
-/** A spiky outline. The spike pattern is fixed per hunter, so each looks the same every time. */
-function jagged(ctx: CanvasRenderingContext2D, x: number, y: number, seed: number): void {
+/** A hunter type's silhouette on its own (menus, how-to-play), at `scale`. */
+export function drawHunterShape(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  type: HunterTypeId,
+  scale = 1,
+): void {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(scale, scale);
+  ctx.fillStyle = THEME.hunterSilhouette;
+  ctx.shadowColor = THEME.hunterSilhouette;
+  ctx.shadowBlur = THEME.glowBlur;
+  jagged(ctx, 0, 0, type, 1);
+  ctx.fill();
+  ctx.restore();
+}
+
+/**
+ * A spiky outline shaped by the hunter's type. The small wobble is fixed per
+ * hunter (`seed`), so each one looks the same every time it is seen.
+ */
+function jagged(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  type: HunterTypeId,
+  seed: number,
+): void {
+  const { spikes, outer, inner } = THEME.hunterShapes[type];
   ctx.beginPath();
-  for (let i = 0; i < SPIKES * 2; i++) {
-    const angle = (i / (SPIKES * 2)) * Math.PI * 2;
+  for (let i = 0; i < spikes * 2; i++) {
+    const angle = (i / (spikes * 2)) * Math.PI * 2;
     const wobble = ((Math.sin(seed * 12.9898 + i * 78.233) * 43758.5453) % 1) * 3;
-    const r = (i % 2 === 0 ? OUTER : INNER) + wobble;
+    const r = (i % 2 === 0 ? outer : inner) + wobble;
     const px = x + Math.cos(angle) * r;
     const py = y + Math.sin(angle) * r;
     if (i === 0) ctx.moveTo(px, py);

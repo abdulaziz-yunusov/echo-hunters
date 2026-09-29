@@ -1,4 +1,5 @@
 import type { SoundKindId } from '@/config/sounds';
+import type { PickupTypeId } from '@/config/pickups';
 import type { EntityId } from './entities/entity';
 import type { RoundStatus } from './gameState';
 import type { SoundWave } from './sound/soundWave';
@@ -25,5 +26,8 @@ export interface GameEvents {
   beaconActivated: { x: number; y: number };
   playerHit: { x: number; y: number; hp: number; by: EntityId };
   hunterHeard: { hunterId: EntityId; x: number; y: number };
+  stoneThrown: { x: number; y: number; toX: number; toY: number };
+  hunterStunned: { hunterId: EntityId; x: number; y: number; scored: boolean };
+  pickupCollected: { pickupId: number; type: PickupTypeId; x: number; y: number };
   roundEnded: { status: Exclude<RoundStatus, 'playing'>; time: number };
 }

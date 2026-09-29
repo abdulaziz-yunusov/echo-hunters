@@ -35,6 +35,13 @@ export interface Player {
   /** Knockback velocity (px/s), fading out. */
   knockVx: number;
   knockVy: number;
+  /** Last direction moved (unit vector): where a stone goes without a mouse. */
+  facingX: number;
+  facingY: number;
+  /** Seconds until the shockwave is ready. */
+  shockCooldown: number;
+  /** Seconds of Silent Boots left. */
+  silentTime: number;
 }
 
 export function createPlayer(id: EntityId, x: number, y: number): Player {
@@ -60,5 +67,9 @@ export function createPlayer(id: EntityId, x: number, y: number): Player {
     invulnerable: 0,
     knockVx: 0,
     knockVy: 0,
+    facingX: 1,
+    facingY: 0,
+    shockCooldown: 0,
+    silentTime: 0,
   };
 }

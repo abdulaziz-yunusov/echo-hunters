@@ -77,25 +77,42 @@ const search: HunterState = {
   },
 };
 
-// ─── Listener (Phase 9 adds the scream; for now it only stands and turns) ──
+// ─── Listener: stands still, turns slowly, screams at what it hears ─────
 
-const standAndTurn: HunterState = {
+/** Seconds the Listener holds still after screaming. */
+const SCREAM_HOLD = 0.8;
+
+const listen: HunterState = {
   enter: ({ hunter }) => stop(hunter),
   update: (c, dt) => {
-    c.hunter.facing += (((c.def.turnSpeed ?? 0) * Math.PI) / 180) * dt;
-    return c.hunter.state === 'idle' ? undefined : 'idle';
+    const h = c.hunter;
+    h.facing += (((c.def.turnSpeed ?? 0) * Math.PI) / 180) * dt;
+    if (h.heard && h.cooldown === 0) return 'investigate';
   },
 };
 
+/**
+ * Scream (GDD §5): a huge ring from the Listener that sends every other
+ * hunter to the noise it heard, not to the Listener itself.
+ */
+const scream: HunterState = {
+  enter: (c) => {
+    const h = c.hunter;
+    if (h.heard) {
+      c.sim.emitSound('listenerScream', h.x, h.y, h.id, h.heard);
+      h.cooldown = c.def.screamCooldown ?? 0;
+    }
+    h.heard = null;
+  },
+  update: (_c, _dt, time) => (time >= SCREAM_HOLD ? 'idle' : undefined),
+};
+
+const backToListening: HunterState = { update: () => 'idle' };
+
 export const BEHAVIOURS: Readonly<Record<HunterBehaviourId, HunterTable>> = {
   stalker: { idle: wander, investigate, search, attack, stunned },
-  listener: {
-    idle: standAndTurn,
-    investigate: standAndTurn,
-    search: standAndTurn,
-    attack,
-    stunned,
-  },
+  // "investigate" is the Listener's scream; it never walks anywhere.
+  listener: { idle: listen, investigate: scream, search: backToListening, attack, stunned },
 };
 
 function headForHeardSound(c: HunterContext): void {

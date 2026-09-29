@@ -6,7 +6,7 @@ import { moveCircle } from '../world/collision';
 
 /**
  * Move the player from input: walk or sneak, slide along walls, leave
- * footsteps, and make a noise when walking into a wall.
+ * footsteps, and make a noise when walking into a wall (unless silent).
  */
 export function updatePlayerMovement(
   ctx: SimContext,
@@ -17,6 +17,8 @@ export function updatePlayerMovement(
   const cfg = GAME.player;
   const sneaking = input.sneak;
   const speed = sneaking ? cfg.sneakSpeed : cfg.speed;
+  // Sneaking is silent but slow; Silent Boots are silent at any speed.
+  const silent = sneaking || player.silentTime > 0;
 
   let mx = input.moveX;
   let my = input.moveY;
@@ -24,6 +26,10 @@ export function updatePlayerMovement(
   if (length > 1) {
     mx /= length;
     my /= length;
+  }
+  if (length > 0.1) {
+    player.facingX = input.moveX / length;
+    player.facingY = input.moveY / length;
   }
   // Knockback from a hit adds to the walk and fades out quickly.
   const wantX = mx * speed + player.knockVx;
@@ -49,8 +55,8 @@ export function updatePlayerMovement(
   player.vy = dy / dt;
   player.sneaking = sneaking;
 
-  // Footsteps by distance walked; sneaking is silent.
-  if (!sneaking) {
+  // Footsteps by distance walked.
+  if (!silent) {
     player.stride += Math.hypot(dx, dy);
     const strideLength = cfg.speed * cfg.footstepInterval;
     while (player.stride >= strideLength) {
@@ -61,7 +67,7 @@ export function updatePlayerMovement(
 
   // Wall bump: only on first contact, only when hitting the wall head-on hard enough.
   player.bumpCooldown = Math.max(0, player.bumpCooldown - dt);
-  if (moved.hit && !player.touchingWall && player.bumpCooldown === 0) {
+  if (moved.hit && !player.touchingWall && player.bumpCooldown === 0 && !silent) {
     const impactSpeed = -(wantX * moved.nx + wantY * moved.ny);
     if (impactSpeed >= GAME.wallBump.minImpactSpeed) {
       // At the contact point, 1 px off the wall face (a sound needs open floor to start in).

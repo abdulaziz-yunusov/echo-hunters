@@ -5,8 +5,16 @@ import type { Camera } from './camera';
 import { Effects } from './fx';
 import { drawHunterDebug, drawHunterSilhouettes, hunterKey } from './hunterRenderer';
 import { drawFullMap } from './mapDebug';
-import { BEACON_KEY, coreKey, drawBeacon, drawCores } from './objectRenderer';
-import { drawPlayer } from './playerRenderer';
+import {
+  BEACON_KEY,
+  coreKey,
+  drawBeacon,
+  drawCores,
+  drawPickupIcons,
+  drawPickups,
+  pickupKey,
+} from './objectRenderer';
+import { drawPlayer, drawStones } from './playerRenderer';
 import { RevealMap, type RevealableObject } from './revealMap';
 import { WallLayer } from './wallLayer';
 import { drawWavePolygons, drawWaves } from './waveLayer';
@@ -38,6 +46,14 @@ export class WorldRenderer {
     sim.events.on('coreCollected', (e) => this.fx.flash(e.x, e.y, 'cyan'));
     sim.events.on('beaconActivated', (e) => this.fx.flash(e.x, e.y, 'green', 48, 0.9));
     sim.events.on('playerHit', (e) => this.fx.flash(e.x, e.y, 'red', 34, 0.5));
+    sim.events.on('hunterStunned', (e) => this.fx.flash(e.x, e.y, 'orange', 22, 0.6));
+    sim.events.on('pickupCollected', (e) =>
+      this.fx.flash(
+        e.x,
+        e.y,
+        e.type === 'heart' ? 'red' : e.type === 'silentBoots' ? 'cyan' : 'white',
+      ),
+    );
   }
 
   /** Waves still revealing walls (debug). */
@@ -79,8 +95,10 @@ export class WorldRenderer {
     if (debug) {
       drawWavePolygons(ctx, state.waves, pixel);
       drawHunterDebug(ctx, state.hunters, alpha, pixel);
+      drawPickupIcons(ctx, state.pickups, pixel, () => 0.5);
     }
     this.fx.draw(ctx, pixel);
+    drawStones(ctx, state.stones, alpha);
     drawPlayer(ctx, state.player, alpha);
   }
 
@@ -90,6 +108,7 @@ export class WorldRenderer {
     drawFullMap(ctx, state.layout, state.walls, pixel, true);
     drawWavePolygons(ctx, state.waves, pixel);
     drawHunterDebug(ctx, state.hunters, alpha, pixel);
+    drawPickupIcons(ctx, state.pickups, pixel, () => 1);
     drawPlayer(ctx, state.player, alpha);
   }
 
@@ -98,6 +117,7 @@ export class WorldRenderer {
     const args = [this.reveal, state.time, this.fadeSeconds, this.ghostAlpha] as const;
     drawCores(ctx, state.cores, ...args);
     drawBeacon(ctx, state.beacon, ...args, pixel);
+    drawPickups(ctx, state.pickups, ...args, pixel);
   }
 }
 
@@ -106,5 +126,8 @@ function* revealables(state: GameState): Generator<RevealableObject> {
     if (!core.collected) yield { key: coreKey(core), x: core.x, y: core.y };
   }
   yield { key: BEACON_KEY, x: state.beacon.x, y: state.beacon.y };
+  for (const p of state.pickups) {
+    if (!p.collected) yield { key: pickupKey(p), x: p.x, y: p.y };
+  }
   for (const h of state.hunters) yield { key: hunterKey(h), x: h.x, y: h.y, owner: h.id };
 }

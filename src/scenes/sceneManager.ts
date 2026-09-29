@@ -33,6 +33,7 @@ export class SceneManager {
   /** Open `scene` on top; the one below is kept (and drawn if `scene.overlay`). */
   push(scene: Scene): void {
     this.apply(() => {
+      this.current?.pause?.();
       this.stack.push(scene);
       scene.enter?.();
     });
@@ -40,7 +41,10 @@ export class SceneManager {
 
   /** Close the top scene and resume the one below. */
   pop(): void {
-    this.apply(() => this.stack.pop()?.exit?.());
+    this.apply(() => {
+      this.stack.pop()?.exit?.();
+      this.current?.resume?.();
+    });
   }
 
   update(dt: number, input: InputFrame): void {

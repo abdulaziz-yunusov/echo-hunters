@@ -1,5 +1,8 @@
 import type { InputFrame } from '@/input/inputFrame';
 import type { Viewport } from '@/platform/viewport';
+import type { AudioEngine } from '@/audio/audioEngine';
+import type { InputManager } from '@/input/inputManager';
+import type { SoundOutput } from '@/audio/soundOutput';
 import type { DebugLayer } from '@/render/debugLayer';
 import type { ScoreBreakdown } from '@/sim/scoring';
 import type { RunState } from './run';
@@ -12,6 +15,12 @@ export interface Scene {
   readonly overlay?: boolean;
   enter?(): void;
   exit?(): void;
+  /** Another scene opened on top of this one. */
+  pause?(): void;
+  /** The scene on top closed; this one is in charge again. */
+  resume?(): void;
+  /** The browser tab was hidden (e.g. to pause the game). */
+  onHidden?(): void;
   /** Fixed-step update; only the top scene receives it. */
   update(dt: number, input: InputFrame): void;
   /** @param alpha 0..1 between the last tick and the next, for smooth drawing. */
@@ -27,6 +36,10 @@ export interface SceneParams {
   play: { run: RunState };
   levelEnd: { run: RunState; score: ScoreBreakdown; seconds: number };
   gameOver: { run: RunState; score: ScoreBreakdown };
+  howToPlay: undefined;
+  settings: undefined;
+  controls: undefined;
+  pause: undefined;
 }
 
 export type SceneId = keyof SceneParams;
@@ -39,6 +52,14 @@ export type SceneArgs<K extends SceneId> = SceneParams[K] extends undefined
 export interface AppContext {
   readonly viewport: Viewport;
   readonly debug: DebugLayer;
-  /** Replace the current scene(s). */
+  readonly audio: AudioEngine;
+  /** Where scenes send sound (through an AudioDirector). */
+  readonly sound: SoundOutput;
+  readonly input: InputManager;
+  /** Replace every open scene with this one. */
   goTo<K extends SceneId>(id: K, ...args: SceneArgs<K>): void;
+  /** Open a scene on top (the one below waits, e.g. settings over the pause menu). */
+  open<K extends SceneId>(id: K, ...args: SceneArgs<K>): void;
+  /** Close the top scene and return to the one below. */
+  close(): void;
 }

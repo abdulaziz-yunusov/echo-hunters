@@ -59,7 +59,9 @@ export const GAME = {
 
   abilities: {
     ping: { cooldown: 2.5 },
-    stone: { throwRange: 260, flightTime: 0.45 },
+    /** Decoy stone: flies at throwRange / flightTime px/s, lands at the aim point or the first wall. */
+    stone: { throwRange: 260, flightTime: 0.45, radius: 3 },
+    /** Stuns hunters in line of sight within effectRadius (px). */
     shockwave: { cooldown: 6, effectRadius: 120 },
   },
 
@@ -79,7 +81,7 @@ export const GAME = {
   hearing: {
     /** 'los' = sound blocked by walls (GDD). 'path' = travels along corridors. */
     model: 'path' as HearingModel,
-    /** 'path' model: heard if path distance <= maxRadius * pathFactor. */
+    /** 'path' model: around corners, corridor distance counts as distance / pathFactor. */
     pathFactor: 0.75,
   },
 
@@ -87,8 +89,10 @@ export const GAME = {
     coresPerLevel: 3,
     coreHumInterval: 4,
     beaconPulseInterval: 3,
-    /** Distance at which a core or the beacon is touched (px). */
+    /** Distance at which a core, the beacon or a pickup is touched (px). */
     pickupRadius: 16,
+    /** Pickups are placed at least this many tiles (walking) from the player spawn. */
+    pickupMinTilesFromSpawn: 6,
   },
 
   ambient: {

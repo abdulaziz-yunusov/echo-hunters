@@ -1,7 +1,9 @@
 import { GAME } from '@/config/game';
 import type { HunterTypeId } from '@/config/hunters';
+import type { LevelDef } from '@/config/levels';
 import type { SoundKindId } from '@/config/sounds';
 import { EventBus } from '@/core/events';
+import type { Vec2 } from '@/core/geometry';
 import { deriveSeed, Rng } from '@/core/rng';
 import { setHunterState, updateHunters } from './ai/hunterBrain';
 import { createHunter } from './entities/hunter';
@@ -10,16 +12,19 @@ import { createPlayer } from './entities/player';
 import { PLAYER_ID, type EntityId } from './entities/entity';
 import type { GameEvents } from './events';
 import type { GameState, SimContext } from './gameState';
-import { levelDef } from './level';
+import { levelDef, levelMapScale } from './level';
 import type { PlayerInput } from './playerInput';
 import { deliverHearings, scheduleHearing } from './sound/hearing';
 import { createWave, growWaves, pruneWaves } from './sound/soundWave';
 import { updateAbilities } from './systems/abilities';
 import { updateCombat } from './systems/combat';
 import { updateObjectives } from './systems/objectives';
+import { updatePickups } from './systems/pickups';
 import { updatePlayerMovement } from './systems/playerMovement';
+import { updateStones } from './systems/stones';
 import { buildWallGeometry, type WallGeometry } from './world/edges';
 import { generateMap, mapOptionsFromConfig, type MapLayout } from './world/mapGen';
+import { placePickups } from './world/pickupPlacement';
 
 /** Hunter ids start here (the player is 1). */
 const FIRST_HUNTER_ID = 100;
@@ -29,6 +34,8 @@ export interface SimulationOptions {
   level?: number;
   /** Hunter types to spawn; defaults to the level's list. Extra types beyond the map's spawn spots are skipped. */
   hunters?: readonly HunterTypeId[];
+  /** Pickups to place (counts per type); defaults to the level's. */
+  pickups?: LevelDef['pickups'];
 }
 
 /**
@@ -44,7 +51,8 @@ export class Simulation implements SimContext {
     const level = options.level ?? 1;
     const { tiles } = layout;
     const spawn = tiles.center(layout.spawns[0]);
-    const hunterTypes = options.hunters ?? levelDef(level).hunters;
+    const def = levelDef(level);
+    const hunterTypes = options.hunters ?? def.hunters;
 
     this.state = {
       level,
@@ -60,10 +68,14 @@ export class Simulation implements SimContext {
       }),
       cores: createCores(layout.cores.map((c) => tiles.center(c))),
       beacon: createBeacon(tiles.center(layout.beacon)),
+      pickups: placePickups(layout, options.pickups ?? def.pickups),
+      stones: [],
+      nextStoneId: 1,
       waves: [],
       nextWaveId: 1,
       rng: new Rng(deriveSeed(layout.seed, 'ai')),
       hearings: [],
+      rules: { pingCooldown: def.overrides?.pingCooldown ?? GAME.abilities.ping.cooldown },
       hearingModel: GAME.hearing.model,
       stats: { huntersStunned: 0 },
     };
@@ -92,6 +104,8 @@ export class Simulation implements SimContext {
     if (playing) {
       updatePlayerMovement(this, s.player, input, dt);
       updateAbilities(this, s.player, input, dt);
+      updateStones(this, dt);
+      updatePickups(this, s.player, dt);
       updateObjectives(this, s.player, dt);
       updateHunters(this, dt);
       updateCombat(this, dt);
@@ -101,9 +115,9 @@ export class Simulation implements SimContext {
     s.waves = pruneWaves(s.waves);
   }
 
-  emitSound(kind: SoundKindId, x: number, y: number, owner: EntityId | null): void {
+  emitSound(kind: SoundKindId, x: number, y: number, owner: EntityId | null, focus?: Vec2): void {
     const s = this.state;
-    const wave = createWave(s.walls, s.nextWaveId++, kind, x, y, owner, s.time);
+    const wave = createWave(s.walls, s.nextWaveId++, kind, x, y, owner, s.time, focus);
     s.waves.push(wave);
     if (s.status === 'playing') scheduleHearing(s, wave);
     this.events.emit('soundEmitted', { kind, x, y, owner, time: s.time, wave });
@@ -129,6 +143,7 @@ export function createSimulation({
   /** Override the level's hunters (tests, sandbox). */
   hunters?: readonly HunterTypeId[];
 }): Simulation {
-  const layout = generateMap(mapOptionsFromConfig(levelSeed(seed, level)));
+  const options = mapOptionsFromConfig(levelSeed(seed, level), { scale: levelMapScale(level) });
+  const layout = generateMap(options);
   return new Simulation(layout, buildWallGeometry(layout.tiles), { level, hunters });
 }

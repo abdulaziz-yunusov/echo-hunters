@@ -2,6 +2,8 @@ import { THEME } from '@/config/theme';
 import type { InputFrame } from '@/input/inputFrame';
 import { submitScore } from '@/platform/storage';
 import { drawText } from '@/render/text';
+import { MenuList } from '@/ui/menuList';
+import { drawMenu } from '@/ui/menuRenderer';
 import type { ScoreBreakdown } from '@/sim/scoring';
 import { nextLevel, type RunState } from './run';
 import type { AppContext, Scene } from './scene';
@@ -20,6 +22,7 @@ export class LevelEndScene implements Scene {
   private readonly next: RunState;
   private readonly highScore: number;
   private readonly isNewHigh: boolean;
+  private readonly menu: MenuList;
   private time = 0;
 
   constructor(app: AppContext, params: { run: RunState; score: ScoreBreakdown; seconds: number }) {
@@ -31,13 +34,21 @@ export class LevelEndScene implements Scene {
     const high = submitScore(this.next.score);
     this.highScore = high.highScore;
     this.isNewHigh = high.isNew;
+    this.menu = new MenuList([
+      {
+        kind: 'action',
+        label: `NEXT: LEVEL ${this.next.level}`,
+        onSelect: () => app.goTo('play', { run: this.next }),
+      },
+      { kind: 'action', label: 'MAIN MENU', onSelect: () => app.goTo('menu') },
+    ]);
   }
 
   update(dt: number, input: InputFrame): void {
     this.time += dt;
     if (this.time < INPUT_GRACE) return;
-    if (input.confirm) this.app.goTo('play', { run: this.next });
-    else if (input.back) this.app.goTo('menu');
+    if (input.back) this.app.goTo('menu');
+    else this.menu.update(input);
   }
 
   render(ctx: CanvasRenderingContext2D): void {
@@ -88,15 +99,7 @@ export class LevelEndScene implements Scene {
       this.isNewHigh ? THEME.colors.green : white,
     );
 
-    if (this.time >= INPUT_GRACE) {
-      const blink = 0.35 + 0.65 * Math.abs(Math.sin(this.time * 2.5));
-      drawText(ctx, `ENTER: LEVEL ${this.next.level} · ESC: MENU`, cx, y + 56, {
-        size: 13,
-        color: white,
-        align: 'center',
-        alpha: blink,
-      });
-    }
+    if (this.time >= INPUT_GRACE) drawMenu(ctx, this.menu, cx, y + 60, 300);
   }
 
   private row(
