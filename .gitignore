@@ -1,0 +1,14 @@
+# Dependencies and build output
+node_modules/
+dist/
+coverage/
+
+# Local-only project documents (design doc, plan, decisions)
+docs/
+Additionals/
+
+# OS and editor clutter
+*.log
+.DS_Store
+Thumbs.db
+~$*.docx
