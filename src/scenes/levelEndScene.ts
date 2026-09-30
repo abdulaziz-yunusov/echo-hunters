@@ -2,9 +2,12 @@ import { THEME } from '@/config/theme';
 import type { InputFrame } from '@/input/inputFrame';
 import { submitScore } from '@/platform/storage';
 import { drawText } from '@/render/text';
+import { formatTime } from '@/ui/format';
 import { MenuList } from '@/ui/menuList';
 import { drawMenu } from '@/ui/menuRenderer';
+import type { Replay } from '@/replay/replay';
 import type { ScoreBreakdown } from '@/sim/scoring';
+import { replayItem } from './menuItems';
 import { nextLevel, type RunState } from './run';
 import type { AppContext, Scene } from './scene';
 
@@ -25,7 +28,10 @@ export class LevelEndScene implements Scene {
   private readonly menu: MenuList;
   private time = 0;
 
-  constructor(app: AppContext, params: { run: RunState; score: ScoreBreakdown; seconds: number }) {
+  constructor(
+    app: AppContext,
+    params: { run: RunState; score: ScoreBreakdown; seconds: number; replay?: Replay },
+  ) {
     this.app = app;
     this.run = params.run;
     this.score = params.score;
@@ -40,6 +46,7 @@ export class LevelEndScene implements Scene {
         label: `NEXT: LEVEL ${this.next.level}`,
         onSelect: () => app.goTo('play', { run: this.next }),
       },
+      ...replayItem(app, params.replay),
       { kind: 'action', label: 'MAIN MENU', onSelect: () => app.goTo('menu') },
     ]);
   }
@@ -114,10 +121,4 @@ export class LevelEndScene implements Scene {
     drawText(ctx, label, cx - 170, y, { size: 15, color, alpha });
     drawText(ctx, value, cx + 170, y, { size: 15, color, alpha, align: 'right' });
   }
-}
-
-function formatTime(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${m}:${s.toString().padStart(2, '0')}`;
 }

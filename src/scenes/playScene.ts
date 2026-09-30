@@ -9,6 +9,7 @@ import { Camera } from '@/render/camera';
 import { drawHud } from '@/render/hud';
 import { drawAimReticle, playerDrawPosition } from '@/render/playerRenderer';
 import { drawText } from '@/render/text';
+import { ReplayRecorder } from '@/replay/recorder';
 import { WorldRenderer } from '@/render/worldRenderer';
 import { roundResult, scoreRound } from '@/sim/scoring';
 import { levelDef } from '@/sim/level';
@@ -34,6 +35,7 @@ export class PlayScene implements Scene {
   private world!: WorldRenderer;
   private audio: AudioDirector | null = null;
   private tutorial: Tutorial | null = null;
+  private recorder!: ReplayRecorder;
   /** A menu is open on top: keep the world, hide banners and prompts. */
   private covered = false;
   private overview = false;
@@ -70,6 +72,7 @@ export class PlayScene implements Scene {
       toPlayerInput(input, (x, y) => this.camera.screenToWorld(x, y)),
       dt,
     );
+    this.recorder.afterStep();
     this.world.tick(dt);
     this.audio?.tick();
     this.tutorial?.tick(dt);
@@ -168,6 +171,7 @@ export class PlayScene implements Scene {
     this.sim = createSimulation({ seed: this.run.seed, level: this.run.level });
     this.world = new WorldRenderer(this.sim, DIFFICULTIES[this.run.difficulty].ghostAlpha);
     this.audio = new AudioDirector(this.sim, this.app.sound);
+    this.recorder = new ReplayRecorder(this.sim, this.run.seed);
     if (levelDef(this.run.level).tutorial) this.tutorial = new Tutorial(this.sim);
     this.endedAt = null;
     this.sim.events.on('roundEnded', (e) => (this.endedAt = e.time));
@@ -240,10 +244,12 @@ export class PlayScene implements Scene {
   private finishLevel(): void {
     const { state } = this.sim;
     const score = scoreRound(roundResult(state));
+    const replay = this.recorder.finish();
     if (state.status === 'extracted') {
-      this.app.goTo('levelEnd', { run: this.run, score, seconds: this.endedAt ?? state.time });
+      const seconds = this.endedAt ?? state.time;
+      this.app.goTo('levelEnd', { run: this.run, score, seconds, replay });
     } else {
-      this.app.goTo('gameOver', { run: this.run, score });
+      this.app.goTo('gameOver', { run: this.run, score, replay });
     }
   }
 

@@ -8,6 +8,7 @@ import { LevelEndScene } from './levelEndScene';
 import { MenuScene } from './menuScene';
 import { PauseScene } from './pauseScene';
 import { PlayScene } from './playScene';
+import { ReplayScene } from './replayScene';
 import type { AppContext, Scene, SceneArgs, SceneId } from './scene';
 import { SettingsScene } from './settingsScene';
 
@@ -23,6 +24,7 @@ const FACTORIES: { [K in SceneId]: SceneFactory<K> } = {
   settings: (app) => new SettingsScene(app),
   controls: (app) => new ControlsScene(app),
   pause: (app) => new PauseScene(app),
+  replay: (app, params) => new ReplayScene(app, params),
   duelLobby: (app) => new DuelLobbyScene(app),
   duel: (app, params) => new DuelScene(app, params),
   duelEnd: (app, params) => new DuelEndScene(app, params),

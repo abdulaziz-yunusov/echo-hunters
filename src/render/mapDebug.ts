@@ -28,20 +28,7 @@ export function drawFullMap(
     }
   }
 
-  // All walls in one glowing stroke (one blur pass for the whole map).
-  ctx.save();
-  ctx.strokeStyle = THEME.wall;
-  ctx.shadowColor = THEME.colors.cyan;
-  ctx.shadowBlur = THEME.glowBlur;
-  ctx.lineWidth = 1.5 * pixel;
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  for (const s of geometry.segments) {
-    ctx.moveTo(s.ax, s.ay);
-    ctx.lineTo(s.bx, s.by);
-  }
-  ctx.stroke();
-  ctx.restore();
+  drawAllWalls(ctx, geometry, pixel);
 
   if (detailed) {
     // Segment endpoints: shows how edges were merged.
@@ -71,6 +58,27 @@ export function drawFullMap(
 
   ctx.fillStyle = THEME.colors.white;
   for (const s of layout.spawns) dot(ctx, s, ts, ts * 0.3);
+}
+
+/** Every wall, lit, in one glowing stroke (one blur pass for the whole map). */
+export function drawAllWalls(
+  ctx: CanvasRenderingContext2D,
+  geometry: WallGeometry,
+  pixel: number,
+): void {
+  ctx.save();
+  ctx.strokeStyle = THEME.wall;
+  ctx.shadowColor = THEME.colors.cyan;
+  ctx.shadowBlur = THEME.glowBlur;
+  ctx.lineWidth = 1.5 * pixel;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  for (const s of geometry.segments) {
+    ctx.moveTo(s.ax, s.ay);
+    ctx.lineTo(s.bx, s.by);
+  }
+  ctx.stroke();
+  ctx.restore();
 }
 
 function dot(ctx: CanvasRenderingContext2D, t: TileCoord, ts: number, r: number): void {

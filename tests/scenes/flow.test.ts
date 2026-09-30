@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+﻿import { describe, expect, it } from 'vitest';
 import type { AudioEngine } from '@/audio/audioEngine';
 import type { SoundOutput } from '@/audio/soundOutput';
 import { AUDIO } from '@/config/audio';
@@ -14,6 +14,9 @@ import type { AppContext, SceneArgs, SceneId } from '@/scenes/scene';
 import { SceneManager } from '@/scenes/sceneManager';
 import { ROW_HEIGHT } from '@/ui/menuList';
 import { createLoopbackPair } from '@/net/loopback';
+import { ReplayRecorder } from '@/replay/recorder';
+import { IDLE_INPUT } from '@/sim/playerInput';
+import { createSimulation, type Simulation } from '@/sim/simulation';
 
 const DT = 1 / 60;
 
@@ -33,6 +36,17 @@ const fakeCtx = new Proxy({} as Record<string | symbol, unknown>, {
     return true;
   },
 }) as unknown as CanvasRenderingContext2D;
+
+/** 1.5 s of a real level 3 round with a ping in it. */
+function recordedRound() {
+  const sim = createSimulation({ seed: 3, level: 3 });
+  const recorder = new ReplayRecorder(sim, 3);
+  for (let i = 0; i < 90; i++) {
+    sim.step({ ...IDLE_INPUT, moveX: 1, ping: i === 10 }, DT);
+    recorder.afterStep();
+  }
+  return recorder.finish();
+}
 
 /** The real scenes and scene manager, with every browser service faked. */
 function testApp() {
@@ -102,7 +116,7 @@ function testApp() {
 }
 
 describe('screen flow', () => {
-  it('menu → settings → controls, and back with ESC each time', () => {
+  it('menu â†’ settings â†’ controls, and back with ESC each time', () => {
     const t = testApp();
     t.app.goTo('menu');
     t.choose(4); // PLAY, DUEL, DIFFICULTY, HOW TO PLAY, SETTINGS
@@ -115,7 +129,7 @@ describe('screen flow', () => {
     expect(t.current()).toBe('Menu');
   });
 
-  it('menu → how to play → back', () => {
+  it('menu â†’ how to play â†’ back', () => {
     const t = testApp();
     t.app.goTo('menu');
     t.choose(3); // HOW TO PLAY
@@ -135,7 +149,7 @@ describe('screen flow', () => {
     expect(t.audio().muted).toBe(true);
   });
 
-  it('play → ESC pauses over the game; resume and quit work', () => {
+  it('play â†’ ESC pauses over the game; resume and quit work', () => {
     const t = testApp();
     t.app.goTo('play', { run: newRun(1, 'easy') });
     t.press({ pause: true });
@@ -194,6 +208,61 @@ describe('screen flow', () => {
     expect(t.current()).toBe('Menu');
   });
 
+  it('level end â†’ REPLAY â†’ ESC comes back to the same level end', () => {
+    const t = testApp();
+    const score = { cores: 0, extraction: 0, timeBonus: 0, ghostBonus: 0, stuns: 0, total: 0 };
+    const replay = recordedRound();
+    t.app.goTo('levelEnd', { run: newRun(1, 'easy'), score, seconds: 30, replay });
+    t.idle(1);
+    t.choose(1); // NEXT, REPLAY
+    expect(t.current()).toBe('Replay');
+    expect(t.stack()).toBe(2);
+    t.render();
+    t.press({ back: true });
+    expect(t.current()).toBe('LevelEnd');
+    expect(t.stack()).toBe(1);
+  });
+
+  it('the replay plays, pauses, seeks and changes speed', () => {
+    const t = testApp();
+    const replay = recordedRound();
+    t.app.goTo('replay', { replay });
+    const scene = t.scenes.current as unknown as {
+      position: number;
+      speed: number;
+      isPlaying: boolean;
+    };
+    t.idle(0.5);
+    expect(scene.isPlaying).toBe(true);
+    expect(scene.position).toBeCloseTo(0.5, 1);
+    t.press({ confirm: true });
+    expect(scene.isPlaying).toBe(false);
+    const paused = scene.position;
+    t.idle(0.5);
+    expect(scene.position).toBe(paused);
+    t.press({ navX: 1 });
+    expect(scene.position).toBeCloseTo(Math.min(paused + 5, 1.5), 5);
+    t.press({ navY: -1 });
+    expect(scene.speed).toBe(2);
+    t.render();
+  });
+
+  it('a round played in the game can be replayed after game over', () => {
+    const t = testApp();
+    t.app.goTo('play', { run: newRun(7, 'easy') });
+    const { sim } = t.scenes.current as unknown as { sim: Simulation };
+    t.idle(0.5);
+    // Waiting for a hunter is slow: end the round as combat does when HP runs out.
+    sim.state.status = 'dead';
+    sim.events.emit('roundEnded', { status: 'dead', time: sim.state.time });
+    t.idle(1.5);
+    expect(t.current()).toBe('GameOver');
+    t.idle(1);
+    t.choose(1); // NEW RUN, REPLAY
+    expect(t.current()).toBe('Replay');
+    t.render();
+  });
+
   it('every screen renders without errors', () => {
     const t = testApp();
     const score = { cores: 3, extraction: 500, timeBonus: 80, ghostBonus: 0, stuns: 1, total: 930 };
@@ -207,6 +276,7 @@ describe('screen flow', () => {
       ['pause'],
       ['levelEnd', { run, score, seconds: 71 }],
       ['gameOver', { run, score }],
+      ['replay', { replay: recordedRound() }],
       ['duelLobby'],
       ['duel', { transport: createLoopbackPair().a, role: 'host', seed: 5 }],
       ['duel', { transport: createLoopbackPair().b, role: 'client', seed: 5 }],

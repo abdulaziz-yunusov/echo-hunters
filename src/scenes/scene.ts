@@ -6,6 +6,7 @@ import type { SoundOutput } from '@/audio/soundOutput';
 import type { DebugLayer } from '@/render/debugLayer';
 import type { ScoreBreakdown } from '@/sim/scoring';
 import type { Transport } from '@/net/transport';
+import type { Replay } from '@/replay/replay';
 import type { DuelOutcome } from './duelEndScene';
 import type { RunState } from './run';
 
@@ -36,8 +37,9 @@ export interface Scene {
 export interface SceneParams {
   menu: undefined;
   play: { run: RunState };
-  levelEnd: { run: RunState; score: ScoreBreakdown; seconds: number };
-  gameOver: { run: RunState; score: ScoreBreakdown };
+  levelEnd: { run: RunState; score: ScoreBreakdown; seconds: number; replay?: Replay };
+  gameOver: { run: RunState; score: ScoreBreakdown; replay?: Replay };
+  replay: { replay: Replay };
   howToPlay: undefined;
   settings: undefined;
   controls: undefined;

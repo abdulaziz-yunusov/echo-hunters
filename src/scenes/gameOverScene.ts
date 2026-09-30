@@ -5,7 +5,9 @@ import { submitScore } from '@/platform/storage';
 import { drawText } from '@/render/text';
 import { MenuList } from '@/ui/menuList';
 import { drawMenu } from '@/ui/menuRenderer';
+import type { Replay } from '@/replay/replay';
 import type { ScoreBreakdown } from '@/sim/scoring';
+import { replayItem } from './menuItems';
 import { newRun, type RunState } from './run';
 import type { AppContext, Scene } from './scene';
 
@@ -23,7 +25,7 @@ export class GameOverScene implements Scene {
   private readonly menu: MenuList;
   private time = 0;
 
-  constructor(app: AppContext, params: { run: RunState; score: ScoreBreakdown }) {
+  constructor(app: AppContext, params: { run: RunState; score: ScoreBreakdown; replay?: Replay }) {
     this.app = app;
     this.run = params.run;
     // Points earned before dying (cores, stuns) still count.
@@ -37,6 +39,7 @@ export class GameOverScene implements Scene {
         label: 'NEW RUN',
         onSelect: () => app.goTo('play', { run: newRun(randomSeed(), this.run.difficulty) }),
       },
+      ...replayItem(app, params.replay),
       { kind: 'action', label: 'MAIN MENU', onSelect: () => app.goTo('menu') },
     ]);
   }
