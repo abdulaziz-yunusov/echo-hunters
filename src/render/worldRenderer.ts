@@ -1,7 +1,9 @@
 import { GAME } from '@/config/game';
 import type { GameState } from '@/sim/gameState';
+import { playerMasked } from '@/sim/systems/emitters';
 import type { Simulation } from '@/sim/simulation';
 import type { Camera } from './camera';
+import { drawEmitters, emitterKey } from './emitterRenderer';
 import { Effects } from './fx';
 import { drawHunterDebug, drawHunterSilhouettes, hunterKey } from './hunterRenderer';
 import { drawFullMap } from './mapDebug';
@@ -119,7 +121,7 @@ export class WorldRenderer {
     }
     this.fx.draw(ctx, pixel);
     drawStones(ctx, state.stones, alpha);
-    drawPlayer(ctx, state.player, alpha);
+    drawPlayer(ctx, state.player, alpha, playerMasked(state));
   }
 
   /** Debug: the whole map with everything visible. ctx must already be scaled to fit. */
@@ -127,6 +129,7 @@ export class WorldRenderer {
     const { state } = this.sim;
     drawFullMap(ctx, state.layout, state.walls, pixel, true);
     drawSurfaces(ctx, this.surfaces, state.layout.tiles.tileSize, pixel, () => 1);
+    drawEmitters(ctx, state.emitters, null, state.time, 1, 0, pixel);
     drawWavePolygons(ctx, state.waves, pixel);
     drawHunterDebug(ctx, state.hunters, alpha, pixel);
     drawPickupIcons(ctx, state.pickups, pixel, () => 1);
@@ -139,6 +142,7 @@ export class WorldRenderer {
     drawCores(ctx, state.cores, ...args);
     drawBeacon(ctx, state.beacon, ...args, pixel);
     drawPickups(ctx, state.pickups, ...args, pixel);
+    drawEmitters(ctx, state.emitters, ...args, pixel);
   }
 }
 
@@ -150,6 +154,7 @@ function* revealables(state: GameState): Generator<RevealableObject> {
   for (const p of state.pickups) {
     if (!p.collected) yield { key: pickupKey(p), x: p.x, y: p.y };
   }
+  for (const e of state.emitters) yield { key: emitterKey(e), x: e.x, y: e.y };
   for (const h of state.hunters) yield { key: hunterKey(h), x: h.x, y: h.y, owner: h.id };
   const rival = state.rival;
   if (rival) yield { key: RIVAL_KEY, x: rival.x, y: rival.y, owner: rival.id };

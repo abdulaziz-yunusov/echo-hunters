@@ -3,6 +3,7 @@ import { HUNTER_TYPES, type HunterTypeDef } from '@/config/hunters';
 import { SOUND_KINDS } from '@/config/sounds';
 import type { EntityId } from '../entities/entity';
 import type { GameState, SimContext } from '../gameState';
+import { isMasked } from '../systems/emitters';
 import { distanceField } from '../world/pathfinding';
 import { hasLineOfSight } from '../world/visibility';
 import type { SoundWave } from './soundWave';
@@ -29,9 +30,12 @@ export interface PendingHearing {
  *   (sound bends round corners, muffled); the 'los' model hears nothing.
  *
  * The sound arrives after distance / speed seconds, so near hunters react first.
+ * Footsteps started in an active emitter's cover are not heard at all.
  */
 export function scheduleHearing(state: GameState, wave: SoundWave): void {
   const sound = SOUND_KINDS[wave.kind];
+  // Lost in machine noise (Phase 17): nobody hears it.
+  if (isMasked(state, wave.x, wave.y, sound.tags)) return;
   const tiles = state.layout.tiles;
   let field: Int32Array | null = null;
 

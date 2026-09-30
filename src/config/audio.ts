@@ -15,6 +15,8 @@ export const SYNTHS = [
   'beacon',
   'wallBump',
   'coreHum',
+  'vent',
+  'drip',
   'scream',
   'coreCollected',
   'beaconOn',
@@ -51,6 +53,8 @@ export const AUDIO_SOUNDS = {
   beacon: { synth: 'beacon', range: 1600, volume: 0.8 },
   wallBump: { synth: 'wallBump', range: 320, volume: 0.6 },
   coreHum: { synth: 'coreHum', range: 280, volume: 0.4 },
+  ventHum: { synth: 'vent', range: 420, volume: 0.45 },
+  drip: { synth: 'drip', range: 300, volume: 0.35 },
 } as const satisfies Record<SoundKindId, SpatialSoundDef>;
 
 /** Feedback sounds for game events: played centered, not placed in the world. */

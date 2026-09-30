@@ -135,6 +135,8 @@ export const GAME = {
     hunters: ['stalker'] as HunterTypeId[],
     /** No hearts: duels have no HP. */
     pickups: { stoneBag: 2, silentBoots: 1 },
+    /** Sound cover in the arena (Phase 17). */
+    emitters: { vent: 2, drip: 2 },
     /** Own position sent this often (Hz). */
     positionSendHz: 15,
     /** Host's authoritative snapshot (cores, hunters, …) sent this often (Hz). */

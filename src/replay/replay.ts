@@ -1,3 +1,4 @@
+import { EMITTER_TYPES, type EmitterTypeId } from '@/config/emitters';
 import type { HunterTypeId } from '@/config/hunters';
 import type { PickupTypeId } from '@/config/pickups';
 import type { Vec2 } from '@/core/geometry';
@@ -53,6 +54,13 @@ export interface ReplayPickup extends ReplayThing {
   type: PickupTypeId;
 }
 
+/** A vent or pipe, and when each of its noisy spells started (ascending). */
+export interface ReplayEmitter extends Vec2 {
+  id: number;
+  type: EmitterTypeId;
+  spells: number[];
+}
+
 /**
  * Everything needed to watch a finished round again, recorded while it was
  * played (see ReplayRecorder). Plain data; the queries below read it.
@@ -76,6 +84,7 @@ export interface Replay {
   marks: ReplayMark[];
   cores: ReplayThing[];
   pickups: ReplayPickup[];
+  emitters: ReplayEmitter[];
   beacon: Vec2 & { activeAt: number | null };
   outcome: Exclude<RoundStatus, 'playing'> | null;
 }
@@ -137,6 +146,20 @@ export function soundsAt(replay: Replay, t: number): SoundWave[] {
     if (radius < w.maxRadius) active.push({ ...w, radius });
   }
   return active;
+}
+
+/** Was this vent or pipe making noise (covering footsteps) at time `t`? */
+export function emitterActiveAt(emitter: ReplayEmitter, t: number): boolean {
+  const { spells } = emitter;
+  // Last spell that started at or before t.
+  let lo = 0;
+  let hi = spells.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (spells[mid] <= t) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo > 0 && t - spells[lo - 1] < EMITTER_TYPES[emitter.type].activeTime;
 }
 
 /** Was the thing still there at time `t`? */

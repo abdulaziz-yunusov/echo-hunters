@@ -6,6 +6,7 @@ import type { Rng } from '@/core/rng';
 import type { EntityId } from './entities/entity';
 import type { Hunter } from './entities/hunter';
 import type { Beacon, Core } from './entities/objectives';
+import type { Emitter } from './entities/emitter';
 import type { Pickup } from './entities/pickup';
 import type { Player } from './entities/player';
 import type { Stone } from './entities/stone';
@@ -66,6 +67,8 @@ export interface GameState {
   cores: Core[];
   beacon: Beacon;
   pickups: Pickup[];
+  /** Vents and dripping pipes: sound cover (Phase 17). */
+  emitters: Emitter[];
   /** Decoy stones in flight. */
   stones: Stone[];
   nextStoneId: number;

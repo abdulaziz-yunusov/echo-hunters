@@ -3,6 +3,7 @@ import { REPLAY } from '@/config/replay';
 import { THEME, type ColorKey } from '@/config/theme';
 import type { Vec2 } from '@/core/geometry';
 import {
+  emitterActiveAt,
   HUNTER_STATE_CODES,
   PLAYER_SNEAKING,
   presentAt,
@@ -15,6 +16,7 @@ import {
   type SamplePoint,
 } from '@/replay/replay';
 import type { SoundKindId } from '@/config/sounds';
+import { drawEmitters } from './emitterRenderer';
 import { drawHunterShape } from './hunterRenderer';
 import { drawAllWalls } from './mapDebug';
 import { drawPickupIcons } from './objectRenderer';
@@ -76,6 +78,12 @@ export function drawReplayWorld(
   drawSurfaces(ctx, surfacesOf(replay), replay.layout.tiles.tileSize, pixel, () => 0.7);
   drawAllWalls(ctx, replay.walls, pixel);
   drawObjects(ctx, replay, t, pixel);
+  const emitters = replay.emitters.map((e) => ({
+    ...e,
+    timer: 0,
+    activeLeft: emitterActiveAt(e, t) ? 1 : 0,
+  }));
+  drawEmitters(ctx, emitters, null, t, 1, 0, pixel);
   drawPlayerPath(ctx, replay, t, at, pixel);
   drawNoiseMarkers(ctx, replay, t, pixel);
   drawHits(ctx, replay, t, pixel);

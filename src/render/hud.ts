@@ -1,6 +1,7 @@
 import { GAME } from '@/config/game';
 import { THEME } from '@/config/theme';
 import type { GameState } from '@/sim/gameState';
+import { playerMasked } from '@/sim/systems/emitters';
 import { drawText } from './text';
 
 const BAR_BLOCKS = 4;
@@ -50,6 +51,14 @@ export function drawHud(ctx: CanvasRenderingContext2D, state: GameState): void {
   cooldown('SHOCK', player.shockCooldown, GAME.abilities.shockwave.cooldown, THEME.colors.red);
 
   let line = y + 22;
+  if (playerMasked(state) && !player.sneaking && player.silentTime <= 0) {
+    drawText(ctx, 'MASKED: STEPS HIDDEN BY NOISE', 12, line, {
+      size: 12,
+      color: THEME.colors.white,
+      alpha: 0.8,
+    });
+    line += 18;
+  }
   if (player.silentTime > 0) {
     drawText(ctx, `SILENT BOOTS ${Math.ceil(player.silentTime)}s`, 12, line, {
       size: 12,

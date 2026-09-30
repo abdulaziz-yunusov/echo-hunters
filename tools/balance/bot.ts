@@ -3,6 +3,7 @@ import type { Vec2 } from '@/core/geometry';
 import type { Hunter } from '@/sim/entities/hunter';
 import { IDLE_INPUT, type PlayerInput } from '@/sim/playerInput';
 import type { Simulation } from '@/sim/simulation';
+import { playerMasked } from '@/sim/systems/emitters';
 import { distanceField, findPath, smoothPath, UNREACHABLE } from '@/sim/world/pathfinding';
 import { hasLineOfSight } from '@/sim/world/visibility';
 
@@ -10,7 +11,8 @@ import { hasLineOfSight } from '@/sim/world/visibility';
  * - basic: the Phase 9 bot. Knows the map, walks the shortest route to the
  *   nearest core, then the beacon, pings every 4 s, never sneaks or uses tools.
  * - careful: the same route, but plays like someone with headphones: sneaks
- *   when a hunter is close (or on metal with one in earshot), throws a stone
+ *   when a hunter is close (or on metal with one in earshot) unless machine
+ *   noise covers it, throws a stone
  *   to the side when one is coming, shocks it on contact, and pings less
  *   (never with a hunter nearby).
  */
@@ -86,7 +88,8 @@ export class Bot {
     if (threat) {
       // Close hunters: sneak. Any hunter in earshot: don't clang across metal grates.
       const onMetal = state.layout.tiles.surfaceAt(player.x, player.y) === 'metal';
-      input.sneak = threatDistance < this.tune.sneakRange || onMetal;
+      // In running cover, walking is silent anyway: go at full speed.
+      input.sneak = (threatDistance < this.tune.sneakRange || onMetal) && !playerMasked(state);
       const reach = GAME.abilities.shockwave.effectRadius - threat.radius;
       if (
         threatDistance < reach &&

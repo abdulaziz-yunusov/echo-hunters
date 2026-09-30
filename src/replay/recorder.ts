@@ -48,6 +48,7 @@ export class ReplayRecorder {
         y: p.y,
         takenAt: null,
       })),
+      emitters: state.emitters.map((e) => ({ id: e.id, type: e.type, x: e.x, y: e.y, spells: [] })),
       beacon: { x: state.beacon.x, y: state.beacon.y, activeAt: null },
       outcome: null,
     };
@@ -100,6 +101,11 @@ export class ReplayRecorder {
     on('soundEmitted', ({ wave }) => {
       if (state.time > REPLAY.maxSeconds) return;
       r.sounds.push(wave);
+      // A vent or pipe starting a spell: its own sound, from exactly where it stands.
+      if (wave.owner === null) {
+        const e = r.emitters.find((m) => m.x === wave.x && m.y === wave.y);
+        if (e) e.spells.push(wave.startTime);
+      }
       r.longestSound = Math.max(r.longestSound, wave.maxRadius / wave.speed);
     });
     on('coreCollected', (e) => {

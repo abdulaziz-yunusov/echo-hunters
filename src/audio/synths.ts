@@ -142,6 +142,19 @@ export const SYNTHS: Record<SynthName, Synth> = {
     tone(ctx, out, 'sine', 780 * p, 776 * p, 0.6, 0.08, 0.1, 0.45);
   },
 
+  // A fan spinning up for a couple of seconds: a low rumble and airy hiss (covers footsteps).
+  vent: (ctx, out, n, p) => {
+    noiseBurst(ctx, out, n, 'lowpass', 420 * p, 0.6, 0.55, 0.35, 2.1);
+    noiseBurst(ctx, out, n, 'bandpass', 1400 * p, 0.7, 0.18, 0.4, 1.9);
+    tone(ctx, out, 'sawtooth', 58 * p, 62 * p, 2, 0.12, 0.3, 2.1);
+  },
+
+  // A single drop into a puddle.
+  drip: (ctx, out, _n, p) => {
+    tone(ctx, out, 'sine', 1500 * p, 650 * p, 0.06, 0.4, 0.002, 0.14);
+    tone(ctx, out, 'sine', 900 * p, 1100 * p, 0.05, 0.12, 0.01, 0.1, 0.05);
+  },
+
   scream: (ctx, out, _n, p) => {
     tone(ctx, out, 'sawtooth', 700 * p, 1500 * p, 0.35, 0.35, 0.02, 0.8);
     tone(ctx, out, 'sawtooth', 715 * p, 1450 * p, 0.4, 0.25, 0.02, 0.8);

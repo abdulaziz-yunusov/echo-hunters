@@ -1,9 +1,12 @@
 import type { HunterTypeId } from './hunters';
+import type { EmitterTypeId } from './emitters';
 import type { PickupTypeId } from './pickups';
 
 export interface LevelDef {
   hunters: readonly HunterTypeId[];
   pickups: Partial<Record<PickupTypeId, number>>;
+  /** Vents and dripping pipes (Phase 17): sound cover. None if left out. */
+  emitters?: Partial<Record<EmitterTypeId, number>>;
   tutorial?: boolean;
   /** Per-level overrides of GAME values. Add fields here as levels need them. */
   overrides?: {
@@ -14,11 +17,21 @@ export interface LevelDef {
 /** GDD §7 hand-made levels. After the last one, ENDLESS rules take over. */
 export const LEVELS: readonly LevelDef[] = [
   { hunters: ['stalker'], pickups: { stoneBag: 1 }, tutorial: true },
-  { hunters: ['stalker', 'stalker'], pickups: { stoneBag: 1, silentBoots: 1 } },
-  { hunters: ['stalker', 'listener'], pickups: { stoneBag: 2, heart: 1 } },
+  // Level 1 (the tutorial) has no cover; it appears from level 2.
+  {
+    hunters: ['stalker', 'stalker'],
+    pickups: { stoneBag: 1, silentBoots: 1 },
+    emitters: { vent: 1, drip: 1 },
+  },
+  {
+    hunters: ['stalker', 'listener'],
+    pickups: { stoneBag: 2, heart: 1 },
+    emitters: { vent: 2, drip: 1 },
+  },
   {
     hunters: ['stalker', 'listener', 'sprinter'],
     pickups: { stoneBag: 2, silentBoots: 1 },
+    emitters: { vent: 2, drip: 2 },
     overrides: { pingCooldown: 3 },
   },
 ];
@@ -36,4 +49,5 @@ export const ENDLESS = {
   mapGrowthPerLevel: 0.1,
   maxMapScale: 1.6,
   pickups: { stoneBag: 2, heart: 1, silentBoots: 1 } as LevelDef['pickups'],
+  emitters: { vent: 2, drip: 2 } as LevelDef['emitters'],
 };

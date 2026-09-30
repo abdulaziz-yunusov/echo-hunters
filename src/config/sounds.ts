@@ -61,6 +61,9 @@ export const SOUND_KINDS = {
     tags: ['footstep', 'impact'],
   },
   coreHum: { maxRadius: 40, hearRadius: 40, speed: 120, color: 'cyan', tags: ['ambient'] },
+  // Phase 17 sound cover: machine noise no hunter reacts to, lighting the walls nearby.
+  ventHum: { maxRadius: 150, hearRadius: 150, speed: 110, color: 'dim', tags: ['ambient'] },
+  drip: { maxRadius: 70, hearRadius: 70, speed: 160, color: 'dim', tags: ['ambient'] },
 } as const satisfies Record<string, SoundKindDef>;
 
 export type SoundKindId = keyof typeof SOUND_KINDS;

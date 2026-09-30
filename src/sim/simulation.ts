@@ -19,12 +19,14 @@ import { createWave, growWaves, pruneWaves } from './sound/soundWave';
 import { updateAbilities } from './systems/abilities';
 import { updateCloseCalls } from './systems/closeCalls';
 import { updateCombat } from './systems/combat';
+import { updateEmitters } from './systems/emitters';
 import { updateObjectives } from './systems/objectives';
 import { updatePickups } from './systems/pickups';
 import { updatePlayerMovement } from './systems/playerMovement';
 import { updateStones } from './systems/stones';
 import { buildWallGeometry, type WallGeometry } from './world/edges';
 import { generateMap, mapOptionsFromConfig, type MapLayout } from './world/mapGen';
+import { placeEmitters } from './world/emitterPlacement';
 import { placePickups } from './world/pickupPlacement';
 
 /** Hunter ids start here (the player is 1). */
@@ -37,6 +39,8 @@ export interface SimulationOptions {
   hunters?: readonly HunterTypeId[];
   /** Pickups to place (counts per type); defaults to the level's. */
   pickups?: LevelDef['pickups'];
+  /** Vents and pipes to place (counts per type); defaults to the level's. */
+  emitters?: LevelDef['emitters'];
   /** Solo (default), or which side of a duel this machine is. */
   mode?: SimMode;
 }
@@ -61,6 +65,8 @@ export class Simulation implements SimContext {
       tiles.center(layout.spawns[Math.min(id - 1, layout.spawns.length - 1)]);
     const def = levelDef(level);
     const hunterTypes = options.hunters ?? def.hunters;
+    const pickups = placePickups(layout, options.pickups ?? def.pickups);
+    const pickupTiles = pickups.map((p) => ({ tx: tiles.toTile(p.x), ty: tiles.toTile(p.y) }));
 
     this.state = {
       level,
@@ -93,7 +99,8 @@ export class Simulation implements SimContext {
       }),
       cores: createCores(layout.cores.map((c) => tiles.center(c))),
       beacon: createBeacon(tiles.center(layout.beacon)),
-      pickups: placePickups(layout, options.pickups ?? def.pickups),
+      pickups,
+      emitters: placeEmitters(layout, options.emitters ?? def.emitters ?? {}, pickupTiles),
       stones: [],
       nextStoneId: 1,
       waves: [],
@@ -134,6 +141,7 @@ export class Simulation implements SimContext {
       updateStones(this, dt);
       updatePickups(this, s.player, dt);
       updateObjectives(this, s.player, dt);
+      updateEmitters(this, dt);
       // A duel client copies the host's hunters and hits instead of running them.
       if (s.mode !== 'client') {
         updateHunters(this, dt);
@@ -197,5 +205,6 @@ export function createDuelSimulation({
     mode: role,
     hunters,
     pickups: GAME.duel.pickups,
+    emitters: GAME.duel.emitters,
   });
 }

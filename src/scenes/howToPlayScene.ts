@@ -20,6 +20,7 @@ const TIPS = [
   'Sneaking is silent. Walking leaves footsteps; hitting a wall is loud.',
   "Metal grates ring out under every step (a hunter's too); moss muffles yours.",
   'A stone lands with a fake ping: hunters go there, not to you.',
+  'While a vent roars or a pipe drips, footsteps near it are lost in the noise.',
   'Let a hunter pass close without being hit: CLOSE CALL, bonus points.',
   'The drone rises when a hunter is near. Headphones help: steps come from their side.',
 ];

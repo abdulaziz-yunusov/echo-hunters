@@ -14,7 +14,12 @@ export function levelDef(level: number): LevelDef {
   for (let i = 0; i < extra && hunters.length < ENDLESS.maxHunters; i++) {
     hunters.push(ENDLESS.hunterPool[i % ENDLESS.hunterPool.length]);
   }
-  return { hunters, pickups: ENDLESS.pickups, overrides: last.overrides };
+  return {
+    hunters,
+    pickups: ENDLESS.pickups,
+    emitters: ENDLESS.emitters,
+    overrides: last.overrides,
+  };
 }
 
 /** Map size multiplier (both sides): 1 for the table levels, then +10% per level, capped. */

@@ -5,7 +5,13 @@ import type { Player } from '@/sim/entities/player';
 import type { Stone } from '@/sim/entities/stone';
 
 /** The player: always visible to yourself, a white dot with a faint aura (GDD §9). */
-export function drawPlayer(ctx: CanvasRenderingContext2D, player: Player, alpha: number): void {
+export function drawPlayer(
+  ctx: CanvasRenderingContext2D,
+  player: Player,
+  alpha: number,
+  /** In sound cover (Phase 17): drawn dimmer, like sneaking, since steps are silent. */
+  masked = false,
+): void {
   const { x, y } = playerDrawPosition(player, alpha);
   const auraRadius = THEME.player.auraRadius;
 
@@ -20,7 +26,7 @@ export function drawPlayer(ctx: CanvasRenderingContext2D, player: Player, alpha:
   // Sneaking dims the dot a little, so the player can see they are silent;
   // after a hit it blinks while the player cannot be hurt.
   const blink = player.invulnerable > 0 && Math.floor(player.invulnerable * 12) % 2 === 0;
-  ctx.globalAlpha = blink ? 0.25 : player.sneaking ? 0.6 : 1;
+  ctx.globalAlpha = blink ? 0.25 : player.sneaking || masked ? 0.6 : 1;
   ctx.fillStyle = THEME.player.color;
   ctx.beginPath();
   ctx.arc(x, y, player.radius, 0, Math.PI * 2);
