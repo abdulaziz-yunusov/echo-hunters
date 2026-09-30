@@ -33,7 +33,7 @@ export interface ReplayHunter {
   track: ReplayTrack;
 }
 
-export type ReplayMarkKind = 'core' | 'pickup' | 'beacon' | 'hit' | 'stun' | 'end';
+export type ReplayMarkKind = 'core' | 'pickup' | 'beacon' | 'hit' | 'stun' | 'close' | 'end';
 
 /** Something worth pointing out on the timeline. */
 export interface ReplayMark {

@@ -146,6 +146,12 @@ export const SYNTHS: Record<SynthName, Synth> = {
 
   stun: (ctx, out) => tone(ctx, out, 'square', 320, 110, 0.25, 0.18, 0.003, 0.28),
 
+  // A soft breath out: you got away.
+  closeCall: (ctx, out, n) => {
+    noiseBurst(ctx, out, n, 'bandpass', 1800, 0.8, 0.25, 0.08, 0.4, 500);
+    tone(ctx, out, 'sine', 740, 494, 0.35, 0.12, 0.02, 0.35);
+  },
+
   pickup: (ctx, out) => {
     tone(ctx, out, 'sine', 990, 990, 0, 0.3, 0.004, 0.12);
     tone(ctx, out, 'sine', 1320, 1320, 0, 0.3, 0.004, 0.16, 0.08);

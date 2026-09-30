@@ -83,6 +83,8 @@ export interface GameState {
   stats: {
     /** Hunters stunned this round (Phase 7). */
     huntersStunned: number;
+    /** Close calls that scored this round (Phase 15). */
+    closeCalls: number;
   };
 }
 

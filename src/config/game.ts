@@ -97,6 +97,13 @@ export const GAME = {
     pickupMinTilesFromSpawn: 6,
   },
 
+  /**
+   * Close call (Phase 15): a hunter came within `radius` and the player was not
+   * hit for `window` seconds. It re-arms once the hunter is beyond `exitRadius`.
+   * Distances are between centers (touching is 18 px).
+   */
+  closeCall: { radius: 40, exitRadius: 64, window: 1.5 },
+
   ambient: {
     /** Drone rises in pitch when a hunter is closer than this (px). */
     hunterDroneRange: 150,
@@ -110,6 +117,9 @@ export const GAME = {
     parTime: 90,
     ghostBonus: 300,
     hunterStunned: 50,
+    closeCall: 25,
+    /** Close calls score at most this many times per level. */
+    closeCallMax: 5,
   },
 
   duel: {

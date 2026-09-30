@@ -87,6 +87,7 @@ export class LevelEndScene implements Scene {
       ['Ghost bonus (no pings)', s.ghostBonus],
     ];
     if (s.stuns > 0) rows.push(['Hunters stunned', s.stuns]);
+    if (s.closeCalls > 0) rows.push(['Close calls', s.closeCalls]);
     for (const [label, points] of rows) {
       this.row(ctx, label, `+${points}`, y, points > 0 ? 1 : 0.4);
       y += LINE;

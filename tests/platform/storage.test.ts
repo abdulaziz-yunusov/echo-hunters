@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AUDIO } from '@/config/audio';
+import { DISPLAY } from '@/config/display';
 import { loadSave, submitScore, updateSave } from '@/platform/storage';
 
 function fakeStorage(initial: Record<string, string> = {}) {
@@ -17,11 +18,12 @@ describe('save data', () => {
   it('starts from defaults', () => {
     vi.stubGlobal('localStorage', fakeStorage());
     expect(loadSave()).toEqual({
-      version: 2,
+      version: 3,
       highScore: 0,
       audio: { muted: false, ...AUDIO.volumes },
       difficulty: 'easy',
       bindings: {},
+      display: DISPLAY.defaults,
     });
   });
 
@@ -60,7 +62,7 @@ describe('save data', () => {
       fakeStorage({ 'pulse-echo-hunters': JSON.stringify({ version: 1, highScore: 4200 }) }),
     );
     const save = loadSave();
-    expect(save.version).toBe(2);
+    expect(save.version).toBe(3);
     expect(save.highScore).toBe(4200);
     expect(save.audio.muted).toBe(false);
   });
@@ -78,6 +80,46 @@ describe('save data', () => {
     );
     expect(loadSave().audio).toEqual({ muted: false, ...AUDIO.volumes });
     expect(loadSave().highScore).toBe(1);
+  });
+
+  it('upgrades a version 2 save to 3: keeps everything, adds display defaults', () => {
+    const audio = { muted: true, master: 0.3, sfx: 1, ambient: 0.2 };
+    vi.stubGlobal(
+      'localStorage',
+      fakeStorage({
+        'pulse-echo-hunters': JSON.stringify({
+          version: 2,
+          highScore: 900,
+          audio,
+          difficulty: 'hard',
+        }),
+      }),
+    );
+    expect(loadSave()).toMatchObject({
+      version: 3,
+      highScore: 900,
+      audio,
+      difficulty: 'hard',
+      display: DISPLAY.defaults,
+    });
+  });
+
+  it('remembers display settings, and replaces broken ones with defaults', () => {
+    vi.stubGlobal('localStorage', fakeStorage());
+    const display = { shake: 0, flash: 0.5, soundCues: true, palette: 'colorblind' as const };
+    updateSave({ display });
+    expect(loadSave().display).toEqual(display);
+
+    vi.stubGlobal(
+      'localStorage',
+      fakeStorage({
+        'pulse-echo-hunters': JSON.stringify({
+          version: 3,
+          display: { shake: 3, flash: 0, soundCues: 'yes', palette: 'sepia' },
+        }),
+      }),
+    );
+    expect(loadSave().display).toEqual({ ...DISPLAY.defaults, flash: 0 });
   });
 
   it('keeps a high score only when it is beaten', () => {

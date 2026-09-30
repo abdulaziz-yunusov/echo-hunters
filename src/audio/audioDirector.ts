@@ -33,6 +33,7 @@ export class AudioDirector {
       on('beaconActivated', centered('beaconActivated')),
       on('playerHit', (e) => this.ifMine(e.target, 'playerHit')),
       on('hunterStunned', centered('hunterStunned')),
+      on('closeCall', centered('closeCall')),
       on('pickupCollected', (e) => this.ifMine(e.by, 'pickupCollected')),
       on('stoneThrown', centered('stoneThrown')),
       on('roundEnded', (e) => {
@@ -63,7 +64,8 @@ export class AudioDirector {
     const def = AUDIO_SOUNDS[sound.kind];
     const { player, walls } = this.sim.state;
     const dx = sound.x - player.x;
-    const distance = Math.hypot(dx, sound.y - player.y);
+    const dy = sound.y - player.y;
+    const distance = Math.hypot(dx, dy);
     const gain = def.volume * distanceGain(distance, def.range);
     if (gain <= 0.001) return;
 
@@ -74,6 +76,7 @@ export class AudioDirector {
       pan: stereoPan(dx, AUDIO.panRange),
       muffled,
       pitch: isStep ? 1 + (this.jitter() * 2 - 1) * STEP_PITCH_JITTER : 1,
+      offset: { dx, dy },
     });
   }
 
@@ -84,6 +87,6 @@ export class AudioDirector {
 
   private playCentered(event: keyof typeof AUDIO_EVENTS): void {
     const def = AUDIO_EVENTS[event];
-    this.out.play(def.synth, { gain: def.volume, pan: 0, muffled: false, pitch: 1 });
+    this.out.play(def.synth, { gain: def.volume, pan: 0, muffled: false, pitch: 1, offset: null });
   }
 }

@@ -1,6 +1,8 @@
-import { THEME } from '@/config/theme';
+import { DISPLAY, type DisplaySettings } from '@/config/display';
+import { PALETTES, THEME, type PaletteId } from '@/config/theme';
 import type { InputFrame } from '@/input/inputFrame';
-import { updateSave, type AudioSettings } from '@/platform/storage';
+import { loadSave, updateSave, type AudioSettings } from '@/platform/storage';
+import { applyPalette } from '@/render/palette';
 import { levelBar, MenuList } from '@/ui/menuList';
 import { drawMenu, drawTitle } from '@/ui/menuRenderer';
 import type { AppContext, Scene } from './scene';
@@ -8,7 +10,7 @@ import type { AppContext, Scene } from './scene';
 const VOLUME_STEP = 0.1;
 const MENU_WIDTH = 460;
 
-/** Sound and controls. Every change applies and is saved at once. */
+/** Sound, display and controls. Every change applies and is saved at once. */
 export class SettingsScene implements Scene {
   readonly name = 'Settings';
   private readonly app: AppContext;
@@ -25,6 +27,18 @@ export class SettingsScene implements Scene {
         this.change({ [key]: Math.min(1, Math.max(0, v)) });
       },
     });
+    const level = (label: string, key: 'shake' | 'flash') => ({
+      kind: 'adjust' as const,
+      label,
+      value: () => `${Math.round(this.display()[key] * 100)}%`,
+      onChange: (step: 1 | -1) => {
+        const steps = DISPLAY.levels;
+        const i = steps.indexOf(this.display()[key]);
+        const next =
+          steps[Math.min(steps.length - 1, Math.max(0, (i < 0 ? steps.length - 1 : i) + step))];
+        this.changeDisplay({ [key]: next });
+      },
+    });
     this.menu = new MenuList([
       volume('MASTER VOLUME', 'master'),
       volume('EFFECTS', 'sfx'),
@@ -34,6 +48,26 @@ export class SettingsScene implements Scene {
         label: 'SOUND',
         value: () => (this.settings().muted ? 'OFF' : 'ON'),
         onChange: () => this.change({ muted: !this.settings().muted }),
+      },
+      {
+        kind: 'adjust',
+        label: 'SOUND CUES',
+        value: () => (this.display().soundCues ? 'ON' : 'OFF'),
+        onChange: () => this.changeDisplay({ soundCues: !this.display().soundCues }),
+      },
+      level('SCREEN SHAKE', 'shake'),
+      level('FLASHES', 'flash'),
+      {
+        kind: 'adjust',
+        label: 'COLORS',
+        value: () => this.display().palette.toUpperCase(),
+        onChange: (step: 1 | -1) => {
+          const ids = Object.keys(PALETTES) as PaletteId[];
+          const i = ids.indexOf(this.display().palette);
+          const palette = ids[(i + step + ids.length) % ids.length];
+          applyPalette(palette);
+          this.changeDisplay({ palette });
+        },
       },
       { kind: 'action', label: 'CONTROLS', onSelect: () => app.open('controls') },
       { kind: 'action', label: 'BACK', onSelect: () => app.close() },
@@ -58,6 +92,14 @@ export class SettingsScene implements Scene {
 
   private settings(): AudioSettings {
     return this.app.audio.getSettings();
+  }
+
+  private display(): DisplaySettings {
+    return loadSave().display;
+  }
+
+  private changeDisplay(changes: Partial<DisplaySettings>): void {
+    updateSave({ display: { ...this.display(), ...changes } });
   }
 
   private change(changes: Partial<AudioSettings>): void {

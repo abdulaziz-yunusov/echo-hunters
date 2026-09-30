@@ -1,7 +1,10 @@
-﻿import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { AudioEngine } from '@/audio/audioEngine';
 import type { SoundOutput } from '@/audio/soundOutput';
 import { AUDIO } from '@/config/audio';
+import { PALETTES, THEME } from '@/config/theme';
+import { loadSave } from '@/platform/storage';
+import { applyPalette } from '@/render/palette';
 import type { Bindings } from '@/input/bindings';
 import { EMPTY_INPUT, type InputFrame } from '@/input/inputFrame';
 import type { InputManager } from '@/input/inputManager';
@@ -116,12 +119,12 @@ function testApp() {
 }
 
 describe('screen flow', () => {
-  it('menu â†’ settings â†’ controls, and back with ESC each time', () => {
+  it('menu → settings → controls, and back with ESC each time', () => {
     const t = testApp();
     t.app.goTo('menu');
     t.choose(4); // PLAY, DUEL, DIFFICULTY, HOW TO PLAY, SETTINGS
     expect(t.current()).toBe('Settings');
-    t.choose(4); // CONTROLS
+    t.choose(8); // … SOUND, SOUND CUES, SCREEN SHAKE, FLASHES, COLORS, CONTROLS
     expect(t.current()).toBe('Controls');
     t.press({ back: true });
     expect(t.current()).toBe('Settings');
@@ -129,7 +132,7 @@ describe('screen flow', () => {
     expect(t.current()).toBe('Menu');
   });
 
-  it('menu â†’ how to play â†’ back', () => {
+  it('menu → how to play → back', () => {
     const t = testApp();
     t.app.goTo('menu');
     t.choose(3); // HOW TO PLAY
@@ -149,7 +152,36 @@ describe('screen flow', () => {
     expect(t.audio().muted).toBe(true);
   });
 
-  it('play â†’ ESC pauses over the game; resume and quit work', () => {
+  it('display settings are saved and applied, the palette at once', () => {
+    const data = new Map<string, string>();
+    vi.stubGlobal('localStorage', {
+      getItem: (k: string) => data.get(k) ?? null,
+      setItem: (k: string, v: string) => void data.set(k, v),
+    });
+    try {
+      const t = testApp();
+      t.app.goTo('menu');
+      t.app.open('settings');
+      t.choose(4); // SOUND CUES: OFF → ON
+      t.press({ navY: 1 }); // SCREEN SHAKE
+      t.press({ navX: -1 }); // 100% → 50%
+      t.press({ navY: 1 });
+      t.press({ navY: 1 }); // COLORS
+      t.press({ navX: 1 }); // STANDARD → COLORBLIND
+      expect(loadSave().display).toMatchObject({
+        soundCues: true,
+        shake: 0.5,
+        palette: 'colorblind',
+      });
+      expect(THEME.colors.green).toBe(PALETTES.colorblind.green);
+      t.render();
+    } finally {
+      applyPalette('standard');
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('play → ESC pauses over the game; resume and quit work', () => {
     const t = testApp();
     t.app.goTo('play', { run: newRun(1, 'easy') });
     t.press({ pause: true });
@@ -199,7 +231,15 @@ describe('screen flow', () => {
 
   it('level end and game over can be left with the mouse', () => {
     const t = testApp();
-    const score = { cores: 0, extraction: 0, timeBonus: 0, ghostBonus: 0, stuns: 0, total: 0 };
+    const score = {
+      cores: 0,
+      extraction: 0,
+      timeBonus: 0,
+      ghostBonus: 0,
+      stuns: 0,
+      closeCalls: 0,
+      total: 0,
+    };
     t.app.goTo('gameOver', { run: newRun(1, 'easy'), score });
     t.idle(1);
     t.render(); // menus place their rows when drawn
@@ -208,9 +248,17 @@ describe('screen flow', () => {
     expect(t.current()).toBe('Menu');
   });
 
-  it('level end â†’ REPLAY â†’ ESC comes back to the same level end', () => {
+  it('level end → REPLAY → ESC comes back to the same level end', () => {
     const t = testApp();
-    const score = { cores: 0, extraction: 0, timeBonus: 0, ghostBonus: 0, stuns: 0, total: 0 };
+    const score = {
+      cores: 0,
+      extraction: 0,
+      timeBonus: 0,
+      ghostBonus: 0,
+      stuns: 0,
+      closeCalls: 0,
+      total: 0,
+    };
     const replay = recordedRound();
     t.app.goTo('levelEnd', { run: newRun(1, 'easy'), score, seconds: 30, replay });
     t.idle(1);
@@ -265,7 +313,15 @@ describe('screen flow', () => {
 
   it('every screen renders without errors', () => {
     const t = testApp();
-    const score = { cores: 3, extraction: 500, timeBonus: 80, ghostBonus: 0, stuns: 1, total: 930 };
+    const score = {
+      cores: 3,
+      extraction: 500,
+      timeBonus: 80,
+      ghostBonus: 0,
+      stuns: 1,
+      closeCalls: 2,
+      total: 980,
+    };
     const run = newRun(1, 'hard');
     const screens: [SceneId, unknown?][] = [
       ['menu'],

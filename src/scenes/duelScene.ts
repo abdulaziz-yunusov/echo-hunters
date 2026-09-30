@@ -13,6 +13,7 @@ import { WorldRenderer } from '@/render/worldRenderer';
 import { createDuelSimulation, type Simulation } from '@/sim/simulation';
 import { MenuList } from '@/ui/menuList';
 import { drawMenu, drawTitle } from '@/ui/menuRenderer';
+import { RoundDisplay } from './roundDisplay';
 import type { AppContext, Scene } from './scene';
 
 /** Seconds to linger on the world after the duel is decided. */
@@ -33,6 +34,7 @@ export class DuelScene implements Scene {
   private readonly world: WorldRenderer;
   private readonly audio: AudioDirector;
   private readonly camera: Camera;
+  private readonly display: RoundDisplay;
   private readonly menu: MenuList;
   private readonly role: 'host' | 'client';
   private menuOpen = false;
@@ -48,7 +50,8 @@ export class DuelScene implements Scene {
     this.camera = new Camera(app.viewport);
     this.sim = createDuelSimulation({ seed: params.seed, role: params.role });
     this.world = new WorldRenderer(this.sim, DIFFICULTIES.easy.ghostAlpha);
-    this.audio = new AudioDirector(this.sim, app.sound);
+    this.display = new RoundDisplay(this.camera, this.world);
+    this.audio = new AudioDirector(this.sim, this.display.output(app.sound));
     this.net = new NetSession(this.sim, params.transport);
     this.net.onDisconnect(() => {
       if (this.sim.state.status === 'playing') app.goTo('duelEnd', { outcome: 'disconnected' });
@@ -79,6 +82,7 @@ export class DuelScene implements Scene {
     );
     this.world.tick(dt);
     this.audio.tick();
+    this.display.update(dt);
     this.camera.update(dt);
 
     const { state } = this.sim;
@@ -112,6 +116,7 @@ export class DuelScene implements Scene {
     }
     ctx.restore();
 
+    this.display.draw(ctx, width, height, focus);
     drawHud(ctx, state);
     if (state.time < BANNER_TIME && !this.menuOpen) {
       const a = Math.min(1, (BANNER_TIME - state.time) / 0.6);

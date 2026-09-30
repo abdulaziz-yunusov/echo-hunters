@@ -10,6 +10,8 @@ export class Camera {
   x = 0;
   y = 0;
   private readonly viewport: Viewport;
+  /** Player setting: 0 turns screen shake off, 1 is full strength. */
+  shakeScale = 1;
   private shakeStrength = 0;
   private shakeDuration = 0;
   private shakeLeft = 0;
@@ -31,8 +33,9 @@ export class Camera {
 
   /** Shake the view (screen pixels), fading out over `duration` seconds. Stronger shakes win. */
   shake(strength: number, duration: number): void {
-    if (this.currentShake() > strength) return;
-    this.shakeStrength = strength;
+    const scaled = strength * this.shakeScale;
+    if (scaled <= 0 || this.currentShake() > scaled) return;
+    this.shakeStrength = scaled;
     this.shakeDuration = duration;
     this.shakeLeft = duration;
   }
@@ -72,6 +75,15 @@ export class Camera {
       minY: this.y - halfH,
       maxX: this.x + halfW,
       maxY: this.y + halfH,
+    };
+  }
+
+  /** Where a world point is on screen (CSS px), ignoring shake. */
+  worldToScreen(x: number, y: number): Vec2 {
+    const { width, height, worldScale } = this.viewport;
+    return {
+      x: (x - this.x) * worldScale + width / 2,
+      y: (y - this.y) * worldScale + height / 2,
     };
   }
 

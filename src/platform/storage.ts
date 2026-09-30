@@ -1,5 +1,7 @@
 import { AUDIO } from '@/config/audio';
 import { DEFAULT_DIFFICULTY, DIFFICULTIES, type DifficultyId } from '@/config/difficulty';
+import { DISPLAY, type DisplaySettings } from '@/config/display';
+import { PALETTES } from '@/config/theme';
 import { REMAPPABLE } from '@/config/input';
 import type { BindingOverrides } from '@/input/bindings';
 
@@ -13,24 +15,27 @@ export interface AudioSettings {
 
 /** Everything the game remembers between sessions. Bump `version` when the shape changes. */
 export interface SaveData {
-  version: 2;
+  version: 3;
   highScore: number;
   audio: AudioSettings;
   /** Last difficulty picked in the menu. */
   difficulty: DifficultyId;
   /** Keys the player rebound (the rest use the defaults). */
   bindings: BindingOverrides;
+  /** Shake, flashes, sound cues, colors (v3). */
+  display: DisplaySettings;
 }
 
 const KEY = 'pulse-echo-hunters';
 
 function defaults(): SaveData {
   return {
-    version: 2,
+    version: 3,
     highScore: 0,
     audio: { muted: false, ...AUDIO.volumes },
     difficulty: DEFAULT_DIFFICULTY,
     bindings: {},
+    display: { ...DISPLAY.defaults },
   };
 }
 
@@ -71,14 +76,15 @@ export function submitScore(score: number): { highScore: number; isNew: boolean 
 function migrate(data: Record<string, unknown>): SaveData {
   const result = defaults();
   const highScore = data.highScore;
-  // v1 had only the high score; v2 adds audio settings.
-  if (data.version !== 1 && data.version !== 2) return result;
+  // v1 had only the high score; v2 adds audio settings; v3 display settings.
+  if (data.version !== 1 && data.version !== 2 && data.version !== 3) return result;
   if (typeof highScore === 'number') result.highScore = highScore;
-  if (data.version === 2 && isAudioSettings(data.audio)) result.audio = data.audio;
+  if (data.version !== 1 && isAudioSettings(data.audio)) result.audio = data.audio;
   if (typeof data.difficulty === 'string' && data.difficulty in DIFFICULTIES) {
     result.difficulty = data.difficulty as DifficultyId;
   }
   result.bindings = validBindings(data.bindings);
+  result.display = validDisplay(data.display);
   return result;
 }
 
@@ -91,6 +97,21 @@ function validBindings(value: unknown): BindingOverrides {
     if (Array.isArray(inputs) && inputs.length > 0 && inputs.every((i) => typeof i === 'string')) {
       result[action] = inputs as string[];
     }
+  }
+  return result;
+}
+
+/** Each display setting is kept if valid, otherwise it falls back to its default. */
+function validDisplay(value: unknown): DisplaySettings {
+  const result = { ...DISPLAY.defaults };
+  if (typeof value !== 'object' || value === null) return result;
+  const d = value as Record<string, unknown>;
+  const level = (v: unknown) => typeof v === 'number' && v >= 0 && v <= 1;
+  if (level(d.shake)) result.shake = d.shake as number;
+  if (level(d.flash)) result.flash = d.flash as number;
+  if (typeof d.soundCues === 'boolean') result.soundCues = d.soundCues;
+  if (typeof d.palette === 'string' && d.palette in PALETTES) {
+    result.palette = d.palette as DisplaySettings['palette'];
   }
   return result;
 }

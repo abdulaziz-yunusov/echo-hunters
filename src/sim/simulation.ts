@@ -17,6 +17,7 @@ import type { PlayerInput } from './playerInput';
 import { deliverHearings, scheduleHearing } from './sound/hearing';
 import { createWave, growWaves, pruneWaves } from './sound/soundWave';
 import { updateAbilities } from './systems/abilities';
+import { updateCloseCalls } from './systems/closeCalls';
 import { updateCombat } from './systems/combat';
 import { updateObjectives } from './systems/objectives';
 import { updatePickups } from './systems/pickups';
@@ -101,7 +102,7 @@ export class Simulation implements SimContext {
       hearings: [],
       rules: { pingCooldown: def.overrides?.pingCooldown ?? GAME.abilities.ping.cooldown },
       hearingModel: GAME.hearing.model,
-      stats: { huntersStunned: 0 },
+      stats: { huntersStunned: 0, closeCalls: 0 },
     };
     for (const h of this.state.hunters) setHunterState(this, h, 'idle');
   }
@@ -138,6 +139,7 @@ export class Simulation implements SimContext {
         updateHunters(this, dt);
         updateCombat(this, dt);
       }
+      if (s.mode === 'solo') updateCloseCalls(this);
     }
     if (playing && s.mode !== 'client') deliverHearings(this);
     growWaves(s.waves, dt);

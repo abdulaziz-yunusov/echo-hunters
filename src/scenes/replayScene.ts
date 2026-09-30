@@ -16,7 +16,7 @@ const BAR_INSET = 120;
 const BAR_HEIGHT = 10;
 const BUTTON = { w: 80, h: 30 };
 /** Timeline marks explained above the bar, and the width of one 11 px monospace character. */
-const LEGEND: readonly ReplayMarkKind[] = ['hit', 'core', 'stun', 'pickup', 'beacon'];
+const LEGEND: readonly ReplayMarkKind[] = ['hit', 'close', 'core', 'stun', 'pickup', 'beacon'];
 const LEGEND_CHAR = 6.6;
 
 interface Rect {

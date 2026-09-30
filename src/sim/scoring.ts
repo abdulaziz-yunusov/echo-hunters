@@ -8,6 +8,7 @@ export interface RoundResult {
   seconds: number;
   pingsUsed: number;
   huntersStunned: number;
+  closeCalls: number;
   /** Map area relative to the base map (1 = base size); bigger maps get more par time. */
   areaScale: number;
 }
@@ -18,6 +19,7 @@ export interface ScoreBreakdown {
   timeBonus: number;
   ghostBonus: number;
   stuns: number;
+  closeCalls: number;
   total: number;
 }
 
@@ -31,6 +33,7 @@ export function roundResult(state: GameState): RoundResult {
     seconds: state.time,
     pingsUsed: player.pingsUsed,
     huntersStunned: state.stats.huntersStunned,
+    closeCalls: state.stats.closeCalls,
     areaScale: (layout.tiles.width * layout.tiles.height) / base,
   };
 }
@@ -49,12 +52,14 @@ export function scoreRound(r: RoundResult): ScoreBreakdown {
     : 0;
   const ghostBonus = r.extracted && r.pingsUsed === 0 ? s.ghostBonus : 0;
   const stuns = r.huntersStunned * s.hunterStunned;
+  const closeCalls = Math.min(r.closeCalls, s.closeCallMax) * s.closeCall;
   return {
     cores,
     extraction,
     timeBonus,
     ghostBonus,
     stuns,
-    total: cores + extraction + timeBonus + ghostBonus + stuns,
+    closeCalls,
+    total: cores + extraction + timeBonus + ghostBonus + stuns + closeCalls,
   };
 }

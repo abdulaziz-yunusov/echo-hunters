@@ -60,6 +60,11 @@ export class WorldRenderer {
     });
   }
 
+  /** Player setting: brightness of hit / pickup / stun flashes (0..1). */
+  set flashIntensity(value: number) {
+    this.fx.intensity = value;
+  }
+
   /** Waves still revealing walls (debug). */
   get revealingWaves(): number {
     return this.reveal.activeWaves;

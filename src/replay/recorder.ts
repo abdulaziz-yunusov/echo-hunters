@@ -118,6 +118,7 @@ export class ReplayRecorder {
     });
     on('playerHit', (e) => mark('hit', e.x, e.y));
     on('hunterStunned', (e) => mark('stun', e.x, e.y));
+    on('closeCall', (e) => mark('close', e.x, e.y));
     on('roundEnded', (e) => {
       r.outcome = e.status;
       mark('end', state.player.x, state.player.y);

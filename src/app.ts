@@ -9,6 +9,7 @@ import { startFrameDriver } from '@/platform/frameDriver';
 import { loadSave, updateSave } from '@/platform/storage';
 import { Viewport } from '@/platform/viewport';
 import { DebugLayer } from '@/render/debugLayer';
+import { applyPalette } from '@/render/palette';
 import { drawText } from '@/render/text';
 import { createScene } from '@/scenes/registry';
 import type { AppContext, SceneArgs, SceneId } from '@/scenes/scene';
@@ -21,6 +22,7 @@ export function startApp(canvas: HTMLCanvasElement): void {
 
   const viewport = new Viewport(canvas, GAME.camera.viewSize, GAME.render.maxDpr);
   const save = loadSave();
+  applyPalette(save.display.palette);
   const input = new InputManager(canvas, withOverrides(save.bindings));
   const debug = new DebugLayer();
   const scenes = new SceneManager();

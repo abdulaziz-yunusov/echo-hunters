@@ -16,6 +16,7 @@ import { levelDef } from '@/sim/level';
 import { createSimulation, type Simulation } from '@/sim/simulation';
 import type { RunState } from './run';
 import { Tutorial } from './tutorial';
+import { RoundDisplay } from './roundDisplay';
 import type { AppContext, Scene } from './scene';
 
 /** Seconds the "LEVEL n" banner stays up. */
@@ -24,6 +25,8 @@ const BANNER_TIME = 3;
 const OVERVIEW_MARGIN = 0.92;
 /** Seconds to linger on the world after extraction before the score screen. */
 const END_DELAY = 1.2;
+/** Seconds a popup such as "CLOSE CALL +25" stays up. */
+const POPUP_TIME = 1.4;
 
 /** One level of a run: the dark maze, seen only through sound. */
 export class PlayScene implements Scene {
@@ -36,6 +39,9 @@ export class PlayScene implements Scene {
   private audio: AudioDirector | null = null;
   private tutorial: Tutorial | null = null;
   private recorder!: ReplayRecorder;
+  private display!: RoundDisplay;
+  /** "CLOSE CALL +25" and when it appeared (sim time). */
+  private popup: { text: string; at: number } | null = null;
   /** A menu is open on top: keep the world, hide banners and prompts. */
   private covered = false;
   private overview = false;
@@ -75,6 +81,7 @@ export class PlayScene implements Scene {
     this.recorder.afterStep();
     this.world.tick(dt);
     this.audio?.tick();
+    this.display.update(dt);
     this.tutorial?.tick(dt);
     this.camera.update(dt);
 
@@ -123,10 +130,12 @@ export class PlayScene implements Scene {
     }
     ctx.restore();
 
+    this.display.draw(ctx, width, height, playerDrawPosition(state.player, alpha));
     drawHud(ctx, state);
     if (!this.covered) {
       this.drawLevelBanner(ctx, state.time);
       this.drawTutorial(ctx);
+      this.drawPopup(ctx, state.time);
     }
     drawText(ctx, `LEVEL ${this.run.level} · SEED ${this.run.seed}`, width - 12, height - 12, {
       size: 11,
@@ -153,6 +162,8 @@ export class PlayScene implements Scene {
 
   resume(): void {
     this.covered = false;
+    // Settings may have changed in a menu on top.
+    this.display.refresh();
   }
 
   onHidden(): void {
@@ -170,11 +181,20 @@ export class PlayScene implements Scene {
     this.exit();
     this.sim = createSimulation({ seed: this.run.seed, level: this.run.level });
     this.world = new WorldRenderer(this.sim, DIFFICULTIES[this.run.difficulty].ghostAlpha);
-    this.audio = new AudioDirector(this.sim, this.app.sound);
+    this.display = new RoundDisplay(this.camera, this.world);
+    this.audio = new AudioDirector(this.sim, this.display.output(this.app.sound));
+    this.popup = null;
     this.recorder = new ReplayRecorder(this.sim, this.run.seed);
     if (levelDef(this.run.level).tutorial) this.tutorial = new Tutorial(this.sim);
     this.endedAt = null;
     this.sim.events.on('roundEnded', (e) => (this.endedAt = e.time));
+    this.sim.events.on('closeCall', (e) => {
+      const points = GAME.scoring.closeCall;
+      this.popup = {
+        text: e.scored ? `CLOSE CALL +${points}` : 'CLOSE CALL',
+        at: this.sim.state.time,
+      };
+    });
     this.sim.events.on('soundEmitted', (s) => {
       if (s.kind !== 'shockwave') return;
       const { strength, duration } = THEME.shake.shockwave;
@@ -213,6 +233,21 @@ export class PlayScene implements Scene {
       color: THEME.colors.white,
       align: 'center',
       alpha: alpha * 0.8,
+    });
+  }
+
+  /** A short note under the HUD, e.g. "CLOSE CALL +25". */
+  private drawPopup(ctx: CanvasRenderingContext2D, time: number): void {
+    if (!this.popup) return;
+    const age = time - this.popup.at;
+    if (age > POPUP_TIME) return;
+    const alpha = Math.min(1, age / 0.1, (POPUP_TIME - age) / 0.4);
+    drawText(ctx, this.popup.text, this.app.viewport.width / 2, 72 - age * 10, {
+      size: 16,
+      color: THEME.colors.white,
+      align: 'center',
+      glow: THEME.glowBlur,
+      alpha,
     });
   }
 

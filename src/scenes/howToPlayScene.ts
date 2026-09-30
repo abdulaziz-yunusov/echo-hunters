@@ -19,6 +19,7 @@ const HUNTERS: readonly [HunterTypeId, string][] = [
 const TIPS = [
   'Sneaking is silent. Walking leaves footsteps; hitting a wall is loud.',
   'A stone lands with a fake ping: hunters go there, not to you.',
+  'Let a hunter pass close without being hit: CLOSE CALL, bonus points.',
   'The drone rises when a hunter is near. Headphones help: steps come from their side.',
 ];
 

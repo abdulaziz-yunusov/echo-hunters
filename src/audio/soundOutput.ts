@@ -9,6 +9,11 @@ export interface PlayOptions {
   muffled: boolean;
   /** Playback pitch multiplier (1 = normal), for small natural variation. */
   pitch: number;
+  /**
+   * Where the sound is, relative to the listener (world px); null for
+   * feedback played centered. Web Audio ignores it; visual sound cues use it.
+   */
+  offset: { dx: number; dy: number } | null;
 }
 
 /**

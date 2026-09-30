@@ -61,6 +61,17 @@ describe('AudioDirector', () => {
     expect(ping.gain).toBeGreaterThan(0.5);
   });
 
+  it('tells outputs where a sound is; feedback has no position', () => {
+    const { sim, out } = setup(ROOM, { hunters: ['stalker', 'stalker'] });
+    const [left] = sim.state.hunters;
+    sim.emitSound('hunterStep', left.x, left.y, left.id);
+    const [step] = out.of('hunterStep');
+    expect(step.offset?.dx).toBeCloseTo(left.x - sim.state.player.x, 5);
+    expect(step.offset?.dy).toBeCloseTo(0, 5);
+    sim.events.emit('closeCall', { hunterId: left.id, x: left.x, y: left.y, scored: true });
+    expect(out.of('closeCall')).toEqual([expect.objectContaining({ pan: 0, offset: null })]);
+  });
+
   it('pans hunter footsteps to the side they are on', () => {
     const { sim, out } = setup(ROOM, { hunters: ['stalker', 'stalker'] });
     const [left, right] = sim.state.hunters;

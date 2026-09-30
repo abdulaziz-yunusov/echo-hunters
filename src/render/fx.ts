@@ -12,9 +12,11 @@ interface Flash {
 
 /**
  * Short visual effects that are not sounds: they reveal nothing and no
- * hunter hears them (e.g. the flash of picking up a core). Screen shake joins in Phase 6.
+ * hunter hears them (e.g. the flash of picking up a core).
  */
 export class Effects {
+  /** Player setting: 0 hides flashes, 1 is full brightness. */
+  intensity = 1;
   private flashes: Flash[] = [];
 
   flash(x: number, y: number, color: ColorKey, radius = 26, duration = 0.45): void {
@@ -33,7 +35,7 @@ export class Effects {
     for (const f of this.flashes) {
       const t = f.age / f.duration;
       const color = THEME.colors[f.color];
-      ctx.globalAlpha = 1 - t;
+      ctx.globalAlpha = (1 - t) * this.intensity;
       ctx.strokeStyle = color;
       ctx.shadowColor = color;
       ctx.shadowBlur = THEME.glowBlur;

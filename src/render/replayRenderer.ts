@@ -27,6 +27,7 @@ export const MARK_COLORS: Record<ReplayMarkKind, ColorKey> = {
   beacon: 'green',
   hit: 'red',
   stun: 'orange',
+  close: 'dim',
   end: 'white',
 };
 

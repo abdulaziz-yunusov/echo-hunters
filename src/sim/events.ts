@@ -28,6 +28,8 @@ export interface GameEvents {
   hunterHeard: { hunterId: EntityId; x: number; y: number };
   stoneThrown: { x: number; y: number; toX: number; toY: number };
   hunterStunned: { hunterId: EntityId; x: number; y: number; scored: boolean };
+  /** A hunter came close and the player got away unhurt (scored = counted toward points). */
+  closeCall: { hunterId: EntityId; x: number; y: number; scored: boolean };
   pickupCollected: { pickupId: number; type: PickupTypeId; x: number; y: number; by: EntityId };
   roundEnded: { status: Exclude<RoundStatus, 'playing'>; time: number };
   /** Duel client: asking the host for something contested. */

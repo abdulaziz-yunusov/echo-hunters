@@ -35,6 +35,10 @@ export interface Hunter extends MachineState<HunterStateId> {
   facing: number;
   /** Already scored a stun this level (stun points are given once per hunter). */
   stunScored: boolean;
+  /** Close call: sim time this hunter came near the player (null = not near). */
+  closeCallSince: number | null;
+  /** Close call already counted (or spoiled by a hit) for this approach. */
+  closeCallDone: boolean;
   /** Seconds until the hunter's special ability (the Listener's scream) is ready. */
   cooldown: number;
 }
@@ -60,6 +64,8 @@ export function createHunter(id: EntityId, type: HunterTypeId, x: number, y: num
     stride: 0,
     facing: 0,
     stunScored: false,
+    closeCallSince: null,
+    closeCallDone: false,
     cooldown: 0,
   };
 }
