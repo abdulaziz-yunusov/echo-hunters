@@ -1,3 +1,4 @@
+import { SURFACE_IDS, type SurfaceId } from '@/config/surfaces';
 import type { Vec2 } from '@/core/geometry';
 
 export const FLOOR = 0;
@@ -25,12 +26,15 @@ export class TileMap {
   /** World pixels per tile. */
   readonly tileSize: number;
   readonly tiles: Uint8Array;
+  /** What each floor tile is made of: an index into SURFACE_IDS (0 = normal). */
+  readonly surfaces: Uint8Array;
 
   constructor(width: number, height: number, tileSize: number, fill: TileType = WALL) {
     this.width = width;
     this.height = height;
     this.tileSize = tileSize;
     this.tiles = new Uint8Array(width * height).fill(fill);
+    this.surfaces = new Uint8Array(width * height);
   }
 
   get worldWidth(): number {
@@ -68,6 +72,21 @@ export class TileMap {
   set(tx: number, ty: number, type: TileType): void {
     if (!this.inBounds(tx, ty)) throw new Error(`Tile out of bounds: ${tx},${ty}`);
     this.tiles[this.index(tx, ty)] = type;
+  }
+
+  /** Surface of a tile ('normal' outside the map). */
+  surface(tx: number, ty: number): SurfaceId {
+    return this.inBounds(tx, ty) ? SURFACE_IDS[this.surfaces[this.index(tx, ty)]] : 'normal';
+  }
+
+  /** Surface under a world point. */
+  surfaceAt(x: number, y: number): SurfaceId {
+    return this.surface(this.toTile(x), this.toTile(y));
+  }
+
+  setSurface(tx: number, ty: number, surface: SurfaceId): void {
+    if (!this.inBounds(tx, ty)) throw new Error(`Tile out of bounds: ${tx},${ty}`);
+    this.surfaces[this.index(tx, ty)] = SURFACE_IDS.indexOf(surface);
   }
 
   /** Tile containing a world coordinate (one axis). */

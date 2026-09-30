@@ -39,6 +39,8 @@ export const THEME = {
   glowBlur: 12,
   colors: { ...PALETTES.standard } as Record<ColorName, string>,
   wall: '#bff6ff',
+  /** Floor patterns (Phase 16): grates and moss differ by pattern too, not only color. */
+  surfaces: { metal: '#a6c8da', soft: '#7cc592' },
   player: { color: '#ffffff', auraRadius: 20 },
   hunterSilhouette: '#ff2a4a',
   /** Silhouette spikes per hunter type, so each kind is recognisable at a glance. */

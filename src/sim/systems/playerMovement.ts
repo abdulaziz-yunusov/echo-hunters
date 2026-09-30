@@ -1,4 +1,5 @@
 import { GAME } from '@/config/game';
+import { SURFACES } from '@/config/surfaces';
 import type { Player } from '../entities/player';
 import type { SimContext } from '../gameState';
 import type { PlayerInput } from '../playerInput';
@@ -61,7 +62,8 @@ export function updatePlayerMovement(
     const strideLength = cfg.speed * cfg.footstepInterval;
     while (player.stride >= strideLength) {
       player.stride -= strideLength;
-      ctx.emitSound('step', player.x, player.y, player.id);
+      const surface = ctx.state.layout.tiles.surfaceAt(player.x, player.y);
+      ctx.emitSound(SURFACES[surface].playerStep, player.x, player.y, player.id);
     }
   }
 

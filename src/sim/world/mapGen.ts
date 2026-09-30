@@ -4,6 +4,7 @@ import { HUNTER_COMMON } from '@/config/hunters';
 import type { Rect } from '@/core/geometry';
 import { deriveSeed, Rng } from '@/core/rng';
 import { distanceField, UNREACHABLE } from './pathfinding';
+import { placeSurfaces } from './surfaces';
 import { DIRS4, FLOOR, TileMap, WALL, type TileCoord } from './tileMap';
 
 export interface MapGenOptions {
@@ -110,6 +111,10 @@ function tryGenerate(o: MapGenOptions, seed: number): MapLayout | null {
   const hunterSpawns = pickHunterSpawns(tiles, fields, o.hunterSpawnMinTiles, [beacon, ...cores]);
   if (hunterSpawns.length < o.hunterSpawnsNeeded) return null;
   rng.shuffle(hunterSpawns);
+
+  // Last, on their own stream: floors never change the maze, rooms or spawns.
+  const areaScale = (o.cellsX * o.cellsY) / (GAME.map.cellsX * GAME.map.cellsY);
+  placeSurfaces(tiles, { seed, spawns, cores, beacon, areaScale });
 
   return { seed, tiles, rooms, spawns, beacon, cores, hunterSpawns };
 }

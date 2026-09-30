@@ -13,9 +13,11 @@ import {
   drawPickupIcons,
   drawPickups,
   pickupKey,
+  revealAlpha,
 } from './objectRenderer';
 import { drawPlayer, drawRivalOutline, drawStones, RIVAL_KEY } from './playerRenderer';
 import { RevealMap, type RevealableObject } from './revealMap';
+import { drawSurfaces, listSurfaceTiles, type SurfaceTile } from './surfaceRenderer';
 import { WallLayer } from './wallLayer';
 import { drawWavePolygons, drawWaves } from './waveLayer';
 
@@ -33,6 +35,8 @@ export class WorldRenderer {
   private readonly wallLayer: WallLayer;
   private readonly fx = new Effects();
   private readonly ghostAlpha: number;
+  /** Metal and moss tiles: revealed by sound like objects. */
+  private readonly surfaces: SurfaceTile[];
   private readonly fadeSeconds = GAME.reveal.fadeMs / 1000;
   private readonly silhouetteSeconds = GAME.reveal.silhouetteFadeMs / 1000;
 
@@ -41,6 +45,7 @@ export class WorldRenderer {
     this.ghostAlpha = ghostAlpha;
     this.reveal = new RevealMap(sim.state.walls);
     this.wallLayer = new WallLayer(sim.state.walls);
+    this.surfaces = listSurfaceTiles(sim.state.layout.tiles);
 
     sim.events.on('soundEmitted', (s) => this.reveal.addWave(s.wave));
     // Personal flashes only: in a duel they must not give the rival's position away.
@@ -75,6 +80,7 @@ export class WorldRenderer {
     const { state } = this.sim;
     this.reveal.update(state.time);
     this.reveal.revealObjects(state.waves, revealables(state), state.time, dt);
+    this.reveal.revealObjects(state.waves, this.surfaces, state.time, dt);
     this.fx.update(dt);
   }
 
@@ -89,6 +95,10 @@ export class WorldRenderer {
       drawFullMap(ctx, state.layout, state.walls, pixel, true);
       ctx.globalAlpha = 1;
     }
+    const { tileSize } = state.layout.tiles;
+    drawSurfaces(ctx, this.surfaces, tileSize, pixel, (s) =>
+      revealAlpha(this.reveal.objectRevealTime(s.key), time, this.fadeSeconds, this.ghostAlpha),
+    );
     this.wallLayer.draw(
       ctx,
       this.reveal,
@@ -116,6 +126,7 @@ export class WorldRenderer {
   drawOverview(ctx: CanvasRenderingContext2D, pixel: number, alpha: number): void {
     const { state } = this.sim;
     drawFullMap(ctx, state.layout, state.walls, pixel, true);
+    drawSurfaces(ctx, this.surfaces, state.layout.tiles.tileSize, pixel, () => 1);
     drawWavePolygons(ctx, state.waves, pixel);
     drawHunterDebug(ctx, state.hunters, alpha, pixel);
     drawPickupIcons(ctx, state.pickups, pixel, () => 1);

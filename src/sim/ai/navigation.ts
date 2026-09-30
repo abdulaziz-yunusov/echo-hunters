@@ -1,4 +1,5 @@
 import { HUNTER_COMMON } from '@/config/hunters';
+import { SURFACES } from '@/config/surfaces';
 import type { Vec2 } from '@/core/geometry';
 import type { Hunter } from '../entities/hunter';
 import { moveCircle } from '../world/collision';
@@ -106,6 +107,7 @@ function leaveFootsteps(c: HunterContext, distance: number): void {
   const strideLength = def.speed * def.footstepInterval;
   while (h.stride >= strideLength) {
     h.stride -= strideLength;
-    c.sim.emitSound('hunterStep', h.x, h.y, h.id);
+    const surface = c.sim.state.layout.tiles.surfaceAt(h.x, h.y);
+    c.sim.emitSound(SURFACES[surface].hunterStep, h.x, h.y, h.id);
   }
 }

@@ -5,7 +5,10 @@ import type { SoundKindId } from './sounds';
 export const SYNTHS = [
   'ping',
   'step',
+  'stepMetal',
+  'stepSoft',
   'hunterStep',
+  'hunterStepMetal',
   'stone',
   'throw',
   'shockwave',
@@ -36,11 +39,14 @@ export interface SpatialSoundDef {
 /** How each in-world sound is played for the player (GDD §10). */
 export const AUDIO_SOUNDS = {
   step: { synth: 'step', range: 220, volume: 0.35 },
+  stepMetal: { synth: 'stepMetal', range: 420, volume: 0.5 },
+  stepSoft: { synth: 'stepSoft', range: 120, volume: 0.2 },
   ping: { synth: 'ping', range: 700, volume: 0.55 },
   stoneImpact: { synth: 'stone', range: 700, volume: 0.6 },
   shockwave: { synth: 'shockwave', range: 800, volume: 0.9 },
   // Hunters are heard from much further than their rings reach: the headphone advantage.
   hunterStep: { synth: 'hunterStep', range: 460, volume: 0.9 },
+  hunterStepMetal: { synth: 'hunterStepMetal', range: 650, volume: 1 },
   listenerScream: { synth: 'scream', range: 1500, volume: 1 },
   beacon: { synth: 'beacon', range: 1600, volume: 0.8 },
   wallBump: { synth: 'wallBump', range: 320, volume: 0.6 },

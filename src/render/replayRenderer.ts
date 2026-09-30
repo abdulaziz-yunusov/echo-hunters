@@ -18,7 +18,20 @@ import type { SoundKindId } from '@/config/sounds';
 import { drawHunterShape } from './hunterRenderer';
 import { drawAllWalls } from './mapDebug';
 import { drawPickupIcons } from './objectRenderer';
+import { drawSurfaces, listSurfaceTiles, type SurfaceTile } from './surfaceRenderer';
 import { drawWaves } from './waveLayer';
+
+/** Surface tiles per replay, listed once. */
+const surfaceCache = new WeakMap<Replay, SurfaceTile[]>();
+
+function surfacesOf(replay: Replay): SurfaceTile[] {
+  let list = surfaceCache.get(replay);
+  if (!list) {
+    list = listSurfaceTiles(replay.layout.tiles);
+    surfaceCache.set(replay, list);
+  }
+  return list;
+}
 
 /** Colors of timeline marks (and of the matching symbols on the map). */
 export const MARK_COLORS: Record<ReplayMarkKind, ColorKey> = {
@@ -60,6 +73,7 @@ export function drawReplayWorld(
   pixel: number,
 ): void {
   const at = samplePointAt(replay, t);
+  drawSurfaces(ctx, surfacesOf(replay), replay.layout.tiles.tileSize, pixel, () => 0.7);
   drawAllWalls(ctx, replay.walls, pixel);
   drawObjects(ctx, replay, t, pixel);
   drawPlayerPath(ctx, replay, t, at, pixel);

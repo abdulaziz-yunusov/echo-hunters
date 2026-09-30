@@ -10,8 +10,9 @@ import { hasLineOfSight } from '@/sim/world/visibility';
  * - basic: the Phase 9 bot. Knows the map, walks the shortest route to the
  *   nearest core, then the beacon, pings every 4 s, never sneaks or uses tools.
  * - careful: the same route, but plays like someone with headphones: sneaks
- *   when a hunter is close, throws a stone to the side when one is coming,
- *   shocks it on contact, and pings less (never with a hunter nearby).
+ *   when a hunter is close (or on metal with one in earshot), throws a stone
+ *   to the side when one is coming, shocks it on contact, and pings less
+ *   (never with a hunter nearby).
  */
 export type BotProfile = 'basic' | 'careful';
 
@@ -83,7 +84,9 @@ export class Bot {
     }
 
     if (threat) {
-      input.sneak = threatDistance < this.tune.sneakRange;
+      // Close hunters: sneak. Any hunter in earshot: don't clang across metal grates.
+      const onMetal = state.layout.tiles.surfaceAt(player.x, player.y) === 'metal';
+      input.sneak = threatDistance < this.tune.sneakRange || onMetal;
       const reach = GAME.abilities.shockwave.effectRadius - threat.radius;
       if (
         threatDistance < reach &&

@@ -25,6 +25,9 @@ export interface SoundKindDef {
 /** GDD §4 sound table, plus hearing ranges (see DECISIONS.md, Phase 6). */
 export const SOUND_KINDS = {
   step: { maxRadius: 60, hearRadius: 90, speed: 200, color: 'dim', tags: ['footstep'] },
+  // Phase 16 floors: a clang on metal grates, a whisper on moss.
+  stepMetal: { maxRadius: 90, hearRadius: 180, speed: 220, color: 'white', tags: ['footstep'] },
+  stepSoft: { maxRadius: 40, hearRadius: 40, speed: 180, color: 'dim', tags: ['footstep'] },
   ping: { maxRadius: 400, hearRadius: 800, speed: 350, color: 'cyan', tags: ['ping'] },
   stoneImpact: {
     maxRadius: 250,
@@ -35,6 +38,13 @@ export const SOUND_KINDS = {
   },
   shockwave: { maxRadius: 180, hearRadius: 400, speed: 600, color: 'red', tags: ['shockwave'] },
   hunterStep: { maxRadius: 80, hearRadius: 80, speed: 200, color: 'orange', tags: ['hunter'] },
+  hunterStepMetal: {
+    maxRadius: 120,
+    hearRadius: 120,
+    speed: 220,
+    color: 'orange',
+    tags: ['hunter'],
+  },
   listenerScream: {
     maxRadius: 900,
     hearRadius: 1400,

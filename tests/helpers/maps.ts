@@ -12,11 +12,18 @@ const NO_BEACON: TileCoord = { tx: -100, ty: -100 };
 /**
  * Build a tile map from rows of characters:
  * '#' wall, '.' floor, 'P' player spawn, 'C' Signal Core, 'B' beacon, 'H' hunter spawn
- * (all on floor).
+ * (all on floor), '=' metal grate floor, '~' moss floor.
  */
 export function fromAscii(rows: string[]): TileMap {
   const map = new TileMap(rows[0].length, rows.length, TS);
-  rows.forEach((row, ty) => [...row].forEach((c, tx) => c !== '#' && map.set(tx, ty, FLOOR)));
+  rows.forEach((row, ty) =>
+    [...row].forEach((c, tx) => {
+      if (c === '#') return;
+      map.set(tx, ty, FLOOR);
+      if (c === '=') map.setSurface(tx, ty, 'metal');
+      if (c === '~') map.setSurface(tx, ty, 'soft');
+    }),
+  );
   return map;
 }
 

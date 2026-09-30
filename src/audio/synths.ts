@@ -94,6 +94,24 @@ export const SYNTHS: Record<SynthName, Synth> = {
     tone(ctx, out, 'sine', 75 * p, 55 * p, 0.1, 0.5, 0.004, 0.12);
   },
 
+  // A grate under your feet: a bright, ringing clank.
+  stepMetal: (ctx, out, n, p) => {
+    noiseBurst(ctx, out, n, 'bandpass', 3200 * p, 4, 0.6, 0.002, 0.09);
+    tone(ctx, out, 'triangle', 1850 * p, 1780 * p, 0.2, 0.18, 0.002, 0.25);
+    tone(ctx, out, 'triangle', 2790 * p, 2700 * p, 0.2, 0.08, 0.002, 0.18);
+  },
+
+  // Moss: barely a brush.
+  stepSoft: (ctx, out, n, p) => noiseBurst(ctx, out, n, 'lowpass', 500 * p, 0.5, 0.35, 0.01, 0.08),
+
+  // A hunter on a grate: its heavy thump with a metal ring over it.
+  hunterStepMetal: (ctx, out, n, p) => {
+    noiseBurst(ctx, out, n, 'lowpass', 380 * p, 0.7, 0.9, 0.004, 0.14);
+    tone(ctx, out, 'sine', 75 * p, 55 * p, 0.1, 0.5, 0.004, 0.12);
+    tone(ctx, out, 'triangle', 930 * p, 900 * p, 0.3, 0.2, 0.003, 0.4);
+    noiseBurst(ctx, out, n, 'bandpass', 2400 * p, 5, 0.35, 0.002, 0.12);
+  },
+
   // A knock, with a faint ping under it: the decoy fakes a ping.
   stone: (ctx, out, n, p) => {
     tone(ctx, out, 'triangle', 950 * p, 600 * p, 0.05, 0.4, 0.002, 0.09);

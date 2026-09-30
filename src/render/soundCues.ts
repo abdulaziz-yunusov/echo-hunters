@@ -7,6 +7,8 @@ import type { Vec2 } from '@/core/geometry';
 /** What each sound looks like as a cue. Sounds not listed get none. */
 const CUE_COLORS: Partial<Record<SynthName, ColorKey>> = {
   hunterStep: 'orange',
+  hunterStepMetal: 'orange',
+  stepMetal: 'white',
   scream: 'red',
   shockwave: 'red',
   ping: 'cyan',
