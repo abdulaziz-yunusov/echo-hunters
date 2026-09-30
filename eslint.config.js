@@ -12,6 +12,13 @@ export default tseslint.config(
     },
   },
   {
+    // Node scripts (tools/*.mjs) run outside the browser.
+    files: ['tools/**/*.mjs'],
+    languageOptions: {
+      globals: { process: 'readonly', console: 'readonly', URL: 'readonly' },
+    },
+  },
+  {
     // The simulation must stay deterministic (multiplayer seed sync, replays)
     // and must not depend on the browser.
     files: ['src/sim/**/*.ts', 'src/config/**/*.ts', 'src/core/**/*.ts', 'src/replay/**/*.ts'],

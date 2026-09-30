@@ -13,7 +13,8 @@
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.node.json",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "check": "npm run typecheck && npm run lint && npm run test"
+    "check": "npm run typecheck && npm run lint && npm run test",
+    "balance": "node tools/balance/run.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
