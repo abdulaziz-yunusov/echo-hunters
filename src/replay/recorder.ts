@@ -51,6 +51,7 @@ export class ReplayRecorder {
       emitters: state.emitters.map((e) => ({ id: e.id, type: e.type, x: e.x, y: e.y, spells: [] })),
       beacon: { x: state.beacon.x, y: state.beacon.y, activeAt: null },
       outcome: null,
+      duel: state.rival ? { rivalId: state.rival.id, rival: emptyTrack(), winner: null } : null,
     };
     this.listen();
     this.sample();
@@ -81,6 +82,8 @@ export class ReplayRecorder {
     r.times.push(state.time);
     const p = state.player;
     push(r.player, p.x, p.y, p.sneaking ? PLAYER_SNEAKING : 0);
+    // The rival's position comes from the network; whether they sneak does not.
+    if (r.duel && state.rival) push(r.duel.rival, state.rival.x, state.rival.y, 0);
     for (const rh of r.hunters) {
       const h = state.hunters.find((x) => x.id === rh.id);
       if (h) push(rh.track, h.x, h.y, HUNTER_STATE_CODES.indexOf(h.state));
@@ -123,6 +126,15 @@ export class ReplayRecorder {
       mark('beacon', e.x, e.y);
     });
     on('playerHit', (e) => mark('hit', e.x, e.y));
+    // Duel: cores knocked loose are new cores on the floor from now on.
+    on('coresDropped', (e) => {
+      for (const c of e.cores) {
+        r.cores.push({ id: c.id, x: c.x, y: c.y, takenAt: null, appearedAt: state.time });
+      }
+    });
+    on('duelEnded', (e) => {
+      if (r.duel) r.duel.winner = e.winner;
+    });
     on('hunterStunned', (e) => mark('stun', e.x, e.y));
     on('closeCall', (e) => mark('close', e.x, e.y));
     on('roundEnded', (e) => {

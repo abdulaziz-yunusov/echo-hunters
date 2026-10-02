@@ -12,6 +12,8 @@ import {
   tryExtract,
   tryGrant,
 } from '@/sim/systems/duel';
+import type { Replay } from '@/replay/replay';
+import { packReplay, unpackReplay } from '@/replay/wire';
 import { Interpolator } from './interpolation';
 import type { NetMessage } from './protocol';
 import type { Transport } from './transport';
@@ -43,6 +45,8 @@ export class NetSession {
   private snapshotTimer = 0;
   private closed = false;
   private closeListeners: (() => void)[] = [];
+  private recording: Replay | null = null;
+  private recordingListeners: ((replay: Replay) => void)[] = [];
 
   constructor(sim: Simulation, transport: Transport) {
     this.sim = sim;
@@ -89,6 +93,23 @@ export class NetSession {
 
   onDisconnect(listener: () => void): void {
     this.closeListeners.push(listener);
+  }
+
+  /**
+   * Host: send the finished round's recording to the client, for its debrief.
+   * Packing takes a moment (it is gzipped), so it goes out shortly after.
+   */
+  shareRecording(replay: Replay): void {
+    packReplay(replay).then(
+      (data) => this.send({ t: 'rec', data }),
+      () => {}, // no debrief for the client; the duel itself is unaffected
+    );
+  }
+
+  /** Client: `listener` gets the host's recording once it has arrived (at once if it has). */
+  onRecording(listener: (replay: Replay) => void): void {
+    if (this.recording) listener(this.recording);
+    else this.recordingListeners.push(listener);
   }
 
   /** Call once per tick, before the simulation steps. */
@@ -211,6 +232,9 @@ export class NetSession {
       case 'end':
         if (!this.isHost) declareWinner(sim, m.winner);
         break;
+      case 'rec':
+        if (!this.isHost && !this.recording) void this.receiveRecording(m.data);
+        break;
       case 'bye':
         this.markClosed();
         break;
@@ -274,6 +298,16 @@ export class NetSession {
       if (state.player.cores < state.duel.coresToWin) state.duel.extractPending = false;
     }
     if (m.winner !== null) declareWinner(this.sim, m.winner);
+  }
+
+  /** Rebuild the host's recording on this side's own copy of the map. */
+  private async receiveRecording(data: string): Promise<void> {
+    const { layout, walls } = this.sim.state;
+    const replay = await unpackReplay(data, layout, walls);
+    if (!replay || this.recording) return;
+    this.recording = replay;
+    for (const listener of this.recordingListeners) listener(replay);
+    this.recordingListeners = [];
   }
 
   private markClosed(): void {

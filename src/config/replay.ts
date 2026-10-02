@@ -15,4 +15,8 @@ export const REPLAY = {
   teleportDistance: 64,
   /** The player's most recent path is drawn brighter (s). */
   playerTrail: 3,
+  /** Duel recordings sent to the client (message `rec`): largest packed size (characters). */
+  maxPackedChars: 8_000_000,
+  /** …and largest size once unpacked (bytes), so a malformed message can't eat the memory. */
+  maxUnpackedBytes: 48_000_000,
 } as const;

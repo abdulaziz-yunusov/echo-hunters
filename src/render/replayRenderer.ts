@@ -10,6 +10,7 @@ import {
   samplePointAt,
   soundsAt,
   trackPosition,
+  viewedTracks,
   type Replay,
   type ReplayMarkKind,
   type ReplayTrack,
@@ -46,6 +47,9 @@ export const MARK_COLORS: Record<ReplayMarkKind, ColorKey> = {
   end: 'white',
 };
 
+/** The duel rival's path and dot (the HUD shows the rival in this color too). */
+export const RIVAL_COLOR: ColorKey = 'orange';
+
 /** Hunter trail color by AI state: chasing a sound is red, strolling is faint. */
 const HUNTER_STATE_COLORS: Record<(typeof HUNTER_STATE_CODES)[number], ColorKey> = {
   idle: 'orange',
@@ -67,15 +71,18 @@ const NOISE_MARKERS: Partial<Record<SoundKindId, ColorKey>> = {
 /**
  * One moment of a replay over the whole, fully lit map: the player's path so
  * far, where they made noise, hunters with their recent trails, and the
- * rings that were spreading. ctx must already be in world pixels.
+ * rings that were spreading. A duel shows both players: `viewerId`'s own
+ * path as usual, the rival's dashed. ctx must already be in world pixels.
  */
 export function drawReplayWorld(
   ctx: CanvasRenderingContext2D,
   replay: Replay,
   t: number,
   pixel: number,
+  viewerId = replay.playerId,
 ): void {
   const at = samplePointAt(replay, t);
+  const { mine, rival } = viewedTracks(replay, viewerId);
   drawSurfaces(ctx, surfacesOf(replay), replay.layout.tiles.tileSize, pixel, () => 0.7);
   drawAllWalls(ctx, replay.walls, pixel);
   drawObjects(ctx, replay, t, pixel);
@@ -85,7 +92,8 @@ export function drawReplayWorld(
     activeLeft: emitterActiveAt(e, t) ? 1 : 0,
   }));
   drawEmitters(ctx, emitters, null, t, 1, 0, pixel);
-  drawPlayerPath(ctx, replay, t, at, pixel);
+  if (rival) drawPlayerPath(ctx, replay, rival, t, at, pixel, true);
+  drawPlayerPath(ctx, replay, mine, t, at, pixel, false);
   drawNoiseMarkers(ctx, replay, t, pixel);
   drawHits(ctx, replay, t, pixel);
   for (const h of replay.hunters) {
@@ -94,7 +102,8 @@ export function drawReplayWorld(
     drawHunterShape(ctx, pos.x, pos.y, h.type, 0.8);
   }
   drawWaves(ctx, soundsAt(replay, t), 0, pixel);
-  drawPlayerDot(ctx, trackPosition(replay.player, at));
+  if (rival) drawPlayerDot(ctx, trackPosition(rival, at), true);
+  drawPlayerDot(ctx, trackPosition(mine, at), false);
 }
 
 function drawObjects(ctx: CanvasRenderingContext2D, replay: Replay, t: number, pixel: number) {
@@ -102,6 +111,7 @@ function drawObjects(ctx: CanvasRenderingContext2D, replay: Replay, t: number, p
   ctx.lineWidth = 1.5 * pixel;
   ctx.shadowBlur = THEME.glowBlur;
   for (const c of replay.cores) {
+    if ((c.appearedAt ?? 0) > t) continue; // a duel core not dropped yet
     const here = presentAt(c, t);
     ctx.globalAlpha = here ? 1 : 0.3;
     ctx.fillStyle = ctx.strokeStyle = ctx.shadowColor = THEME.colors.cyan;
@@ -122,16 +132,21 @@ function drawObjects(ctx: CanvasRenderingContext2D, replay: Replay, t: number, p
   drawPickupIcons(ctx, pickups, pixel, () => 0.9);
 }
 
-/** The whole path so far (sneaking dimmer), with the last few seconds brighter. */
+/**
+ * A player's whole path so far (sneaking dimmer), with the last few seconds
+ * brighter. A duel rival's is dashed and in the rival color.
+ */
 function drawPlayerPath(
   ctx: CanvasRenderingContext2D,
   replay: Replay,
+  track: ReplayTrack,
   t: number,
   at: SamplePoint,
   pixel: number,
+  rival: boolean,
 ) {
-  const { xy, codes } = replay.player;
-  const now = trackPosition(replay.player, at);
+  const { xy, codes } = track;
+  const now = trackPosition(track, at);
   const recentFrom = t - REPLAY.playerTrail;
   const styleOf = (i: number) =>
     ((codes[i] & PLAYER_SNEAKING) !== 0 ? 1 : 0) + (replay.times[i] >= recentFrom ? 2 : 0);
@@ -140,13 +155,18 @@ function drawPlayerPath(
   ctx.lineWidth = 2 * pixel;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
+  if (rival) ctx.setLineDash([6 * pixel, 5 * pixel]);
   // Segment i runs from sample i to sample i + 1 (the last one to "now").
   // Runs of segments with the same look go into one stroke.
   let i = 0;
   while (i <= at.i) {
     const style = styleOf(i);
     const sneaking = (style & 1) !== 0;
-    ctx.strokeStyle = sneaking ? THEME.colors.cyan : THEME.colors.white;
+    ctx.strokeStyle = rival
+      ? THEME.colors[RIVAL_COLOR]
+      : sneaking
+        ? THEME.colors.cyan
+        : THEME.colors.white;
     ctx.globalAlpha = (sneaking ? 0.3 : 0.45) * (style & 2 ? 2 : 1);
     ctx.beginPath();
     ctx.moveTo(xy[i * 2], xy[i * 2 + 1]);
@@ -161,14 +181,14 @@ function drawPlayerPath(
   ctx.restore();
 }
 
-/** A small ring where each loud noise of the player's started. */
+/** A small ring where each loud noise of a player's started. */
 function drawNoiseMarkers(ctx: CanvasRenderingContext2D, replay: Replay, t: number, pixel: number) {
   ctx.save();
   ctx.lineWidth = 1.5 * pixel;
   for (const s of replay.sounds) {
     if (s.startTime > t) break;
     const color = NOISE_MARKERS[s.kind];
-    if (!color || s.owner !== replay.playerId) continue;
+    if (!color || (s.owner !== replay.playerId && s.owner !== replay.duel?.rivalId)) continue;
     ctx.globalAlpha = 0.7;
     ctx.strokeStyle = THEME.colors[color];
     ctx.beginPath();
@@ -226,15 +246,17 @@ function drawTrail(
   ctx.restore();
 }
 
-function drawPlayerDot(ctx: CanvasRenderingContext2D, p: Vec2) {
+function drawPlayerDot(ctx: CanvasRenderingContext2D, p: Vec2, rival: boolean) {
+  // Palette colors are #rrggbb: add an alpha byte for the aura.
+  const color = rival ? THEME.colors[RIVAL_COLOR] : THEME.player.color;
   const aura = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, THEME.player.auraRadius);
-  aura.addColorStop(0, 'rgba(255, 255, 255, 0.35)');
-  aura.addColorStop(1, 'rgba(255, 255, 255, 0)');
+  aura.addColorStop(0, `${color}59`);
+  aura.addColorStop(1, `${color}00`);
   ctx.fillStyle = aura;
   ctx.beginPath();
   ctx.arc(p.x, p.y, THEME.player.auraRadius, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = THEME.player.color;
+  ctx.fillStyle = color;
   ctx.beginPath();
   ctx.arc(p.x, p.y, GAME.player.radius, 0, Math.PI * 2);
   ctx.fill();

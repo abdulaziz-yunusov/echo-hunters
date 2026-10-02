@@ -1,8 +1,9 @@
+import { REPLAY } from '@/config/replay';
 import { SOUND_KINDS, type SoundKindId } from '@/config/sounds';
 import type { TakeKind } from '@/sim/gameState';
 
 /** Bump when messages change shape; mismatched players are told to reload. */
-export const PROTOCOL_VERSION = 2;
+export const PROTOCOL_VERSION = 3;
 
 export type { TakeKind };
 
@@ -64,6 +65,8 @@ export type NetMessage =
     }
   /** Host → client: the duel is over. */
   | { t: 'end'; winner: number }
+  /** Host → client, after the end: the round's recording for the debrief (replay/wire.ts). */
+  | { t: 'rec'; data: string }
   /** Leaving on purpose. */
   | { t: 'bye' };
 
@@ -127,5 +130,6 @@ const VALIDATORS: Record<MessageType, (m: Rec) => boolean> = {
     typeof m.beacon === 'boolean' &&
     (m.winner === null || int(m.winner)),
   end: (m) => int(m.winner),
+  rec: (m) => typeof m.data === 'string' && m.data.length <= REPLAY.maxPackedChars,
   bye: () => true,
 };

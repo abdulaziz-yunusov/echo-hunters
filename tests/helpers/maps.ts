@@ -11,8 +11,8 @@ const NO_BEACON: TileCoord = { tx: -100, ty: -100 };
 
 /**
  * Build a tile map from rows of characters:
- * '#' wall, '.' floor, 'P' player spawn, 'C' Signal Core, 'B' beacon, 'H' hunter spawn
- * (all on floor), '=' metal grate floor, '~' moss floor.
+ * '#' wall, '.' floor, 'P' player spawn (a second P is the duel guest's), 'C' Signal Core,
+ * 'B' beacon, 'H' hunter spawn (all on floor), '=' metal grate floor, '~' moss floor.
  */
 export function fromAscii(rows: string[]): TileMap {
   const map = new TileMap(rows[0].length, rows.length, TS);
@@ -39,13 +39,13 @@ function find(rows: string[], char: string): TileCoord[] {
 
 /** A minimal layout around hand-drawn tiles, for system tests. */
 export function layoutFromAscii(rows: string[]): MapLayout {
-  const [spawn] = find(rows, 'P');
-  if (!spawn) throw new Error('ASCII map needs a P (spawn)');
+  const spawns = find(rows, 'P');
+  if (spawns.length === 0) throw new Error('ASCII map needs a P (spawn)');
   return {
     seed: 0,
     tiles: fromAscii(rows),
     rooms: [],
-    spawns: [spawn],
+    spawns,
     beacon: find(rows, 'B')[0] ?? NO_BEACON,
     cores: find(rows, 'C'),
     hunterSpawns: find(rows, 'H'),

@@ -2,6 +2,7 @@ import { GAME } from '@/config/game';
 import { HUNTER_TYPES, type HunterTypeId } from '@/config/hunters';
 import { createSimulation } from '@/sim/simulation';
 import { Bot, BOT_PROFILES, type BotProfile } from './bot';
+import { formatDuelTable, MAX_LAG, measureDuels } from './duelBalance';
 
 /** A round the bot hasn't finished by then counts as failed (s). */
 export const ROUND_LIMIT = 300;
@@ -124,19 +125,31 @@ export function parseLevels(text: string): number[] {
   return levels;
 }
 
-const USAGE = `npm run balance -- [--levels 1-8] [--maps 40] [--profile basic|careful|all] [--hunters stalker,listener]`;
+const USAGE = `npm run balance -- [--levels 1-8] [--maps 40] [--profile basic|careful|all] [--hunters stalker,listener]
+       npm run balance -- --duel [--maps 40]`;
 
 export interface CliOptions {
   levels: number[];
   maps: number;
   profiles: BotProfile[];
   hunters?: HunterTypeId[];
+  /** Measure duels (two duel bots) instead of solo levels. */
+  duel: boolean;
 }
 
 export function parseArgs(argv: readonly string[]): CliOptions {
-  const options: CliOptions = { levels: parseLevels('1-8'), maps: 40, profiles: ['basic'] };
+  const options: CliOptions = {
+    levels: parseLevels('1-8'),
+    maps: 40,
+    profiles: ['basic'],
+    duel: false,
+  };
   for (let i = 0; i < argv.length; i++) {
     const flag = argv[i];
+    if (flag === '--duel') {
+      options.duel = true;
+      continue;
+    }
     const value = argv[i + 1];
     if (value === undefined) throw new Error(`${flag} needs a value.\n${USAGE}`);
     i++;
@@ -158,9 +171,17 @@ export function parseArgs(argv: readonly string[]): CliOptions {
   return options;
 }
 
-/** Entry point (see tools/balance/run.mjs). Prints one table per profile. */
+/** Entry point (see tools/balance/run.mjs). Prints one table per profile, or the duel table. */
 export function main(argv: readonly string[], log: (line: string) => void = console.log): void {
   const cli = parseArgs(argv);
+  if (cli.duel) {
+    const started = Date.now();
+    const stats = measureDuels(cli.maps);
+    log(`\nduel bot vs duel bot · ${cli.maps} maps · lag 0–${MAX_LAG} ticks\n`);
+    log(formatDuelTable(stats));
+    log(`\n(${((Date.now() - started) / 1000).toFixed(1)} s)`);
+    return;
+  }
   const note = cli.hunters ? ` · hunters ${cli.hunters.join(',')}` : '';
   for (const profile of cli.profiles) {
     const started = Date.now();

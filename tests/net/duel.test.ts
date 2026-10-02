@@ -1,51 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { GAME } from '@/config/game';
-import type { HunterTypeId } from '@/config/hunters';
 import { Rng } from '@/core/rng';
-import { createLoopbackPair } from '@/net/loopback';
-import { NetSession } from '@/net/netSession';
-import type { Player } from '@/sim/entities/player';
-import { IDLE_INPUT, type PlayerInput } from '@/sim/playerInput';
-import { createDuelSimulation, type Simulation } from '@/sim/simulation';
+import type { Simulation } from '@/sim/simulation';
 import { hitPlayer } from '@/sim/systems/duel';
+import { duel, DUEL_DT, floorAt, teleport } from '../helpers/duel';
 
-const DT = 1 / 60;
-const SEED = 20260929;
-
-/** Host and client simulations joined by an in-memory link with `latency` ticks each way. */
-function duel(latency = 3, hunters: HunterTypeId[] = []) {
-  const link = createLoopbackPair(latency);
-  const host = createDuelSimulation({ seed: SEED, role: 'host', hunters });
-  const client = createDuelSimulation({ seed: SEED, role: 'client', hunters });
-  const hostNet = new NetSession(host, link.a);
-  const clientNet = new NetSession(client, link.b);
-  const step = (
-    hostInput: Partial<PlayerInput> = {},
-    clientInput: Partial<PlayerInput> = {},
-    ticks = 1,
-  ) => {
-    for (let i = 0; i < ticks; i++) {
-      hostNet.tick(DT);
-      clientNet.tick(DT);
-      host.step({ ...IDLE_INPUT, ...hostInput }, DT);
-      client.step({ ...IDLE_INPUT, ...clientInput }, DT);
-      link.pump();
-    }
-  };
-  const settle = () => step({}, {}, 40);
-  return { host, client, hostNet, clientNet, step, settle };
-}
-
-/** Center of the floor tile under (x, y): a safe place to put someone. */
-function floorAt(sim: Simulation, x: number, y: number) {
-  const { tiles } = sim.state.layout;
-  return tiles.center({ tx: tiles.toTile(x), ty: tiles.toTile(y) });
-}
-
-function teleport(p: Player, x: number, y: number) {
-  p.x = p.prevX = x;
-  p.y = p.prevY = y;
-}
+const DT = DUEL_DT;
 
 /** Everything contested must look the same on both machines. */
 function expectSamePicture(host: Simulation, client: Simulation) {

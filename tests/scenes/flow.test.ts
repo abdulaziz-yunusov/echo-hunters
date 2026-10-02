@@ -15,9 +15,12 @@ import { createScene } from '@/scenes/registry';
 import { newRun } from '@/scenes/run';
 import type { AppContext, SceneArgs, SceneId } from '@/scenes/scene';
 import { SceneManager } from '@/scenes/sceneManager';
-import { ROW_HEIGHT } from '@/ui/menuList';
+import { ROW_HEIGHT, type MenuList } from '@/ui/menuList';
+import type { DuelEndScene } from '@/scenes/duelEndScene';
+import { flushLink, recordedDuel } from '../helpers/duel';
 import { createLoopbackPair } from '@/net/loopback';
 import { ReplayRecorder } from '@/replay/recorder';
+import { toWire } from '@/replay/wire';
 import { IDLE_INPUT } from '@/sim/playerInput';
 import { createSimulation, type Simulation } from '@/sim/simulation';
 
@@ -311,6 +314,86 @@ describe('screen flow', () => {
     t.render();
   });
 
+  it('duel end: the host opens the debrief at once, as itself', () => {
+    const { hostNet, replay } = recordedDuel();
+    const t = testApp();
+    t.app.goTo('duelEnd', { outcome: 'lost', net: hostNet, replay, viewerId: 1 });
+    t.idle(1);
+    t.choose(0); // MAP
+    expect(t.current()).toBe('Replay');
+    expect((t.scenes.current as unknown as { viewerId: number }).viewerId).toBe(1);
+    t.render();
+    t.press({ back: true });
+    expect(t.current()).toBe('DuelEnd');
+    // Leaving the screen closes the connection it was handed.
+    t.choose(2); // MAP, NEW DUEL, MAIN MENU
+    expect(t.current()).toBe('Menu');
+    expect(hostNet.disconnected).toBe(true);
+  });
+
+  it('duel end: the client waits for the recording, then opens the debrief as itself', async () => {
+    const { hostNet, clientNet, link, replay } = recordedDuel();
+    const t = testApp();
+    t.app.goTo('duelEnd', { outcome: 'won', net: clientNet, viewerId: 2 });
+    t.idle(1);
+    const scene = t.scenes.current as DuelEndScene;
+    expect(scene.debrief).toBeNull();
+    t.render(); // MAP shows RECEIVING…
+
+    hostNet.shareRecording(replay);
+    await flushLink(link);
+    t.idle(0.1);
+    expect(scene.debrief).not.toBeNull();
+    t.press({ navY: -1 }); // the selection stayed on NEW DUEL: up to MAP
+    t.press({ confirm: true });
+    expect(t.current()).toBe('Replay');
+    expect((t.scenes.current as unknown as { viewerId: number }).viewerId).toBe(2);
+    t.render();
+  });
+
+  it('duel end: if the host leaves first, MAP says the recording never came', () => {
+    const { hostNet, clientNet, link } = recordedDuel();
+    const t = testApp();
+    t.app.goTo('duelEnd', { outcome: 'won', net: clientNet, viewerId: 2 });
+    hostNet.dispose();
+    link.pump();
+    t.idle(1);
+    const map = (t.scenes.current as unknown as { menu: MenuList }).menu.items[0];
+    expect(map).toMatchObject({ label: 'MAP', disabled: true, note: 'NOT RECEIVED' });
+  });
+
+  it('a duel played in the scenes ends with the same debrief on both sides', async () => {
+    const link = createLoopbackPair(2);
+    const host = testApp();
+    const client = testApp();
+    host.app.goTo('duel', { transport: link.a, role: 'host', seed: 9 });
+    client.app.goTo('duel', { transport: link.b, role: 'client', seed: 9 });
+    const tick = (n: number) => {
+      for (let i = 0; i < n; i++) {
+        host.press({});
+        client.press({});
+        link.pump();
+      }
+    };
+    // The client walks onto two cores, then onto the beacon.
+    const me = (client.scenes.current as unknown as { sim: Simulation }).sim.state;
+    for (const spot of [...me.cores.slice(0, 2), me.beacon]) {
+      me.player.x = me.player.prevX = spot.x;
+      me.player.y = me.player.prevY = spot.y;
+      tick(30);
+    }
+    expect(me.status).toBe('extracted');
+    tick(150); // the end lingers 2 s
+    await flushLink(link);
+    expect(host.current()).toBe('DuelEnd');
+    expect(client.current()).toBe('DuelEnd');
+    const hostDebrief = (host.scenes.current as DuelEndScene).debrief;
+    const clientDebrief = (client.scenes.current as DuelEndScene).debrief;
+    expect(hostDebrief?.duel?.winner).toBe(2);
+    expect(clientDebrief).not.toBeNull();
+    expect(toWire(clientDebrief!)).toEqual(toWire(hostDebrief!));
+  });
+
   it('every screen renders without errors', () => {
     const t = testApp();
     const score = {
@@ -323,6 +406,7 @@ describe('screen flow', () => {
       total: 980,
     };
     const run = newRun(1, 'hard');
+    const duelReplay = recordedDuel().replay;
     const screens: [SceneId, unknown?][] = [
       ['menu'],
       ['howToPlay'],
@@ -337,6 +421,8 @@ describe('screen flow', () => {
       ['duel', { transport: createLoopbackPair().a, role: 'host', seed: 5 }],
       ['duel', { transport: createLoopbackPair().b, role: 'client', seed: 5 }],
       ['duelEnd', { outcome: 'won' }],
+      ['duelEnd', { outcome: 'lost', replay: duelReplay, viewerId: 1 }],
+      ['replay', { replay: duelReplay, viewerId: 2 }],
     ];
     for (const [id, params] of screens) {
       (t.app.goTo as (id: SceneId, p?: unknown) => void)(id, params);

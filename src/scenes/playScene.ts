@@ -14,6 +14,7 @@ import { WorldRenderer } from '@/render/worldRenderer';
 import { roundResult, scoreRound } from '@/sim/scoring';
 import { levelDef } from '@/sim/level';
 import { createSimulation, type Simulation } from '@/sim/simulation';
+import { warpToObjective } from './debugWarp';
 import type { RunState } from './run';
 import { Tutorial } from './tutorial';
 import { RoundDisplay } from './roundDisplay';
@@ -67,7 +68,7 @@ export class PlayScene implements Scene {
       this.start();
     }
     if (debug.enabled && input.debugOverview) this.overview = !this.overview;
-    if (debug.enabled && input.debugWarp) this.warpToObjective();
+    if (debug.enabled && input.debugWarp) warpToObjective(this.sim.state);
     if (debug.enabled && input.debugHearing) {
       const s = this.sim.state;
       s.hearingModel = s.hearingModel === 'path' ? 'los' : 'path';
@@ -287,22 +288,5 @@ export class PlayScene implements Scene {
     } else {
       this.app.goTo('gameOver', { run: this.run, score, replay });
     }
-  }
-
-  /**
-   * Debug only: jump to the nearest remaining core, else to the beacon. The
-   * game's own rules then collect or extract. (Edits sim state from outside,
-   * so never use it outside debug: it would break replays.)
-   */
-  private warpToObjective(): void {
-    const { player, cores, beacon } = this.sim.state;
-    const remaining = cores.filter((c) => !c.collected);
-    const target =
-      remaining.sort(
-        (a, b) =>
-          Math.hypot(a.x - player.x, a.y - player.y) - Math.hypot(b.x - player.x, b.y - player.y),
-      )[0] ?? beacon;
-    player.x = player.prevX = target.x;
-    player.y = player.prevY = target.y;
   }
 }

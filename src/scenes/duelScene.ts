@@ -10,9 +10,12 @@ import { drawHud } from '@/render/hud';
 import { drawAimGuide, playerDrawPosition } from '@/render/playerRenderer';
 import { drawText } from '@/render/text';
 import { WorldRenderer } from '@/render/worldRenderer';
+import { ReplayRecorder } from '@/replay/recorder';
+import type { Replay } from '@/replay/replay';
 import { createDuelSimulation, type Simulation } from '@/sim/simulation';
 import { MenuList } from '@/ui/menuList';
 import { drawMenu, drawTitle } from '@/ui/menuRenderer';
+import { warpToObjective } from './debugWarp';
 import { RoundDisplay } from './roundDisplay';
 import type { AppContext, Scene } from './scene';
 
@@ -37,6 +40,11 @@ export class DuelScene implements Scene {
   private readonly display: RoundDisplay;
   private readonly menu: MenuList;
   private readonly role: 'host' | 'client';
+  /** The host records the round for both players' debrief (Phase 25). */
+  private readonly recorder: ReplayRecorder | null;
+  private replay: Replay | null = null;
+  /** The connection went on to Duel End, which closes it. */
+  private handedOver = false;
   private menuOpen = false;
   private endedAt: number | null = null;
   private aimScreen: InputFrame['aim'] = null;
@@ -53,6 +61,7 @@ export class DuelScene implements Scene {
     this.display = new RoundDisplay(this.camera, this.world);
     this.audio = new AudioDirector(this.sim, this.display.output(app.sound));
     this.net = new NetSession(this.sim, params.transport);
+    this.recorder = params.role === 'host' ? new ReplayRecorder(this.sim, params.seed) : null;
     this.net.onDisconnect(() => {
       if (this.sim.state.status === 'playing') app.goTo('duelEnd', { outcome: 'disconnected' });
     });
@@ -72,6 +81,7 @@ export class DuelScene implements Scene {
   update(dt: number, input: InputFrame): void {
     if (input.back || input.pause) this.menuOpen = !this.menuOpen;
     else if (this.menuOpen) this.menu.update(input);
+    if (this.app.debug.enabled && input.debugWarp) warpToObjective(this.sim.state);
 
     this.aimScreen = input.aim;
     // The world never pauses in a duel; with the menu open the player just stands still.
@@ -80,14 +90,25 @@ export class DuelScene implements Scene {
       toPlayerInput(input, (x, y) => this.camera.screenToWorld(x, y), this.menuOpen),
       dt,
     );
+    this.recorder?.afterStep();
     this.world.tick(dt);
     this.audio.tick();
     this.display.update(dt);
     this.camera.update(dt);
 
     const { state } = this.sim;
+    if (this.recorder && state.status !== 'playing' && !this.replay) {
+      this.replay = this.recorder.finish();
+      this.net.shareRecording(this.replay);
+    }
     if (this.endedAt !== null && state.time - this.endedAt >= END_DELAY) {
-      this.app.goTo('duelEnd', { outcome: state.status === 'extracted' ? 'won' : 'lost' });
+      this.handedOver = true;
+      this.app.goTo('duelEnd', {
+        outcome: state.status === 'extracted' ? 'won' : 'lost',
+        net: this.net,
+        replay: this.replay ?? undefined,
+        viewerId: state.player.id,
+      });
       return;
     }
     const rival = state.rival;
@@ -96,7 +117,7 @@ export class DuelScene implements Scene {
   }
 
   exit(): void {
-    this.net.dispose();
+    if (!this.handedOver) this.net.dispose();
     this.audio.dispose();
   }
 

@@ -1,8 +1,8 @@
 import { REPLAY } from '@/config/replay';
 import { THEME } from '@/config/theme';
 import type { InputFrame } from '@/input/inputFrame';
-import { replayDuration, type Replay, type ReplayMarkKind } from '@/replay/replay';
-import { drawReplayWorld, MARK_COLORS } from '@/render/replayRenderer';
+import { outcomeFor, replayDuration, type Replay, type ReplayMarkKind } from '@/replay/replay';
+import { drawReplayWorld, MARK_COLORS, RIVAL_COLOR } from '@/render/replayRenderer';
 import { drawText } from '@/render/text';
 import { formatTime } from '@/ui/format';
 import type { AppContext, Scene } from './scene';
@@ -17,6 +17,8 @@ const BAR_HEIGHT = 10;
 const BUTTON = { w: 80, h: 30 };
 /** Timeline marks explained above the bar, and the width of one 11 px monospace character. */
 const LEGEND: readonly ReplayMarkKind[] = ['hit', 'close', 'core', 'stun', 'pickup', 'beacon'];
+/** Duels have no close calls. */
+const DUEL_LEGEND = LEGEND.filter((k) => k !== 'close');
 const LEGEND_CHAR = 6.6;
 
 interface Rect {
@@ -28,7 +30,8 @@ interface Rect {
 
 /**
  * Watch a finished round again over the fully lit map (opened on top of the
- * level end or game over screen, and closed back to it). Keyboard: Enter
+ * level end, game over or duel end screen, and closed back to it). A duel
+ * debrief shows both players' paths, "you" being `viewerId`. Keyboard: Enter
  * plays / pauses, left / right seek, up / down change speed, Esc leaves.
  * Mouse: click the timeline to jump, or the buttons.
  */
@@ -36,14 +39,16 @@ export class ReplayScene implements Scene {
   readonly name = 'Replay';
   private readonly app: AppContext;
   private readonly replay: Replay;
+  private readonly viewerId: number;
   private readonly duration: number;
   private time = 0;
   private playing = true;
   private speedIndex: number = REPLAY.speeds.indexOf(REPLAY.defaultSpeed);
 
-  constructor(app: AppContext, params: { replay: Replay }) {
+  constructor(app: AppContext, params: { replay: Replay; viewerId?: number }) {
     this.app = app;
     this.replay = params.replay;
+    this.viewerId = params.viewerId ?? params.replay.playerId;
     this.duration = replayDuration(params.replay);
   }
 
@@ -93,7 +98,7 @@ export class ReplayScene implements Scene {
       TOP + (areaH - tiles.worldHeight * scale) / 2,
     );
     ctx.scale(scale, scale);
-    drawReplayWorld(ctx, this.replay, this.time, 1 / scale);
+    drawReplayWorld(ctx, this.replay, this.time, 1 / scale, this.viewerId);
     ctx.restore();
 
     this.drawHeader(ctx, width);
@@ -131,14 +136,15 @@ export class ReplayScene implements Scene {
 
   private drawHeader(ctx: CanvasRenderingContext2D, width: number): void {
     const r = this.replay;
-    drawText(ctx, `REPLAY · LEVEL ${r.level}`, width / 2, 34, {
+    const title = r.duel ? 'DUEL DEBRIEF' : `REPLAY · LEVEL ${r.level}`;
+    drawText(ctx, title, width / 2, 34, {
       size: 20,
       color: THEME.colors.cyan,
       align: 'center',
       glow: THEME.glowBlur,
     });
     const outcome =
-      r.outcome === 'extracted' ? 'EXTRACTED' : r.outcome === 'dead' ? 'SIGNAL LOST' : '';
+      OUTCOME_TEXT[`${r.duel ? 'duel' : 'solo'}:${outcomeFor(r, this.viewerId)}`] ?? '';
     drawText(ctx, [`SEED ${r.seed}`, outcome].filter(Boolean).join(' · '), width / 2, 54, {
       size: 12,
       color: THEME.colors.white,
@@ -146,6 +152,16 @@ export class ReplayScene implements Scene {
       alpha: 0.5,
     });
     button(ctx, this.backRect(), '◀ BACK');
+    if (r.duel) {
+      // Key to the two paths, top right.
+      const x = width - SIDE;
+      drawText(ctx, 'YOU ━━', x, 30, { size: 12, color: THEME.colors.white, align: 'right' });
+      drawText(ctx, 'RIVAL ┅┅', x, 46, {
+        size: 12,
+        color: THEME.colors[RIVAL_COLOR],
+        align: 'right',
+      });
+    }
   }
 
   private drawTimeline(ctx: CanvasRenderingContext2D): void {
@@ -184,7 +200,7 @@ export class ReplayScene implements Scene {
       { size: 12, color: white, align: 'right', alpha: 0.7 },
     );
     let lx = bar.x;
-    for (const kind of LEGEND) {
+    for (const kind of this.replay.duel ? DUEL_LEGEND : LEGEND) {
       const label = kind.toUpperCase();
       drawText(ctx, label, lx, bar.y - 14, {
         size: 11,
@@ -221,6 +237,14 @@ export class ReplayScene implements Scene {
     return { x: SIDE, y: 18, w: 100, h: BUTTON.h };
   }
 }
+
+/** Under the title: how the round ended, for whoever is watching. */
+const OUTCOME_TEXT: Record<string, string> = {
+  'solo:extracted': 'EXTRACTED',
+  'solo:dead': 'SIGNAL LOST',
+  'duel:extracted': 'YOU WON',
+  'duel:lost': 'YOU LOST',
+};
 
 function inside(r: Rect, x: number, y: number): boolean {
   return x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h;

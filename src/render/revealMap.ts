@@ -1,6 +1,6 @@
-import { pointInPolygon, pointSegmentDistance } from '@/core/geometry';
+import { pointSegmentDistance } from '@/core/geometry';
 import type { EntityId } from '@/sim/entities/entity';
-import { waveFaces, type SoundWave } from '@/sim/sound/soundWave';
+import { frontPassedOver, waveFaces, type SoundWave } from '@/sim/sound/soundWave';
 import type { WallGeometry } from '@/sim/world/edges';
 import { hasLineOfSight } from '@/sim/world/visibility';
 
@@ -66,13 +66,7 @@ export class RevealMap {
       for (const w of waves) {
         // A hunter's own footsteps do not show it.
         if (o.owner !== undefined && w.owner === o.owner) continue;
-        // Between where the front was last tick and where it is now.
-        // (Strict `<` so a sound's own source, at distance 0, is lit on its first tick.)
-        const d = Math.hypot(o.x - w.x, o.y - w.y);
-        const front = w.radius;
-        const before = front - w.speed * dt;
-        if (d > front || d < before) continue;
-        if (pointInPolygon(o.x, o.y, w.polygon)) {
+        if (frontPassedOver(w, o.x, o.y, dt)) {
           this.objectReveals.set(o.key, { time: now, x: o.x, y: o.y });
           break;
         }

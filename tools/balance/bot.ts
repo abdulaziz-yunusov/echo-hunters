@@ -41,11 +41,12 @@ const ARRIVE = 3;
 
 /** Decides a player's input every tick from the simulation's state. */
 export class Bot {
-  private readonly sim: Simulation;
+  protected readonly sim: Simulation;
   private readonly tune: (typeof PROFILE)[BotProfile];
   private readonly careful: boolean;
   private route: Vec2[] = [];
-  private target: Vec2 | null = null;
+  /** Where the bot is heading now (kept while still valid, so it doesn't dither). */
+  protected target: Vec2 | null = null;
   private plannedAt = -Infinity;
   private lastPing = -Infinity;
   private lastStone = -Infinity;
@@ -112,24 +113,31 @@ export class Bot {
   }
 
   /** The nearest remaining core by walking distance, then the beacon once it is awake. */
-  private nextTarget(): Vec2 | null {
-    const { cores, beacon, player, layout } = this.sim.state;
+  protected nextTarget(): Vec2 | null {
+    const { cores, beacon } = this.sim.state;
     const remaining = cores.filter((c) => !c.collected);
     if (remaining.length === 0) return beacon.active ? beacon : null;
-    if (remaining.length === 1) return remaining[0];
-    if (this.target && remaining.includes(this.target as (typeof remaining)[number])) {
-      return this.target;
-    }
+    return this.nearest(remaining);
+  }
+
+  /**
+   * The point closest by walking distance. The current target wins while it
+   * is still among them, so the bot doesn't switch back and forth.
+   */
+  protected nearest(points: readonly Vec2[]): Vec2 {
+    if (points.length === 1) return points[0];
+    if (this.target && points.includes(this.target)) return this.target;
+    const { player, layout } = this.sim.state;
     const { tiles } = layout;
     const field = distanceField(tiles, [
       { tx: tiles.toTile(player.x), ty: tiles.toTile(player.y) },
     ]);
-    let best = remaining[0];
+    let best = points[0];
     let bestSteps = Infinity;
-    for (const c of remaining) {
-      const steps = field[tiles.index(tiles.toTile(c.x), tiles.toTile(c.y))];
+    for (const p of points) {
+      const steps = field[tiles.index(tiles.toTile(p.x), tiles.toTile(p.y))];
       if (steps !== UNREACHABLE && steps < bestSteps) {
-        best = c;
+        best = p;
         bestSteps = steps;
       }
     }

@@ -1,5 +1,5 @@
 import { SOUND_KINDS, type SoundKindDef, type SoundKindId } from '@/config/sounds';
-import { inSector, type Sector, type Vec2 } from '@/core/geometry';
+import { inSector, pointInPolygon, type Sector, type Vec2 } from '@/core/geometry';
 import type { EntityId } from '../entities/entity';
 import type { WallGeometry } from '../world/edges';
 import { visibilityPolygon } from '../world/visibility';
@@ -78,6 +78,17 @@ export function arcHalfAngle(kind: SoundKindId): number | null {
 /** True if (x, y) lies in the direction the wave spreads (always, for a round one). */
 export function waveFaces(wave: SoundWave, x: number, y: number): boolean {
   return wave.arc === null || inSector(wave.arc, x - wave.x, y - wave.y);
+}
+
+/**
+ * Did the ring's front pass over (x, y) during the last tick, with nothing
+ * blocking the way? That is when a small thing standing there is seen.
+ * (Strict, so a sound's own source, at distance 0, counts on its first tick.)
+ */
+export function frontPassedOver(wave: SoundWave, x: number, y: number, dt: number): boolean {
+  const d = Math.hypot(x - wave.x, y - wave.y);
+  if (d > wave.radius || d < wave.radius - wave.speed * dt) return false;
+  return pointInPolygon(x, y, wave.polygon);
 }
 
 /** Grow every wave by one tick. */

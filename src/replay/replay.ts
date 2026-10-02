@@ -48,6 +48,8 @@ export interface ReplayMark {
 export interface ReplayThing extends Vec2 {
   id: number;
   takenAt: number | null;
+  /** When it appeared, if not at the start (a duel core dropped by a player who was hit). */
+  appearedAt?: number;
 }
 
 export interface ReplayPickup extends ReplayThing {
@@ -59,6 +61,13 @@ export interface ReplayEmitter extends Vec2 {
   id: number;
   type: EmitterTypeId;
   spells: number[];
+}
+
+/** A duel recording (made by the host) also has the other player and the winner. */
+export interface ReplayDuel {
+  rivalId: number;
+  rival: ReplayTrack;
+  winner: number | null;
 }
 
 /**
@@ -86,7 +95,10 @@ export interface Replay {
   pickups: ReplayPickup[];
   emitters: ReplayEmitter[];
   beacon: Vec2 & { activeAt: number | null };
+  /** How the round ended for the recorded player (`playerId`). */
   outcome: Exclude<RoundStatus, 'playing'> | null;
+  /** Duels only. */
+  duel: ReplayDuel | null;
 }
 
 /** Last sample time: how long the replay lasts. */
@@ -162,7 +174,27 @@ export function emitterActiveAt(emitter: ReplayEmitter, t: number): boolean {
   return lo > 0 && t - spells[lo - 1] < EMITTER_TYPES[emitter.type].activeTime;
 }
 
-/** Was the thing still there at time `t`? */
-export function presentAt(thing: { takenAt: number | null }, t: number): boolean {
-  return thing.takenAt === null || thing.takenAt > t;
+/** Was the thing there at time `t` (already there, and not taken yet)? */
+export function presentAt(thing: Pick<ReplayThing, 'takenAt' | 'appearedAt'>, t: number): boolean {
+  return (thing.appearedAt ?? 0) <= t && (thing.takenAt === null || thing.takenAt > t);
+}
+
+/** The players' paths as `viewerId` sees them: their own, and (duels) the rival's. */
+export function viewedTracks(
+  replay: Replay,
+  viewerId = replay.playerId,
+): { mine: ReplayTrack; rival: ReplayTrack | null } {
+  const { duel } = replay;
+  if (!duel) return { mine: replay.player, rival: null };
+  return viewerId === duel.rivalId
+    ? { mine: duel.rival, rival: replay.player }
+    : { mine: replay.player, rival: duel.rival };
+}
+
+/** How the round ended for `viewerId`. */
+export function outcomeFor(replay: Replay, viewerId = replay.playerId): Replay['outcome'] {
+  const { duel } = replay;
+  if (!duel || viewerId === replay.playerId) return replay.outcome;
+  if (duel.winner === null) return null;
+  return duel.winner === viewerId ? 'extracted' : 'lost';
 }

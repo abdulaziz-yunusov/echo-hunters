@@ -7,7 +7,7 @@ import type { DebugLayer } from '@/render/debugLayer';
 import type { ScoreBreakdown } from '@/sim/scoring';
 import type { Transport } from '@/net/transport';
 import type { Replay } from '@/replay/replay';
-import type { DuelOutcome } from './duelEndScene';
+import type { DuelEndParams } from './duelEndScene';
 import type { RunState } from './run';
 
 /** A screen of the game: menu, gameplay, level end, … */
@@ -39,14 +39,15 @@ export interface SceneParams {
   play: { run: RunState };
   levelEnd: { run: RunState; score: ScoreBreakdown; seconds: number; replay?: Replay };
   gameOver: { run: RunState; score: ScoreBreakdown; replay?: Replay };
-  replay: { replay: Replay };
+  /** `viewerId`: whose path is "you" in a duel debrief (default: the recorded player). */
+  replay: { replay: Replay; viewerId?: number };
   howToPlay: undefined;
   settings: undefined;
   controls: undefined;
   pause: undefined;
   duelLobby: undefined;
   duel: { transport: Transport; role: 'host' | 'client'; seed: number };
-  duelEnd: { outcome: DuelOutcome };
+  duelEnd: DuelEndParams;
 }
 
 export type SceneId = keyof SceneParams;
