@@ -22,7 +22,11 @@ export interface Player {
   bumpCooldown: number;
   /** Seconds until the sonar ping is ready. */
   pingCooldown: number;
-  /** Pings this round (the ghost bonus needs zero). */
+  /** Seconds the ping key has been held, while it is down; null when it is up. */
+  pingHold: number | null;
+  /** Seconds until the charged beam is ready (Phase 18). */
+  beamCooldown: number;
+  /** Pings this round, beams included (the ghost bonus needs zero). */
   pingsUsed: number;
   hp: number;
   readonly maxHp: number;
@@ -59,6 +63,8 @@ export function createPlayer(id: EntityId, x: number, y: number): Player {
     touchingWall: false,
     bumpCooldown: 0,
     pingCooldown: 0,
+    pingHold: null,
+    beamCooldown: 0,
     pingsUsed: 0,
     hp: GAME.player.hp,
     maxHp: GAME.player.hp,
@@ -72,4 +78,17 @@ export function createPlayer(id: EntityId, x: number, y: number): Player {
     shockCooldown: 0,
     silentTime: 0,
   };
+}
+
+/** A beam needs its own cooldown and the ping's to be over. */
+export function beamReady(p: Player): boolean {
+  return p.beamCooldown === 0 && p.pingCooldown === 0;
+}
+
+/**
+ * Held past the charge time with the beam ready: releasing now fires a beam.
+ * The player moves at sneak speed meanwhile.
+ */
+export function beamCharged(p: Player): boolean {
+  return p.pingHold !== null && p.pingHold >= GAME.abilities.beam.chargeTime && beamReady(p);
 }

@@ -78,3 +78,22 @@ export function pointInPolygon(px: number, py: number, points: ArrayLike<number>
   }
   return inside;
 }
+
+/** A wedge of directions: everything within `halfAngle` of `dir` (radians). */
+export interface Sector {
+  dir: number;
+  halfAngle: number;
+}
+
+/** Signed angle from `from` to `to`, in (-π, π]. */
+export function angleBetween(from: number, to: number): number {
+  const d = (to - from) % (Math.PI * 2);
+  if (d > Math.PI) return d - Math.PI * 2;
+  return d <= -Math.PI ? d + Math.PI * 2 : d;
+}
+
+/** True if the direction (dx, dy) lies inside the sector (a zero vector does). */
+export function inSector(sector: Sector, dx: number, dy: number): boolean {
+  if (dx === 0 && dy === 0) return true;
+  return Math.abs(angleBetween(sector.dir, Math.atan2(dy, dx))) <= sector.halfAngle;
+}

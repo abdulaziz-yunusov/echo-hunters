@@ -7,7 +7,7 @@ import { toPlayerInput } from '@/input/toPlayerInput';
 import { randomSeed } from '@/platform/seed';
 import { Camera } from '@/render/camera';
 import { drawHud } from '@/render/hud';
-import { drawAimReticle, playerDrawPosition } from '@/render/playerRenderer';
+import { drawAimGuide, playerDrawPosition } from '@/render/playerRenderer';
 import { drawText } from '@/render/text';
 import { ReplayRecorder } from '@/replay/recorder';
 import { WorldRenderer } from '@/render/worldRenderer';
@@ -123,9 +123,9 @@ export class PlayScene implements Scene {
       this.camera.follow(focus.x, focus.y, tiles.worldWidth, tiles.worldHeight);
       this.camera.apply(ctx);
       this.world.draw(ctx, this.camera, alpha, debug);
-      if (this.aimScreen && state.player.stones > 0 && state.status === 'playing') {
+      if (this.aimScreen && state.status === 'playing') {
         const aim = this.camera.screenToWorld(this.aimScreen.x, this.aimScreen.y);
-        drawAimReticle(ctx, focus, aim, this.camera.pixel);
+        drawAimGuide(ctx, state.player, focus, aim, this.camera.pixel);
       }
     }
     ctx.restore();
@@ -145,7 +145,7 @@ export class PlayScene implements Scene {
     });
     const hint = debug
       ? 'T warp · H hearing · O overview · N new map · F1 hide debug · ESC menu'
-      : 'WASD move · SHIFT sneak · SPACE ping · Q stone · CLICK/E shockwave · M mute · ESC pause';
+      : 'WASD move · SHIFT sneak · SPACE ping (hold: beam) · Q stone · CLICK/E shockwave · M mute · ESC pause';
     drawText(ctx, hint, width / 2, height - 12, {
       size: 12,
       color: THEME.colors.white,
@@ -185,7 +185,8 @@ export class PlayScene implements Scene {
     this.audio = new AudioDirector(this.sim, this.display.output(this.app.sound));
     this.popup = null;
     this.recorder = new ReplayRecorder(this.sim, this.run.seed);
-    if (levelDef(this.run.level).tutorial) this.tutorial = new Tutorial(this.sim);
+    const prompts = levelDef(this.run.level).tutorial;
+    if (prompts) this.tutorial = new Tutorial(this.sim, prompts);
     this.endedAt = null;
     this.sim.events.on('roundEnded', (e) => (this.endedAt = e.time));
     this.sim.events.on('closeCall', (e) => {

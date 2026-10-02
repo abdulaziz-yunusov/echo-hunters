@@ -20,6 +20,13 @@ export interface SoundKindDef {
   speed: number;
   color: ColorKey;
   tags: readonly SoundTag[];
+  /**
+   * Directional sound (Phase 18): the ring spreads only in a wedge this wide
+   * (degrees), aimed when it is made. Omitted = all around.
+   */
+  arc?: number;
+  /** Directional sound: hearing range outside the wedge (inside it is `hearRadius`). */
+  sideHearRadius?: number;
 }
 
 /** GDD §4 sound table, plus hearing ranges (see DECISIONS.md, Phase 6). */
@@ -29,6 +36,16 @@ export const SOUND_KINDS = {
   stepMetal: { maxRadius: 90, hearRadius: 180, speed: 220, color: 'white', tags: ['footstep'] },
   stepSoft: { maxRadius: 40, hearRadius: 40, speed: 180, color: 'dim', tags: ['footstep'] },
   ping: { maxRadius: 400, hearRadius: 800, speed: 350, color: 'cyan', tags: ['ping'] },
+  // Phase 18 charged ping: a long, narrow beam, loud ahead and quiet to the sides.
+  pingBeam: {
+    maxRadius: 700,
+    hearRadius: 900,
+    sideHearRadius: 250,
+    speed: 450,
+    color: 'cyan',
+    tags: ['ping'],
+    arc: 40,
+  },
   stoneImpact: {
     maxRadius: 250,
     hearRadius: 550,

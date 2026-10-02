@@ -10,7 +10,7 @@ const WASH_ALPHA = 0.14;
 
 /**
  * Sound rings (GDD §4 rendering): each ring is clipped to its visibility
- * polygon, so walls cast real echo shadows.
+ * polygon, so walls cast real echo shadows. A beam draws only its wedge.
  */
 export function drawWaves(
   ctx: CanvasRenderingContext2D,
@@ -24,6 +24,9 @@ export function drawWaves(
     if (radius <= 0) continue;
     const progress = radius / w.maxRadius;
     const color = THEME.colors[soundColor(w)];
+    const [from, to] = w.arc
+      ? [w.arc.dir - w.arc.halfAngle, w.arc.dir + w.arc.halfAngle]
+      : [0, Math.PI * 2];
 
     ctx.save();
     clipTo(ctx, w.polygon);
@@ -32,8 +35,8 @@ export function drawWaves(
     ctx.globalAlpha = WASH_ALPHA * (1 - progress);
     ctx.fillStyle = color;
     ctx.beginPath();
-    ctx.arc(w.x, w.y, radius, 0, Math.PI * 2);
-    if (radius > WASH_WIDTH) ctx.arc(w.x, w.y, radius - WASH_WIDTH, 0, Math.PI * 2, true);
+    ctx.arc(w.x, w.y, radius, from, to);
+    ctx.arc(w.x, w.y, Math.max(0, radius - WASH_WIDTH), to, from, true);
     ctx.fill();
 
     ctx.globalAlpha = RING_ALPHA * (1 - progress);
@@ -42,7 +45,7 @@ export function drawWaves(
     ctx.shadowBlur = 6;
     ctx.lineWidth = 1.5 * pixel;
     ctx.beginPath();
-    ctx.arc(w.x, w.y, radius, 0, Math.PI * 2);
+    ctx.arc(w.x, w.y, radius, from, to);
     ctx.stroke();
     ctx.restore();
   }

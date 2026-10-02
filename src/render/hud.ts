@@ -1,5 +1,6 @@
 import { GAME } from '@/config/game';
 import { THEME } from '@/config/theme';
+import { beamCharged, beamReady } from '@/sim/entities/player';
 import type { GameState } from '@/sim/gameState';
 import { playerMasked } from '@/sim/systems/emitters';
 import { drawText } from './text';
@@ -9,7 +10,7 @@ const SIZE = 14;
 
 /**
  * Heads-up display, top-left, monospace (GDD §9):
- * HP ●●○  CORES 1/3  STONES 2  PING ▓▓▓░  SHOCK ▓▓░░
+ * HP ●●○  CORES 1/3  STONES 2  PING ▓▓▓░  BEAM ▓░░░  SHOCK ▓▓░░
  */
 export function drawHud(ctx: CanvasRenderingContext2D, state: GameState): void {
   const { player, cores, beacon } = state;
@@ -21,10 +22,9 @@ export function drawHud(ctx: CanvasRenderingContext2D, state: GameState): void {
     drawText(ctx, text, x, y, { size: SIZE, color, alpha, glow });
     x += ctx.measureText(text).width + 22;
   };
-  /** A cooldown as blocks; bright when ready. */
-  const cooldown = (label: string, left: number, total: number, readyColor: string): void => {
-    const filled = Math.floor((1 - left / total) * BAR_BLOCKS + 1e-9);
-    const ready = left === 0;
+  /** A share (0..1) as blocks; bright when ready. */
+  const meter = (label: string, share: number, ready: boolean, readyColor: string): void => {
+    const filled = Math.floor(Math.min(1, share) * BAR_BLOCKS + 1e-9);
     part(
       `${label} ${'▓'.repeat(filled)}${'░'.repeat(BAR_BLOCKS - filled)}`,
       ready ? readyColor : white,
@@ -32,6 +32,8 @@ export function drawHud(ctx: CanvasRenderingContext2D, state: GameState): void {
       ready ? 6 : 0,
     );
   };
+  const cooldown = (label: string, left: number, total: number, readyColor: string): void =>
+    meter(label, 1 - left / total, left === 0, readyColor);
   ctx.font = `${SIZE}px ${THEME.font}`; // for measureText
 
   const duel = state.duel;
@@ -48,6 +50,13 @@ export function drawHud(ctx: CanvasRenderingContext2D, state: GameState): void {
   }
   part(`STONES ${player.stones}`, white, player.stones > 0 ? 0.8 : 0.4);
   cooldown('PING', player.pingCooldown, state.rules.pingCooldown, THEME.colors.cyan);
+  // While the ping key is held with the beam ready, the beam meter shows the charge.
+  const { chargeTime, cooldown: beamTotal } = GAME.abilities.beam;
+  if (player.pingHold !== null && beamReady(player)) {
+    meter('BEAM', player.pingHold / chargeTime, beamCharged(player), THEME.colors.cyan);
+  } else {
+    meter('BEAM', 1 - player.beamCooldown / beamTotal, beamReady(player), THEME.colors.cyan);
+  }
   cooldown('SHOCK', player.shockCooldown, GAME.abilities.shockwave.cooldown, THEME.colors.red);
 
   let line = y + 22;

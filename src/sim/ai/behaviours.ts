@@ -99,7 +99,7 @@ const scream: HunterState = {
   enter: (c) => {
     const h = c.hunter;
     if (h.heard) {
-      c.sim.emitSound('listenerScream', h.x, h.y, h.id, h.heard);
+      c.sim.emitSound('listenerScream', h.x, h.y, h.id, { focus: h.heard });
       h.cooldown = c.def.screamCooldown ?? 0;
     }
     h.heard = null;

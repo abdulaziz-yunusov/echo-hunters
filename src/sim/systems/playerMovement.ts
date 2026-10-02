@@ -1,6 +1,6 @@
 import { GAME } from '@/config/game';
 import { SURFACES } from '@/config/surfaces';
-import type { Player } from '../entities/player';
+import { beamCharged, type Player } from '../entities/player';
 import type { SimContext } from '../gameState';
 import type { PlayerInput } from '../playerInput';
 import { moveCircle } from '../world/collision';
@@ -8,6 +8,7 @@ import { moveCircle } from '../world/collision';
 /**
  * Move the player from input: walk or sneak, slide along walls, leave
  * footsteps, and make a noise when walking into a wall (unless silent).
+ * A charged beam slows the player to sneak speed, but not to silence.
  */
 export function updatePlayerMovement(
   ctx: SimContext,
@@ -17,7 +18,7 @@ export function updatePlayerMovement(
 ): void {
   const cfg = GAME.player;
   const sneaking = input.sneak;
-  const speed = sneaking ? cfg.sneakSpeed : cfg.speed;
+  const speed = sneaking || beamCharged(player) ? cfg.sneakSpeed : cfg.speed;
   // Sneaking is silent but slow; Silent Boots are silent at any speed.
   const silent = sneaking || player.silentTime > 0;
 

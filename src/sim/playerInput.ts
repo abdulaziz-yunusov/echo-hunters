@@ -11,6 +11,8 @@ export interface PlayerInput {
   sneak: boolean;
   /** Pressed this tick. */
   ping: boolean;
+  /** The ping key is down at the end of this tick (held to charge a beam). */
+  pingHeld: boolean;
   throwStone: boolean;
   shockwave: boolean;
   /** Aim point in world px, or null when there is no pointer (touch). */
@@ -22,6 +24,7 @@ export const IDLE_INPUT: Readonly<PlayerInput> = {
   moveY: 0,
   sneak: false,
   ping: false,
+  pingHeld: false,
   throwStone: false,
   shockwave: false,
   aim: null,

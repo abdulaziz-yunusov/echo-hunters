@@ -4,6 +4,7 @@ import { setHunterState } from '@/sim/ai/hunterBrain';
 import type { GameEvents } from '@/sim/events';
 import { IDLE_INPUT, type PlayerInput } from '@/sim/playerInput';
 import type { SimulationOptions } from '@/sim/simulation';
+import { chargedBeam } from '../../helpers/beam';
 import { simFromAscii } from '../../helpers/maps';
 
 const DT = 1 / 60;
@@ -119,5 +120,33 @@ describe('hearing', () => {
     for (const h of sim.state.hunters) sim.emitSound('hunterStep', h.x, h.y, h.id);
     for (let i = 0; i < 60; i++) sim.step(IDLE_INPUT, DT);
     expect(heard).toHaveLength(0);
+  });
+});
+
+describe('hearing a charged beam (Phase 18)', () => {
+  const beam = SOUND_KINDS.pingBeam;
+  // A straight hall: the hunter is 416 px right of the player (13 tiles).
+  const FAR = ['#################', '#P............H.#', '#################'];
+  // The same hall with the hunter 192 px away: within the beam's side range.
+  const NEAR = ['#################', '#P.....H........#', '#################'];
+
+  function fire(rows: string[], aimRight: boolean) {
+    const t = setup(rows);
+    const p = t.sim.state.player;
+    for (const input of chargedBeam({ x: p.x + (aimRight ? 300 : -300), y: p.y })) t.run(input, DT);
+    t.run({}, 2);
+    return t;
+  }
+
+  it('is heard far ahead, inside its wedge (beyond a plain ping too)', () => {
+    expect(416).toBeLessThan(beam.hearRadius);
+    expect(fire(FAR, true).heard).toHaveLength(1);
+  });
+
+  it('outside its wedge it is heard only nearby', () => {
+    expect(416).toBeGreaterThan(beam.sideHearRadius);
+    expect(192).toBeLessThan(beam.sideHearRadius);
+    expect(fire(FAR, false).heard).toHaveLength(0);
+    expect(fire(NEAR, false).heard).toHaveLength(1);
   });
 });

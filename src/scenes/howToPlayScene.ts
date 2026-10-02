@@ -19,6 +19,7 @@ const HUNTERS: readonly [HunterTypeId, string][] = [
 const TIPS = [
   'Sneaking is silent. Walking leaves footsteps; hitting a wall is loud.',
   "Metal grates ring out under every step (a hunter's too); moss muffles yours.",
+  'Hold ping to charge a beam: it sees far ahead, and hunters ahead hear it far too.',
   'A stone lands with a fake ping: hunters go there, not to you.',
   'While a vent roars or a pipe drips, footsteps near it are lost in the noise.',
   'Let a hunter pass close without being hit: CLOSE CALL, bonus points.',
@@ -72,7 +73,7 @@ export class HowToPlayScene implements Scene {
       `Move ${k('moveUp')} ${k('moveLeft')} ${k('moveDown')} ${k('moveRight')}   ·   Sneak ${k('sneak')}`,
     );
     line(
-      `Ping ${k('ping')}   ·   Stone ${k('throwStone')} (aim with mouse)   ·   Shockwave ${k('shockwave')}`,
+      `Ping ${k('ping')} (hold: beam)   ·   Stone ${k('throwStone')} (aim with mouse)   ·   Shockwave ${k('shockwave')}`,
     );
     line('Pause ESC   ·   Mute M');
     y += 8;

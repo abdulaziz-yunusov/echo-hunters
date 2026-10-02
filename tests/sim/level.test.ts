@@ -8,7 +8,8 @@ import { createSimulation } from '@/sim/simulation';
 describe('level progression (GDD §7)', () => {
   it('levels 1–4 follow the table', () => {
     expect(levelDef(1).hunters).toEqual(['stalker']);
-    expect(levelDef(1).tutorial).toBe(true);
+    expect(levelDef(1).tutorial).toBe('basics');
+    expect(levelDef(2).tutorial).toBe('beam');
     expect(levelDef(2).hunters).toEqual(['stalker', 'stalker']);
     expect(levelDef(3).hunters).toEqual(['stalker', 'listener']);
     expect(levelDef(4).hunters).toEqual(['stalker', 'listener', 'sprinter']);

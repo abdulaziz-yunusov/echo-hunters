@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { pointInPolygon } from '@/core/geometry';
+import { inSector, pointInPolygon } from '@/core/geometry';
 import { buildWallGeometry } from '@/sim/world/edges';
 import { generateMap, mapOptionsFromConfig } from '@/sim/world/mapGen';
 import { hasLineOfSight, visibilityPolygon } from '@/sim/world/visibility';
@@ -97,5 +97,41 @@ describe('hasLineOfSight', () => {
   it('is false through a wall', () => {
     expect(hasLineOfSight(walls, O.x, O.y, 124.8, 163.2)).toBe(false);
     expect(hasLineOfSight(walls, 48, 48, 48, 240)).toBe(false);
+  });
+});
+
+describe('visibilityPolygon with a sector (Phase 18 beam)', () => {
+  const full = visibilityPolygon(walls, O.x, O.y, 1000);
+  const wedge = (dir: number, halfAngle = Math.PI / 9) => ({ dir, halfAngle });
+
+  it('starts at the origin and never leaves the wedge', () => {
+    const sector = wedge(0.3);
+    const p = visibilityPolygon(walls, O.x, O.y, 1000, sector);
+    expect([p[0], p[1]]).toEqual([Math.fround(O.x), Math.fround(O.y)]);
+    for (let i = 2; i < p.length; i += 2) {
+      expect(
+        inSector({ ...sector, halfAngle: sector.halfAngle + 1e-3 }, p[i] - O.x, p[i + 1] - O.y),
+      ).toBe(true);
+    }
+  });
+
+  it('is exactly the part of the full polygon inside the wedge', () => {
+    // Includes a wedge aimed at the pillar's shadow and one across the ±π seam.
+    for (const sector of [wedge(0), wedge((3 * Math.PI) / 4), wedge(Math.PI), wedge(-2, 0.9)]) {
+      const p = visibilityPolygon(walls, O.x, O.y, 1000, sector);
+      for (let y = 36; y < 192; y += 8) {
+        for (let x = 36; x < 320; x += 8) {
+          const expected = inSector(sector, x - O.x, y - O.y) && pointInPolygon(x, y, full);
+          expect(pointInPolygon(x, y, p), `${x}, ${y}`).toBe(expected);
+        }
+      }
+    }
+  });
+
+  it('in open space it is a circular sector', () => {
+    const r = 20;
+    const sector = wedge(1);
+    const p = visibilityPolygon(walls, O.x, O.y, r, sector);
+    expect(polygonArea(p) / (sector.halfAngle * r * r)).toBeGreaterThan(0.99);
   });
 });

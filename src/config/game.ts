@@ -61,6 +61,11 @@ export const GAME = {
 
   abilities: {
     ping: { cooldown: 2.5 },
+    /**
+     * Charged ping (Phase 18): hold the ping key past chargeTime (s), aim, release.
+     * Charging slows you to sneak speed. Firing it also restarts the ping cooldown.
+     */
+    beam: { chargeTime: 0.35, cooldown: 6 },
     /** Decoy stone: flies at throwRange / flightTime px/s, lands at the aim point or the first wall. */
     stone: { throwRange: 260, flightTime: 0.45, radius: 3 },
     /** Stuns hunters in line of sight within effectRadius (px). */

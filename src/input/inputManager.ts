@@ -71,6 +71,7 @@ export class InputManager {
       navX: (s.wasPressed('moveRight') ? 1 : 0) - (s.wasPressed('moveLeft') ? 1 : 0),
       navY: (s.wasPressed('moveDown') ? 1 : 0) - (s.wasPressed('moveUp') ? 1 : 0),
       sneak: s.isDown('sneak'),
+      pingHeld: s.isDown('ping'),
       ping: s.wasPressed('ping'),
       throwStone: s.wasPressed('throwStone'),
       shockwave: s.wasPressed('shockwave'),

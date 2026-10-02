@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { RevealMap } from '@/render/revealMap';
 import { IDLE_INPUT } from '@/sim/playerInput';
+import { chargedBeam } from '../helpers/beam';
 import { simFromAscii, TS } from '../helpers/maps';
 
 const DT = 1 / 60;
@@ -103,5 +104,42 @@ describe('RevealMap objects', () => {
     const reveal = new RevealMap(sim.state.walls);
     reveal.revealObjects(sim.state.waves, [{ key: 'src', x: p.x, y: p.y }], sim.state.time, DT);
     expect(reveal.objectRevealTime('src')).toBe(sim.state.time);
+  });
+});
+
+describe('RevealMap and a beam (Phase 18)', () => {
+  function beamAndWait(aimX: number) {
+    const sim = simFromAscii(MAP);
+    const reveal = new RevealMap(sim.state.walls);
+    sim.events.on('soundEmitted', (s) => reveal.addWave(s.wave));
+    const p = sim.state.player;
+    for (const input of [...chargedBeam({ x: aimX, y: p.y }), ...Array(120).fill({})]) {
+      sim.step({ ...IDLE_INPUT, ...input }, DT);
+      reveal.update(sim.state.time);
+    }
+    const revealed = (ax: number, ay: number, bx: number, by: number) => {
+      const i = sim.state.walls.edges.findIndex(
+        (e) =>
+          (e.ax === ax && e.ay === ay && e.bx === bx && e.by === by) ||
+          (e.ax === bx && e.ay === by && e.bx === ax && e.by === ay),
+      );
+      expect(i).toBeGreaterThanOrEqual(0);
+      return reveal.revealTime[i] > -Infinity;
+    };
+    return { revealed };
+  }
+  const farEnd = [10 * TS, TS, 10 * TS, 2 * TS] as const;
+  const nearEnd = [TS, TS, TS, 2 * TS] as const;
+  const ceilingAbove = [TS, TS, 2 * TS, TS] as const;
+
+  it('reveals only the walls in the direction it was aimed', () => {
+    const right = beamAndWait(1000);
+    expect(right.revealed(...farEnd)).toBe(true);
+    expect(right.revealed(...nearEnd)).toBe(false);
+    expect(right.revealed(...ceilingAbove)).toBe(false);
+
+    const left = beamAndWait(0);
+    expect(left.revealed(...nearEnd)).toBe(true);
+    expect(left.revealed(...farEnd)).toBe(false);
   });
 });

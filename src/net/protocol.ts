@@ -2,7 +2,7 @@ import { SOUND_KINDS, type SoundKindId } from '@/config/sounds';
 import type { TakeKind } from '@/sim/gameState';
 
 /** Bump when messages change shape; mismatched players are told to reload. */
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2;
 
 export type { TakeKind };
 
@@ -29,8 +29,17 @@ export type NetMessage =
   | { t: 'hello'; v: number; seed: number }
   /** Own position (15 Hz). */
   | { t: 'p'; x: number; y: number }
-  /** A sound made by the sender (or, from the host, by a hunter). */
-  | { t: 'snd'; kind: SoundKindId; x: number; y: number; owner: number; fx: number; fy: number }
+  /** A sound made by the sender (or, from the host, by a hunter); `dir` aims a beam. */
+  | {
+      t: 'snd';
+      kind: SoundKindId;
+      x: number;
+      y: number;
+      owner: number;
+      fx: number;
+      fy: number;
+      dir?: number;
+    }
   /** Client → host: "I am touching this, may I take it?" */
   | { t: 'take'; kind: TakeKind; id: number }
   /** Host → client: someone got it. */
@@ -99,7 +108,8 @@ const VALIDATORS: Record<MessageType, (m: Rec) => boolean> = {
     num(m.y) &&
     int(m.owner) &&
     num(m.fx) &&
-    num(m.fy),
+    num(m.fy) &&
+    (m.dir === undefined || num(m.dir)),
   take: (m) => takeKind(m.kind) && int(m.id),
   taken: (m) => takeKind(m.kind) && int(m.id) && int(m.by),
   denied: (m) => takeKind(m.kind) && int(m.id),

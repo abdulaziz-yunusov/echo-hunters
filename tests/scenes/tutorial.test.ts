@@ -1,14 +1,16 @@
 import { describe, expect, it } from 'vitest';
+import type { TutorialId } from '@/config/levels';
 import { IDLE_INPUT, type PlayerInput } from '@/sim/playerInput';
 import { Tutorial } from '@/scenes/tutorial';
+import { chargedBeam } from '../helpers/beam';
 import { simFromAscii } from '../helpers/maps';
 
 const DT = 1 / 60;
 const ROOM = ['###################', '#P...C......C...C.#', '###################'];
 
-function setup() {
+function setup(set: TutorialId = 'basics') {
   const sim = simFromAscii(ROOM);
-  const tutorial = new Tutorial(sim);
+  const tutorial = new Tutorial(sim, set);
   const run = (input: Partial<PlayerInput>, seconds: number) => {
     for (let i = 0; i < Math.max(1, Math.round(seconds / DT)); i++) {
       sim.step({ ...IDLE_INPUT, ...input }, DT);
@@ -55,5 +57,19 @@ describe('Tutorial', () => {
     run({ ping: true }, DT);
     run({}, 2);
     expect(tutorial.text).toMatch(/SPACE/); // never saw the ping
+  });
+});
+
+describe('Tutorial: the beam (level 2)', () => {
+  it('waits for a first ping, then teaches the beam until one is fired', () => {
+    const { tutorial, run } = setup('beam');
+    run({}, 2);
+    expect(tutorial.text).toBeNull();
+    run({ ping: true }, DT);
+    run({}, 3); // until the ping, and so the beam, is ready again
+    expect(tutorial.text).toMatch(/beam/);
+    for (const input of chargedBeam({ x: 1000, y: 48 })) run(input, DT);
+    run({}, 0.5);
+    expect(tutorial.text).toBeNull();
   });
 });

@@ -4,6 +4,7 @@ import type { SoundKindId } from './sounds';
 /** Every synthesized sound the game can make (see audio/synths.ts). No audio files. */
 export const SYNTHS = [
   'ping',
+  'pingBeam',
   'step',
   'stepMetal',
   'stepSoft',
@@ -44,6 +45,7 @@ export const AUDIO_SOUNDS = {
   stepMetal: { synth: 'stepMetal', range: 420, volume: 0.5 },
   stepSoft: { synth: 'stepSoft', range: 120, volume: 0.2 },
   ping: { synth: 'ping', range: 700, volume: 0.55 },
+  pingBeam: { synth: 'pingBeam', range: 900, volume: 0.6 },
   stoneImpact: { synth: 'stone', range: 700, volume: 0.6 },
   shockwave: { synth: 'shockwave', range: 800, volume: 0.9 },
   // Hunters are heard from much further than their rings reach: the headphone advantage.

@@ -2,12 +2,16 @@ import type { HunterTypeId } from './hunters';
 import type { EmitterTypeId } from './emitters';
 import type { PickupTypeId } from './pickups';
 
+/** Prompt sets: the basics on level 1, then one new tool at a time. */
+export type TutorialId = 'basics' | 'beam';
+
 export interface LevelDef {
   hunters: readonly HunterTypeId[];
   pickups: Partial<Record<PickupTypeId, number>>;
   /** Vents and dripping pipes (Phase 17): sound cover. None if left out. */
   emitters?: Partial<Record<EmitterTypeId, number>>;
-  tutorial?: boolean;
+  /** Prompts shown during the level (see scenes/tutorial.ts). */
+  tutorial?: TutorialId;
   /** Per-level overrides of GAME values. Add fields here as levels need them. */
   overrides?: {
     pingCooldown?: number;
@@ -16,12 +20,13 @@ export interface LevelDef {
 
 /** GDD §7 hand-made levels. After the last one, ENDLESS rules take over. */
 export const LEVELS: readonly LevelDef[] = [
-  { hunters: ['stalker'], pickups: { stoneBag: 1 }, tutorial: true },
-  // Level 1 (the tutorial) has no cover; it appears from level 2.
+  { hunters: ['stalker'], pickups: { stoneBag: 1 }, tutorial: 'basics' },
+  // Level 1 (the tutorial) has no cover; it appears from level 2, with the charged ping.
   {
     hunters: ['stalker', 'stalker'],
     pickups: { stoneBag: 1, silentBoots: 1 },
     emitters: { vent: 1, drip: 1 },
+    tutorial: 'beam',
   },
   {
     hunters: ['stalker', 'listener'],

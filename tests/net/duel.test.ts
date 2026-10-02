@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { GAME } from '@/config/game';
 import type { HunterTypeId } from '@/config/hunters';
 import { Rng } from '@/core/rng';
 import { createLoopbackPair } from '@/net/loopback';
@@ -93,6 +94,20 @@ describe('duel (GDD §8)', () => {
     step({}, {}, 30);
     expect(rings).toContain('ping');
     expect(heard.some((e) => Math.abs(e.x - client.state.player.x) < 1)).toBe(true);
+  });
+
+  it("the rival's beam reaches this side aimed the same way", () => {
+    const { host, client, step } = duel(3, ['stalker']);
+    const beams: (number | undefined)[] = [];
+    host.events.on('soundEmitted', (s) => s.owner === 2 && beams.push(s.wave.arc?.dir));
+    const p = client.state.player;
+    const aim = { x: p.x + 100, y: p.y - 100 };
+    step({}, { ping: true, pingHeld: true, aim });
+    step({}, { pingHeld: true, aim }, Math.ceil(GAME.abilities.beam.chargeTime / DT) + 1);
+    step({}, { aim });
+    step({}, {}, 10);
+    expect(beams).toHaveLength(1);
+    expect(beams[0]).toBeCloseTo(-Math.PI / 4, 5);
   });
 
   it('a contested core goes to exactly one player, and both machines agree', () => {

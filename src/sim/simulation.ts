@@ -3,7 +3,6 @@ import type { HunterTypeId } from '@/config/hunters';
 import type { LevelDef } from '@/config/levels';
 import type { SoundKindId } from '@/config/sounds';
 import { EventBus } from '@/core/events';
-import type { Vec2 } from '@/core/geometry';
 import { deriveSeed, Rng } from '@/core/rng';
 import { setHunterState, updateHunters } from './ai/hunterBrain';
 import { createHunter } from './entities/hunter';
@@ -15,7 +14,7 @@ import type { GameState, SimContext, SimMode } from './gameState';
 import { levelDef, levelMapScale } from './level';
 import type { PlayerInput } from './playerInput';
 import { deliverHearings, scheduleHearing } from './sound/hearing';
-import { createWave, growWaves, pruneWaves } from './sound/soundWave';
+import { createWave, growWaves, pruneWaves, type SoundOptions } from './sound/soundWave';
 import { updateAbilities } from './systems/abilities';
 import { updateCloseCalls } from './systems/closeCalls';
 import { updateCombat } from './systems/combat';
@@ -154,9 +153,15 @@ export class Simulation implements SimContext {
     s.waves = pruneWaves(s.waves);
   }
 
-  emitSound(kind: SoundKindId, x: number, y: number, owner: EntityId | null, focus?: Vec2): void {
+  emitSound(
+    kind: SoundKindId,
+    x: number,
+    y: number,
+    owner: EntityId | null,
+    options?: SoundOptions,
+  ): void {
     const s = this.state;
-    const wave = createWave(s.walls, s.nextWaveId++, kind, x, y, owner, s.time, focus);
+    const wave = createWave(s.walls, s.nextWaveId++, kind, x, y, owner, s.time, options);
     s.waves.push(wave);
     if (s.status === 'playing' && s.mode !== 'client') scheduleHearing(s, wave);
     this.events.emit('soundEmitted', { kind, x, y, owner, time: s.time, wave });

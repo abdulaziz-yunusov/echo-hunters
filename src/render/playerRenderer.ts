@@ -1,8 +1,12 @@
 import { GAME } from '@/config/game';
 import { THEME } from '@/config/theme';
 import type { Vec2 } from '@/core/geometry';
-import type { Player } from '@/sim/entities/player';
+import { beamCharged, type Player } from '@/sim/entities/player';
 import type { Stone } from '@/sim/entities/stone';
+import { arcHalfAngle } from '@/sim/sound/soundWave';
+
+/** How far out the charged beam's aim guide reaches (world px). */
+const BEAM_GUIDE_LENGTH = 70;
 
 /** The player: always visible to yourself, a white dot with a faint aura (GDD §9). */
 export function drawPlayer(
@@ -65,32 +69,45 @@ export function drawStones(
   ctx.restore();
 }
 
-/** Where a stone would land: the aim point, pulled in to the throw range. */
-export function drawAimReticle(
+/** Aim guide at the pointer: a charged beam's wedge, else where a stone would land. */
+export function drawAimGuide(
   ctx: CanvasRenderingContext2D,
+  player: Player,
   from: Vec2,
   aim: Vec2,
   pixel: number,
 ): void {
-  const range = GAME.abilities.stone.throwRange;
   const dx = aim.x - from.x;
   const dy = aim.y - from.y;
   const length = Math.hypot(dx, dy);
   if (length < 1) return;
-  const d = Math.min(length, range);
-  const x = from.x + (dx / length) * d;
-  const y = from.y + (dy / length) * d;
-  const r = 5;
   ctx.save();
-  ctx.strokeStyle = THEME.colors.white;
-  ctx.globalAlpha = 0.35;
   ctx.lineWidth = pixel;
   ctx.beginPath();
-  ctx.arc(x, y, r, 0, Math.PI * 2);
-  ctx.moveTo(x - r - 3, y);
-  ctx.lineTo(x - r + 2, y);
-  ctx.moveTo(x + r - 2, y);
-  ctx.lineTo(x + r + 3, y);
+  if (beamCharged(player)) {
+    // The beam's edges, a short way out.
+    const dir = Math.atan2(dy, dx);
+    const half = arcHalfAngle('pingBeam') ?? 0;
+    const r = BEAM_GUIDE_LENGTH;
+    ctx.strokeStyle = THEME.colors.cyan;
+    ctx.globalAlpha = 0.5;
+    ctx.moveTo(from.x + Math.cos(dir - half) * r, from.y + Math.sin(dir - half) * r);
+    ctx.lineTo(from.x, from.y);
+    ctx.lineTo(from.x + Math.cos(dir + half) * r, from.y + Math.sin(dir + half) * r);
+    ctx.arc(from.x, from.y, r, dir + half, dir - half, true);
+  } else if (player.stones > 0) {
+    const d = Math.min(length, GAME.abilities.stone.throwRange);
+    const x = from.x + (dx / length) * d;
+    const y = from.y + (dy / length) * d;
+    const r = 5;
+    ctx.strokeStyle = THEME.colors.white;
+    ctx.globalAlpha = 0.35;
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.moveTo(x - r - 3, y);
+    ctx.lineTo(x - r + 2, y);
+    ctx.moveTo(x + r - 2, y);
+    ctx.lineTo(x + r + 3, y);
+  }
   ctx.stroke();
   ctx.restore();
 }

@@ -7,7 +7,7 @@ import { NetSession } from '@/net/netSession';
 import type { Transport } from '@/net/transport';
 import { Camera } from '@/render/camera';
 import { drawHud } from '@/render/hud';
-import { drawAimReticle, playerDrawPosition } from '@/render/playerRenderer';
+import { drawAimGuide, playerDrawPosition } from '@/render/playerRenderer';
 import { drawText } from '@/render/text';
 import { WorldRenderer } from '@/render/worldRenderer';
 import { createDuelSimulation, type Simulation } from '@/sim/simulation';
@@ -110,9 +110,9 @@ export class DuelScene implements Scene {
     this.camera.follow(focus.x, focus.y, tiles.worldWidth, tiles.worldHeight);
     this.camera.apply(ctx);
     this.world.draw(ctx, this.camera, alpha, this.app.debug.enabled);
-    if (this.aimScreen && state.player.stones > 0 && state.status === 'playing' && !this.menuOpen) {
+    if (this.aimScreen && state.status === 'playing' && !this.menuOpen) {
       const aim = this.camera.screenToWorld(this.aimScreen.x, this.aimScreen.y);
-      drawAimReticle(ctx, focus, aim, this.camera.pixel);
+      drawAimGuide(ctx, state.player, focus, aim, this.camera.pixel);
     }
     ctx.restore();
 

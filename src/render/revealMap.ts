@@ -1,6 +1,6 @@
 import { pointInPolygon, pointSegmentDistance } from '@/core/geometry';
 import type { EntityId } from '@/sim/entities/entity';
-import type { SoundWave } from '@/sim/sound/soundWave';
+import { waveFaces, type SoundWave } from '@/sim/sound/soundWave';
 import type { WallGeometry } from '@/sim/world/edges';
 import { hasLineOfSight } from '@/sim/world/visibility';
 
@@ -140,10 +140,12 @@ export class RevealMap {
     return this.tracked.length;
   }
 
+  /** Some sample point of the edge lies in the wave's direction and in its line of sight. */
   private isVisible(wave: SoundWave, e: WallGeometry['edges'][number]): boolean {
     for (const f of SAMPLES) {
       const px = e.ax + (e.bx - e.ax) * f + e.nx * FACE_OFFSET;
       const py = e.ay + (e.by - e.ay) * f + e.ny * FACE_OFFSET;
+      if (!waveFaces(wave, px, py)) continue;
       if (hasLineOfSight(this.walls, wave.x, wave.y, px, py)) return true;
     }
     return false;

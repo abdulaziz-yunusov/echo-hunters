@@ -151,6 +151,7 @@ export class NetSession {
       owner: s.owner ?? 0,
       fx: s.wave.focusX,
       fy: s.wave.focusY,
+      dir: s.wave.arc?.dir,
     });
   }
 
@@ -178,7 +179,7 @@ export class NetSession {
         this.rivalTrack.push(this.time, m.x, m.y);
         break;
       case 'snd':
-        sim.emitSound(m.kind, m.x, m.y, m.owner, { x: m.fx, y: m.fy });
+        sim.emitSound(m.kind, m.x, m.y, m.owner, { focus: { x: m.fx, y: m.fy }, dir: m.dir });
         // The host decides what the client's shockwave hits.
         if (this.isHost && m.kind === 'shockwave' && m.owner === rivalId) {
           resolveShockwave(sim, m.x, m.y, rivalId);

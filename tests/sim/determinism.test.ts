@@ -5,27 +5,33 @@ import { createSimulation, type Simulation } from '@/sim/simulation';
 
 const DT = 1 / 60;
 
-/** A restless fake player: wanders, sneaks, pings, throws and shocks, all from one seed. */
+/** A restless fake player: wanders, sneaks, pings, charges beams, throws and shocks, all from one seed. */
 function scriptedInputs(seed: number, ticks: number): PlayerInput[] {
   const rng = new Rng(seed);
   const inputs: PlayerInput[] = [];
   let moveX = 0;
   let moveY = 0;
+  /** Ticks left holding the ping key down (charging a beam). */
+  let hold = 0;
   for (let i = 0; i < ticks; i++) {
     if (i % 30 === 0) {
       const angle = rng.range(0, Math.PI * 2);
       moveX = Math.cos(angle);
       moveY = Math.sin(angle);
     }
+    const ping = hold === 0 && rng.chance(0.01);
+    if (ping && rng.chance(0.4)) hold = 40;
     inputs.push({
       moveX,
       moveY,
       sneak: rng.chance(0.2),
-      ping: rng.chance(0.01),
+      ping,
+      pingHeld: hold > 0,
       throwStone: rng.chance(0.005),
       shockwave: rng.chance(0.005),
       aim: { x: rng.range(0, 1300), y: rng.range(0, 800) },
     });
+    hold = Math.max(0, hold - 1);
   }
   return inputs;
 }
@@ -44,15 +50,23 @@ function fingerprint(sim: Simulation): string {
   });
 }
 
-function play(level: number, seed: number, ticks: number): { sim: Simulation; prints: string[] } {
+function play(
+  level: number,
+  seed: number,
+  ticks: number,
+): { sim: Simulation; prints: string[]; beams: number } {
   const sim = createSimulation({ seed, level });
   const prints: string[] = [];
+  let beams = 0;
+  sim.events.on('soundEmitted', (s) => {
+    if (s.kind === 'pingBeam') beams++;
+  });
   scriptedInputs(seed, ticks).forEach((input, i) => {
     sim.step(input, DT);
     if (i % 600 === 0) prints.push(fingerprint(sim));
   });
   prints.push(fingerprint(sim));
-  return { sim, prints };
+  return { sim, prints, beams };
 }
 
 /**
@@ -68,6 +82,7 @@ describe('determinism', () => {
     const b = play(level, seed, 60 * 40);
     expect(b.prints).toEqual(a.prints);
     // The script really exercised the game (not a trivially idle round).
-    expect(a.sim.state.player.pingsUsed).toBeGreaterThan(0);
+    expect(a.sim.state.player.pingsUsed).toBeGreaterThan(a.beams);
+    expect(a.beams).toBeGreaterThan(0);
   });
 });

@@ -85,6 +85,12 @@ export const SYNTHS: Record<SynthName, Synth> = {
   // GDD: sine sweep from 1200 Hz down to 400 Hz over 0.3 s.
   ping,
 
+  // A ping squeezed into a beam: higher, longer, with a bright edge.
+  pingBeam: (ctx, out, _n, p) => {
+    tone(ctx, out, 'sine', 1800 * p, 600 * p, 0.5, 0.45, 0.005, 0.7);
+    tone(ctx, out, 'triangle', 2600 * p, 1900 * p, 0.12, 0.12, 0.002, 0.2);
+  },
+
   // GDD: short filtered noise burst.
   step: (ctx, out, n, p) => noiseBurst(ctx, out, n, 'bandpass', 1100 * p, 0.9, 0.6, 0.003, 0.07),
 

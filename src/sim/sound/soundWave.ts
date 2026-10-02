@@ -1,5 +1,5 @@
-import { SOUND_KINDS, type SoundKindId } from '@/config/sounds';
-import type { Vec2 } from '@/core/geometry';
+import { SOUND_KINDS, type SoundKindDef, type SoundKindId } from '@/config/sounds';
+import { inSector, type Sector, type Vec2 } from '@/core/geometry';
 import type { EntityId } from '../entities/entity';
 import type { WallGeometry } from '../world/edges';
 import { visibilityPolygon } from '../world/visibility';
@@ -27,6 +27,16 @@ export interface SoundWave {
    */
   readonly focusX: number;
   readonly focusY: number;
+  /** A directional sound's wedge (Phase 18 beam); null = all around. */
+  readonly arc: Sector | null;
+}
+
+/** Optional details of a new sound. */
+export interface SoundOptions {
+  /** Where hunters that hear it should go (default: the origin). */
+  focus?: Vec2;
+  /** Aim of a directional sound kind (radians); ignored by the others. */
+  dir?: number;
 }
 
 export function createWave(
@@ -37,9 +47,11 @@ export function createWave(
   y: number,
   owner: EntityId | null,
   time: number,
-  focus: Vec2 = { x, y },
+  { focus = { x, y }, dir = 0 }: SoundOptions = {},
 ): SoundWave {
   const def = SOUND_KINDS[kind];
+  const halfAngle = arcHalfAngle(kind);
+  const arc = halfAngle === null ? null : { dir, halfAngle };
   return {
     id,
     kind,
@@ -50,10 +62,22 @@ export function createWave(
     maxRadius: def.maxRadius,
     speed: def.speed,
     radius: 0,
-    polygon: visibilityPolygon(walls, x, y, def.maxRadius),
+    polygon: visibilityPolygon(walls, x, y, def.maxRadius, arc),
     focusX: focus.x,
     focusY: focus.y,
+    arc,
   };
+}
+
+/** Half the width of a sound kind's wedge (radians); null if it spreads all around. */
+export function arcHalfAngle(kind: SoundKindId): number | null {
+  const { arc }: SoundKindDef = SOUND_KINDS[kind];
+  return arc === undefined ? null : (arc * Math.PI) / 360;
+}
+
+/** True if (x, y) lies in the direction the wave spreads (always, for a round one). */
+export function waveFaces(wave: SoundWave, x: number, y: number): boolean {
+  return wave.arc === null || inSector(wave.arc, x - wave.x, y - wave.y);
 }
 
 /** Grow every wave by one tick. */

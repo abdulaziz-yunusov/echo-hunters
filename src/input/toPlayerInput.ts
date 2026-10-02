@@ -1,4 +1,4 @@
-import type { PlayerInput } from '@/sim/playerInput';
+import { IDLE_INPUT, type PlayerInput } from '@/sim/playerInput';
 import type { InputFrame } from './inputFrame';
 
 /**
@@ -11,22 +11,13 @@ export function toPlayerInput(
   screenToWorld: (x: number, y: number) => { x: number; y: number },
   idle = false,
 ): PlayerInput {
-  if (idle) {
-    return {
-      moveX: 0,
-      moveY: 0,
-      sneak: false,
-      ping: false,
-      throwStone: false,
-      shockwave: false,
-      aim: null,
-    };
-  }
+  if (idle) return { ...IDLE_INPUT };
   return {
     moveX: input.moveX,
     moveY: input.moveY,
     sneak: input.sneak,
     ping: input.ping,
+    pingHeld: input.pingHeld,
     throwStone: input.throwStone,
     shockwave: input.shockwave,
     aim: input.aim ? screenToWorld(input.aim.x, input.aim.y) : null,

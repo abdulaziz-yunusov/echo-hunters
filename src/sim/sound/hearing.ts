@@ -1,12 +1,12 @@
 import { GAME } from '@/config/game';
 import { HUNTER_TYPES, type HunterTypeDef } from '@/config/hunters';
-import { SOUND_KINDS } from '@/config/sounds';
+import { SOUND_KINDS, type SoundKindDef } from '@/config/sounds';
 import type { EntityId } from '../entities/entity';
 import type { GameState, SimContext } from '../gameState';
 import { isMasked } from '../systems/emitters';
 import { distanceField } from '../world/pathfinding';
 import { hasLineOfSight } from '../world/visibility';
-import type { SoundWave } from './soundWave';
+import { waveFaces, type SoundWave } from './soundWave';
 
 /** A sound on its way to a hunter: it arrives at `at`. */
 export interface PendingHearing {
@@ -23,7 +23,8 @@ export interface PendingHearing {
  *
  * A hunter hears a sound if its tags interest the hunter's type, it is not
  * the hunter's own, and its effective distance is within the sound's
- * `hearRadius` (and the hunter's own `hearRange`, if any):
+ * `hearRadius` (and the hunter's own `hearRange`, if any). A directional sound
+ * uses `sideHearRadius` for hunters outside its wedge. The distance is:
  *
  * - in line of sight: the straight distance;
  * - otherwise, with the 'path' model: the corridor distance / `pathFactor`
@@ -33,7 +34,7 @@ export interface PendingHearing {
  * Footsteps started in an active emitter's cover are not heard at all.
  */
 export function scheduleHearing(state: GameState, wave: SoundWave): void {
-  const sound = SOUND_KINDS[wave.kind];
+  const sound: SoundKindDef = SOUND_KINDS[wave.kind];
   // Lost in machine noise (Phase 17): nobody hears it.
   if (isMasked(state, wave.x, wave.y, sound.tags)) return;
   const tiles = state.layout.tiles;
@@ -44,7 +45,9 @@ export function scheduleHearing(state: GameState, wave: SoundWave): void {
     const def: HunterTypeDef = HUNTER_TYPES[hunter.type];
     if (!sound.tags.some((t) => def.hears.includes(t))) continue;
 
-    const range = Math.min(sound.hearRadius, def.hearRange ?? Infinity);
+    const ahead = waveFaces(wave, hunter.x, hunter.y);
+    const reach = ahead ? sound.hearRadius : (sound.sideHearRadius ?? sound.hearRadius);
+    const range = Math.min(reach, def.hearRange ?? Infinity);
     const straight = Math.hypot(hunter.x - wave.x, hunter.y - wave.y);
     if (straight > range) continue;
 

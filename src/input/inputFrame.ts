@@ -17,6 +17,8 @@ export interface InputFrame {
 
   /** Held for as long as the button is down. */
   sneak: boolean;
+  /** The ping key is down (a press also sets `ping` for one tick). */
+  pingHeld: boolean;
 
   /** Pressed this tick: true for exactly one tick per press. */
   ping: boolean;
@@ -44,6 +46,7 @@ export const EMPTY_INPUT: Readonly<InputFrame> = {
   navX: 0,
   navY: 0,
   sneak: false,
+  pingHeld: false,
   ping: false,
   throwStone: false,
   shockwave: false,

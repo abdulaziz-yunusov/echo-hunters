@@ -1,7 +1,6 @@
 import type { HearingModel } from '@/config/game';
 import type { SoundKindId } from '@/config/sounds';
 import type { EventBus } from '@/core/events';
-import type { Vec2 } from '@/core/geometry';
 import type { Rng } from '@/core/rng';
 import type { EntityId } from './entities/entity';
 import type { Hunter } from './entities/hunter';
@@ -12,7 +11,7 @@ import type { Player } from './entities/player';
 import type { Stone } from './entities/stone';
 import type { GameEvents } from './events';
 import type { PendingHearing } from './sound/hearing';
-import type { SoundWave } from './sound/soundWave';
+import type { SoundOptions, SoundWave } from './sound/soundWave';
 import type { WallGeometry } from './world/edges';
 import type { MapLayout } from './world/mapGen';
 
@@ -105,7 +104,6 @@ export interface SimContext {
     x: number,
     y: number,
     owner: EntityId | null,
-    /** Where hunters that hear it should go (default: the origin). */
-    focus?: Vec2,
+    options?: SoundOptions,
   ): void;
 }

@@ -58,6 +58,7 @@ const HUNTER_STATE_COLORS: Record<(typeof HUNTER_STATE_CODES)[number], ColorKey>
 /** Noises the player made that get a lasting marker where they happened. */
 const NOISE_MARKERS: Partial<Record<SoundKindId, ColorKey>> = {
   ping: 'cyan',
+  pingBeam: 'cyan',
   stoneImpact: 'cyan',
   shockwave: 'red',
   wallBump: 'white',

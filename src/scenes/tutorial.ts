@@ -1,8 +1,11 @@
+import type { TutorialId } from '@/config/levels';
 import type { Simulation } from '@/sim/simulation';
 
 /** What the player has done so far this level, as the tutorial sees it. */
 interface Progress {
   pings: number;
+  /** Charged pings (Phase 18). */
+  beams: number;
   cores: number;
   stonesThrown: number;
   shockwaves: number;
@@ -26,7 +29,7 @@ interface Step {
 }
 
 /** Level 1 prompts (GDD §7 "tutorial prompts"). Order matters: earlier steps win. */
-const STEPS: readonly Step[] = [
+const BASICS: readonly Step[] = [
   {
     id: 'ping',
     text: 'SPACE: sonar ping. Sound shows the walls, but hunters hear it too.',
@@ -65,6 +68,18 @@ const STEPS: readonly Step[] = [
   },
 ];
 
+/** Level 2: the charged ping, once the player has pinged on this level. */
+const BEAM: readonly Step[] = [
+  {
+    id: 'beam',
+    text: 'New: hold SPACE to charge a beam. Aim, release: it reaches far, but only ahead.',
+    when: (p) => p.pings > 0,
+    done: (p, shown) => p.beams > 0 || shown > 12,
+  },
+];
+
+const STEP_SETS: Record<TutorialId, readonly Step[]> = { basics: BASICS, beam: BEAM };
+
 /** A prompt stays up at least this long, so it can be read (s). */
 const MIN_SHOW = 1.5;
 /** Hunter footsteps closer than this count as "heard" (px). */
@@ -73,16 +88,18 @@ const HEARD_RANGE = 280;
 const CLOSE_RANGE = 110;
 
 /**
- * Trigger-based prompts for the first level: each appears when it becomes
+ * Trigger-based prompts for early levels: each appears when it becomes
  * relevant and goes once the player has done it (or read it long enough).
  * Only watches the round; it never changes it.
  */
 export class Tutorial {
   private readonly sim: Simulation;
+  private readonly steps: readonly Step[];
   private readonly unsubscribe: (() => void)[];
   private readonly finished = new Set<string>();
   private readonly progress: Progress = {
     pings: 0,
+    beams: 0,
     cores: 0,
     stonesThrown: 0,
     shockwaves: 0,
@@ -95,14 +112,16 @@ export class Tutorial {
   private current: Step | null = null;
   private shown = 0;
 
-  constructor(sim: Simulation) {
+  constructor(sim: Simulation, set: TutorialId) {
     this.sim = sim;
+    this.steps = STEP_SETS[set];
     const p = this.progress;
     const on = sim.events.on.bind(sim.events);
     this.unsubscribe = [
       on('soundEmitted', (s) => {
         const me = sim.state.player;
         if (s.owner === me.id && s.kind === 'ping') p.pings++;
+        if (s.owner === me.id && s.kind === 'pingBeam') p.beams++;
         if (s.owner === me.id && s.kind === 'shockwave') p.shockwaves++;
         if (s.kind === 'hunterStep' && Math.hypot(s.x - me.x, s.y - me.y) < HEARD_RANGE) {
           p.hunterHeard = true;
@@ -140,7 +159,7 @@ export class Tutorial {
       }
       return;
     }
-    const next = STEPS.find((s) => !this.finished.has(s.id) && s.when(p));
+    const next = this.steps.find((s) => !this.finished.has(s.id) && s.when(p));
     if (next) {
       this.current = next;
       this.shown = 0;
