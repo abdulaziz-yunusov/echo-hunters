@@ -11,6 +11,7 @@ const base: RoundResult = {
   huntersStunned: 0,
   closeCalls: 0,
   areaScale: 1,
+  scoreMultiplier: 1,
 };
 
 describe('scoreRound', () => {
@@ -48,6 +49,7 @@ describe('scoreRound', () => {
       ghostBonus: 0,
       stuns: 2 * S.hunterStunned,
       closeCalls: 0,
+      modifier: 0,
       total: 3 * S.core + 2 * S.hunterStunned,
     });
   });

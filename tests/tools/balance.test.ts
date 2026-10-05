@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { Bot } from '@/bot/bot';
 import { UPGRADE_IDS } from '@/config/upgrades';
+import { MODIFIER_IDS } from '@/config/modifiers';
 import {
+  formatModifierTable,
   formatTable,
   formatUpgradeTable,
   measureLevel,
+  measureModifiers,
   measureUpgrades,
   parseArgs,
   parseLevels,
@@ -89,6 +92,17 @@ describe('balance command line', () => {
       levels: [4, 5, 6, 7, 8],
     });
     expect(() => parseArgs(['--upgrades', 'jetpack'])).toThrow();
+  });
+
+  it('takes a forced modifier (Phase 21) and the modifier table', () => {
+    expect(parseArgs(['--modifier', 'blackout']).modifier).toBe('blackout');
+    expect(parseArgs(['--modifier', 'none']).modifier).toBeNull();
+    expect(parseArgs([]).modifier).toBeUndefined();
+    expect(parseArgs(['--modifier-table']).modifierTable).toBe(true);
+    expect(() => parseArgs(['--modifier', 'fog'])).toThrow();
+    const rows = measureModifiers([5], 1, 'basic');
+    expect(rows.map((r) => r.modifier)).toEqual([null, ...MODIFIER_IDS]);
+    expect(formatModifierTable(rows)).toContain('ECHO CHAMBER');
   });
 
   it('the upgrade table lists every upgrade against none', () => {

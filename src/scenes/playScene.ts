@@ -14,6 +14,7 @@ import { WorldRenderer } from '@/render/worldRenderer';
 import { roundResult, scoreRound } from '@/sim/scoring';
 import { levelDef, newHunterTypes } from '@/sim/level';
 import { HUNTER_INFO } from '@/ui/hunterInfo';
+import { MODIFIERS } from '@/config/modifiers';
 import { upgradeSummary } from '@/ui/format';
 import { createCustomSimulation, createSimulation, type Simulation } from '@/sim/simulation';
 import { decodeMap } from '@/sim/world/customMap';
@@ -23,9 +24,9 @@ import { Tutorial } from './tutorial';
 import { RoundDisplay } from './roundDisplay';
 import type { AppContext, Scene } from './scene';
 
-/** Seconds the "LEVEL n" banner stays up (longer when it names a new hunter). */
+/** Seconds the "LEVEL n" banner stays up (longer when it has news: a new hunter, a modifier). */
 const BANNER_TIME = 3;
-const BANNER_TIME_NEW_HUNTER = 5;
+const BANNER_TIME_NEWS = 5;
 /** Share of the screen the debug overview map may fill. */
 const OVERVIEW_MARGIN = 0.92;
 /** Seconds to linger on the world after extraction before the score screen. */
@@ -150,7 +151,14 @@ export class PlayScene implements Scene {
     }
     const corner = this.run.custom
       ? 'CUSTOM MAP'
-      : `${this.run.daily ? `DAILY ${this.run.daily} · ` : ''}LEVEL ${this.run.level} · SEED ${this.run.seed}`;
+      : [
+          this.run.daily ? `DAILY ${this.run.daily}` : '',
+          `LEVEL ${this.run.level}`,
+          state.modifier ? MODIFIERS[state.modifier].label : '',
+          `SEED ${this.run.seed}`,
+        ]
+          .filter(Boolean)
+          .join(' · ');
     drawText(ctx, corner, width - 12, height - 12, {
       size: 11,
       color: THEME.colors.white,
@@ -205,7 +213,9 @@ export class PlayScene implements Scene {
           level: this.run.level,
           upgrades: this.run.upgrades,
         });
-    this.world = new WorldRenderer(this.sim, DIFFICULTIES[this.run.difficulty].ghostAlpha);
+    // A modifier (Blackout, Phase 21) may override the difficulty's ghost level.
+    const ghost = this.sim.state.rules.ghostAlpha ?? DIFFICULTIES[this.run.difficulty].ghostAlpha;
+    this.world = new WorldRenderer(this.sim, ghost);
     this.display = new RoundDisplay(this.camera, this.world);
     this.audio = new AudioDirector(this.sim, this.display.output(this.app.sound));
     this.popup = null;
@@ -234,12 +244,14 @@ export class PlayScene implements Scene {
   }
 
   /**
-   * "LEVEL 4 · 3 HUNTERS · PING 3s" for the first seconds of a level, and
-   * a line for each hunter type met for the first time (Phase 19).
+   * "LEVEL 4 · 3 HUNTERS · PING 3s" for the first seconds of a level, then
+   * the run's upgrades (Phase 20), the level's modifier (Phase 21) and a
+   * line for each hunter type met for the first time (Phase 19).
    */
   private drawLevelBanner(ctx: CanvasRenderingContext2D, time: number): void {
     const met = this.run.custom ? [] : newHunterTypes(this.run.level);
-    const shown = met.length > 0 ? BANNER_TIME_NEW_HUNTER : BANNER_TIME;
+    const { modifier } = this.sim.state;
+    const shown = met.length > 0 || modifier ? BANNER_TIME_NEWS : BANNER_TIME;
     if (time > shown) return;
     const alpha = Math.min(1, (shown - time) / 0.6, time / 0.3);
     const { width, height } = this.app.viewport;
@@ -287,6 +299,28 @@ export class PlayScene implements Scene {
         below += 17;
       }
       below += 12;
+    }
+    if (modifier) {
+      const def = MODIFIERS[modifier];
+      drawText(ctx, `MODIFIER: ${def.label} · SCORE ×${def.scoreMultiplier}`, width / 2, below, {
+        size: 16,
+        color: THEME.colors.orange,
+        align: 'center',
+        alpha,
+      });
+      ctx.save();
+      ctx.font = `13px ${THEME.font}`;
+      const lines = wrapLines(ctx, def.blurb, Math.min(720, width - 32));
+      ctx.restore();
+      lines.forEach((line, i) =>
+        drawText(ctx, line, width / 2, below + 20 + i * 17, {
+          size: 13,
+          color: THEME.colors.white,
+          align: 'center',
+          alpha,
+        }),
+      );
+      below += 30 + lines.length * 17;
     }
     // Two short lines each, so they fit a phone held upright.
     met.forEach((type, i) => {

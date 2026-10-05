@@ -6,6 +6,7 @@ import { DUEL_VARIANTS, VARIANT_CHOICES, type VariantChoice } from '@/config/due
 import { DUEL_BOTS, type DuelBotId } from '@/config/duelBots';
 import { formatDuelTable, MAX_LAG, measureDuels, type BotPair } from './duelBalance';
 import { UPGRADE_IDS, UPGRADES, type UpgradeId } from '@/config/upgrades';
+import { MODIFIER_IDS, MODIFIERS, type ModifierId } from '@/config/modifiers';
 
 /** A round the bot hasn't finished by then counts as failed (s). */
 export const ROUND_LIMIT = 300;
@@ -19,6 +20,8 @@ export interface MeasureOptions {
   hunters?: readonly HunterTypeId[];
   /** Upgrades the bot has on every level (Phase 20), one entry per stack. */
   upgrades?: readonly UpgradeId[];
+  /** Force every level's modifier (Phase 21); null = none; unset = the run seed's, as in play. */
+  modifier?: ModifierId | null;
 }
 
 export interface RoundOutcome {
@@ -47,8 +50,9 @@ export function playRound(
   profile: BotProfile,
   hunters?: readonly HunterTypeId[],
   upgrades?: readonly UpgradeId[],
+  modifier?: ModifierId | null,
 ): RoundOutcome {
-  const sim = createSimulation({ seed, level, hunters, upgrades });
+  const sim = createSimulation({ seed, level, hunters, upgrades, modifier });
   const bot = new Bot(sim, profile);
   let hits = 0;
   sim.events.on('playerHit', (e) => {
@@ -69,7 +73,9 @@ export function playRound(
 export function measureLevel(level: number, options: MeasureOptions): LevelStats {
   const outcomes: RoundOutcome[] = [];
   for (let seed = 1; seed <= options.maps; seed++) {
-    outcomes.push(playRound(level, seed, options.profile, options.hunters, options.upgrades));
+    outcomes.push(
+      playRound(level, seed, options.profile, options.hunters, options.upgrades, options.modifier),
+    );
   }
   const won = outcomes.filter((o) => o.extracted);
   return {
@@ -163,6 +169,41 @@ export function formatUpgradeTable(stats: readonly UpgradeStats[]): string {
   return lines.join('\n');
 }
 
+/**
+ * Phase 21: every level played with each modifier forced on, and with
+ * none, on the same maps. Row 0 is "none".
+ */
+export function measureModifiers(
+  levels: readonly number[],
+  maps: number,
+  profile: BotProfile,
+): { modifier: ModifierId | null; stats: LevelStats[] }[] {
+  return [null, ...MODIFIER_IDS].map((modifier) => ({
+    modifier,
+    stats: levels.map((level) => measureLevel(level, { levels, maps, profile, modifier })),
+  }));
+}
+
+/** Success per level for each modifier, with the change from none in brackets. */
+export function formatModifierTable(rows: ReturnType<typeof measureModifiers>): string {
+  const base = rows[0].stats;
+  const pct = (v: number) => `${Math.round(v * 100)}%`;
+  const lines = [
+    `| Modifier | ${base.map((s) => `L${s.level}`).join(' | ')} | worst Δ |`,
+    `| --- | ${base.map(() => '---').join(' | ')} | --- |`,
+    ...rows.map(({ modifier, stats }) => {
+      const name = modifier ? MODIFIERS[modifier].label : '(none)';
+      const deltas = stats.map((s, i) => Math.round((s.success - base[i].success) * 100));
+      const cells = stats.map((s, i) =>
+        modifier ? `${pct(s.success)} (${deltas[i] >= 0 ? '+' : ''}${deltas[i]})` : pct(s.success),
+      );
+      const worst = modifier ? `${Math.min(...deltas)}` : '';
+      return `| ${name} | ${cells.join(' | ')} | ${worst} |`;
+    }),
+  ];
+  return lines.join('\n');
+}
+
 /** "1-8" or "2,4,6" or "5" → level numbers. */
 export function parseLevels(text: string): number[] {
   const levels: number[] = [];
@@ -178,6 +219,8 @@ export function parseLevels(text: string): number[] {
 
 const USAGE = `npm run balance -- [--levels 1-8] [--maps 40] [--profile basic|careful|all] [--hunters stalker,listener] [--upgrades quickPing,quickPing]
        npm run balance -- --upgrade-table [--levels 4-8] [--maps 40] [--profile all]
+       npm run balance -- --modifier-table [--levels 5-10] [--maps 40] [--profile all]
+       (--modifier blackout|…|none forces one on every level)
        npm run balance -- --duel [--maps 40] [--bots hard,easy] [--variant classic|…|random|all]`;
 
 export interface CliOptions {
@@ -189,6 +232,10 @@ export interface CliOptions {
   upgrades?: UpgradeId[];
   /** Compare each upgrade alone against none (Phase 20). */
   upgradeTable: boolean;
+  /** Force a modifier on every level (Phase 21): an id, or null for none. */
+  modifier?: ModifierId | null;
+  /** Compare each modifier against none, level by level (Phase 21). */
+  modifierTable: boolean;
   /** Measure duels (two duel bots) instead of solo levels. */
   duel: boolean;
   /** Duel bot levels to compare (the same one twice by default). */
@@ -203,6 +250,7 @@ export function parseArgs(argv: readonly string[]): CliOptions {
     maps: 40,
     profiles: ['basic'],
     upgradeTable: false,
+    modifierTable: false,
     duel: false,
     bots: ['hard', 'hard'],
     variants: ['classic'],
@@ -215,6 +263,10 @@ export function parseArgs(argv: readonly string[]): CliOptions {
     }
     if (flag === '--upgrade-table') {
       options.upgradeTable = true;
+      continue;
+    }
+    if (flag === '--modifier-table') {
+      options.modifierTable = true;
       continue;
     }
     const value = argv[i + 1];
@@ -239,6 +291,10 @@ export function parseArgs(argv: readonly string[]): CliOptions {
         if (!(id in UPGRADES)) throw new Error(`Unknown upgrade ${id}.`);
       }
       options.upgrades = ids as UpgradeId[];
+    } else if (flag === '--modifier') {
+      if (value === 'none') options.modifier = null;
+      else if (value in MODIFIERS) options.modifier = value as ModifierId;
+      else throw new Error(`Unknown modifier ${value}.\n${USAGE}`);
     } else if (flag === '--variant') {
       if (value === 'all') options.variants = [...VARIANT_CHOICES];
       else if ((VARIANT_CHOICES as readonly string[]).includes(value)) {
@@ -272,6 +328,16 @@ export function main(argv: readonly string[], log: (line: string) => void = cons
     }
     return;
   }
+  if (cli.modifierTable) {
+    for (const profile of cli.profiles) {
+      const started = Date.now();
+      const rows = measureModifiers(cli.levels, cli.maps, profile);
+      log(`\n${profile} bot · each modifier forced on vs none · ${cli.maps} maps per level\n`);
+      log(formatModifierTable(rows));
+      log(`\n(${((Date.now() - started) / 1000).toFixed(1)} s)`);
+    }
+    return;
+  }
   if (cli.upgradeTable) {
     for (const profile of cli.profiles) {
       const started = Date.now();
@@ -285,7 +351,8 @@ export function main(argv: readonly string[], log: (line: string) => void = cons
   }
   const note =
     (cli.hunters ? ` · hunters ${cli.hunters.join(',')}` : '') +
-    (cli.upgrades ? ` · upgrades ${cli.upgrades.join(',')}` : '');
+    (cli.upgrades ? ` · upgrades ${cli.upgrades.join(',')}` : '') +
+    (cli.modifier !== undefined ? ` · modifier ${cli.modifier ?? 'none'}` : '');
   for (const profile of cli.profiles) {
     const started = Date.now();
     const stats = cli.levels.map((level) =>
@@ -295,6 +362,7 @@ export function main(argv: readonly string[], log: (line: string) => void = cons
         profile,
         hunters: cli.hunters,
         upgrades: cli.upgrades,
+        modifier: cli.modifier,
       }),
     );
     log(`\n${profile} bot · ${cli.maps} maps per level${note}\n`);

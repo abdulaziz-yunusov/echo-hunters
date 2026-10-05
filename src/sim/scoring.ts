@@ -1,4 +1,5 @@
 import { GAME } from '@/config/game';
+import { MODIFIERS } from '@/config/modifiers';
 import type { GameState } from './gameState';
 
 export interface RoundResult {
@@ -11,6 +12,8 @@ export interface RoundResult {
   closeCalls: number;
   /** Map area relative to the base map (1 = base size); bigger maps get more par time. */
   areaScale: number;
+  /** The level modifier's reward (Phase 21): the score × this (1 = none). */
+  scoreMultiplier: number;
 }
 
 export interface ScoreBreakdown {
@@ -20,6 +23,8 @@ export interface ScoreBreakdown {
   ghostBonus: number;
   stuns: number;
   closeCalls: number;
+  /** Extra points from the level's modifier (Phase 21). */
+  modifier: number;
   total: number;
 }
 
@@ -35,6 +40,7 @@ export function roundResult(state: GameState): RoundResult {
     huntersStunned: state.stats.huntersStunned,
     closeCalls: state.stats.closeCalls,
     areaScale: (layout.tiles.width * layout.tiles.height) / base,
+    scoreMultiplier: state.modifier ? MODIFIERS[state.modifier].scoreMultiplier : 1,
   };
 }
 
@@ -53,6 +59,9 @@ export function scoreRound(r: RoundResult): ScoreBreakdown {
   const ghostBonus = r.extracted && r.pingsUsed === 0 ? s.ghostBonus : 0;
   const stuns = r.huntersStunned * s.hunterStunned;
   const closeCalls = Math.min(r.closeCalls, s.closeCallMax) * s.closeCall;
+  const earned = cores + extraction + timeBonus + ghostBonus + stuns + closeCalls;
+  // A modifier multiplies everything earned, caught or not.
+  const modifier = Math.round(earned * (r.scoreMultiplier - 1));
   return {
     cores,
     extraction,
@@ -60,6 +69,7 @@ export function scoreRound(r: RoundResult): ScoreBreakdown {
     ghostBonus,
     stuns,
     closeCalls,
-    total: cores + extraction + timeBonus + ghostBonus + stuns + closeCalls,
+    modifier,
+    total: earned + modifier,
   };
 }

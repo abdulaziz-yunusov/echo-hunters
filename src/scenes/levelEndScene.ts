@@ -8,6 +8,8 @@ import { drawMenu } from '@/ui/menuRenderer';
 import type { Replay } from '@/replay/replay';
 import type { ScoreBreakdown } from '@/sim/scoring';
 import { offerUpgrades } from '@/sim/upgrades';
+import { MODIFIERS, type ModifierId } from '@/config/modifiers';
+import { levelModifier } from '@/sim/modifiers';
 import { customMapItems, replayItem } from './menuItems';
 import { nextLevel, type RunState } from './run';
 import type { AppContext, Scene } from './scene';
@@ -28,6 +30,8 @@ export class LevelEndScene implements Scene {
   private readonly isNewHigh: boolean;
   private readonly menu: MenuList;
   private time = 0;
+  /** The level's modifier (Phase 21): it is in the score, and named. */
+  private readonly modifier: ModifierId | null;
 
   constructor(
     app: AppContext,
@@ -37,6 +41,7 @@ export class LevelEndScene implements Scene {
     this.run = params.run;
     this.score = params.score;
     this.seconds = params.seconds;
+    this.modifier = this.run.custom ? null : levelModifier(this.run.seed, this.run.level);
     this.next = nextLevel(this.run, this.score.total);
     // A hand-made map can be made easy, so it never counts for the high score (Phase 13).
     const high = this.run.custom
@@ -84,7 +89,9 @@ export class LevelEndScene implements Scene {
       glow: THEME.glowBlur * 2,
     });
     y += 30;
-    const what = this.run.custom ? 'CUSTOM MAP' : `LEVEL ${this.run.level}`;
+    const what = this.run.custom
+      ? 'CUSTOM MAP'
+      : `LEVEL ${this.run.level}${this.modifier ? ` · ${MODIFIERS[this.modifier].label}` : ''}`;
     drawText(ctx, `${what} · ${formatTime(this.seconds)}`, cx, y, {
       size: 14,
       color: white,
@@ -102,6 +109,10 @@ export class LevelEndScene implements Scene {
     ];
     if (s.stuns > 0) rows.push(['Hunters stunned', s.stuns]);
     if (s.closeCalls > 0) rows.push(['Close calls', s.closeCalls]);
+    if (this.modifier) {
+      const def = MODIFIERS[this.modifier];
+      rows.push([`${def.label} ×${def.scoreMultiplier}`, s.modifier]);
+    }
     for (const [label, points] of rows) {
       this.row(ctx, label, `+${points}`, y, points > 0 ? 1 : 0.4);
       y += LINE;

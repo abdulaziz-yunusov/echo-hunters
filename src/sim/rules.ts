@@ -5,6 +5,7 @@ import {
   type VariantChoice,
 } from '@/config/duel';
 import { GAME } from '@/config/game';
+import { MODIFIERS, type ModifierId } from '@/config/modifiers';
 import type { RuleEffect, Rules } from '@/config/rules';
 import { PICKUP_TYPES } from '@/config/pickups';
 import { SOUND_KINDS } from '@/config/sounds';
@@ -15,14 +16,20 @@ import { levelDef } from './level';
 /**
  * The rules pipeline: the defaults from GAME, then the level's overrides,
  * then the run's upgrades (Phase 20, one pass per stack, in the order
- * picked), then a duel variant's effects. Level modifiers (Phase 21) will
- * be more effects in the same format.
+ * picked), then the level's modifier (Phase 21), then a duel variant's
+ * effects. All of them are effects in the same data format.
  */
 export function buildRules({
   level = 1,
   variant,
   upgrades = [],
-}: { level?: number; variant?: DuelVariantId; upgrades?: readonly UpgradeId[] } = {}): Rules {
+  modifier = null,
+}: {
+  level?: number;
+  variant?: DuelVariantId;
+  upgrades?: readonly UpgradeId[];
+  modifier?: ModifierId | null;
+} = {}): Rules {
   const { abilities, player } = GAME;
   const rules: Rules = {
     pingCooldown: levelDef(level).overrides?.pingCooldown ?? abilities.ping.cooldown,
@@ -48,6 +55,7 @@ export function buildRules({
     taken.set(id, n);
     if (n <= UPGRADES[id].maxStacks) applyEffects(rules, UPGRADES[id].effects);
   }
+  if (modifier) applyEffects(rules, MODIFIERS[modifier].effects);
   if (variant) applyEffects(rules, DUEL_VARIANTS[variant].effects);
   return rules;
 }

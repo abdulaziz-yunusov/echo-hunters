@@ -1,5 +1,6 @@
 import type { HearingModel } from '@/config/game';
 import type { DuelVariantId } from '@/config/duel';
+import type { ModifierId } from '@/config/modifiers';
 import type { Rules } from '@/config/rules';
 import type { SoundKindId } from '@/config/sounds';
 import type { EventBus } from '@/core/events';
@@ -107,6 +108,8 @@ export interface GameState {
   trail: TrailPoint[];
   /** Level-specific rule values (GAME defaults plus the level's overrides). */
   rules: LevelRules;
+  /** The level's modifier (Phase 21), already in `rules`; null for none. */
+  modifier: ModifierId | null;
   /** How hunters hear (GAME.hearing.model by default; debug can switch it live). */
   hearingModel: HearingModel;
   stats: {

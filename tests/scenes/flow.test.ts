@@ -33,6 +33,8 @@ import { createSimulation, type Simulation } from '@/sim/simulation';
 import { UPGRADE_IDS, UPGRADE_OFFER_SIZE, UPGRADES, type UpgradeId } from '@/config/upgrades';
 import { buildRules } from '@/sim/rules';
 import { offerUpgrades } from '@/sim/upgrades';
+import { levelModifier } from '@/sim/modifiers';
+import { roundResult, scoreRound } from '@/sim/scoring';
 
 const DT = 1 / 60;
 
@@ -251,6 +253,7 @@ describe('screen flow', () => {
       ghostBonus: 0,
       stuns: 0,
       closeCalls: 0,
+      modifier: 0,
       total: 0,
     };
     t.app.goTo('gameOver', { run: newRun(1, 'easy'), score });
@@ -270,6 +273,7 @@ describe('screen flow', () => {
       ghostBonus: 0,
       stuns: 0,
       closeCalls: 0,
+      modifier: 0,
       total: 0,
     };
     const replay = recordedRound();
@@ -774,6 +778,7 @@ describe('screen flow', () => {
           ghostBonus: 0,
           stuns: 0,
           closeCalls: 0,
+          modifier: 0,
           total: 800,
         };
         t.app.goTo('levelEnd', { run, score, seconds: 40 });
@@ -813,6 +818,7 @@ describe('screen flow', () => {
         ghostBonus: 0,
         stuns: 0,
         closeCalls: 0,
+        modifier: 0,
         total: 100,
       };
       t.app.goTo('gameOver', { run, score });
@@ -832,6 +838,7 @@ describe('screen flow', () => {
       ghostBonus: 0,
       stuns: 0,
       closeCalls: 0,
+      modifier: 0,
       total: 800,
     };
     type Pick = { offers: UpgradeId[]; cards: { x: number; y: number; w: number; h: number }[] };
@@ -890,6 +897,30 @@ describe('screen flow', () => {
     });
   });
 
+  it('a level modifier (Phase 21): Blackout hides walls even on Easy; Level End names it', () => {
+    const seed = Array.from({ length: 200 }, (_, i) => i + 1).find(
+      (s) => levelModifier(s, 5) === 'blackout',
+    )!;
+    const t = testApp();
+    const run = { ...newRun(seed, 'easy'), level: 5 };
+    t.app.goTo('play', { run });
+    const scene = t.scenes.current as unknown as {
+      sim: Simulation;
+      world: { ghostAlpha: number };
+    };
+    expect(scene.sim.state.modifier).toBe('blackout');
+    expect(scene.world.ghostAlpha).toBe(0);
+    t.render();
+    const score = scoreRound({ ...roundResult(scene.sim.state), extracted: true });
+    t.app.goTo('levelEnd', { run, score, seconds: 40 });
+    expect((t.scenes.current as unknown as { modifier: string }).modifier).toBe('blackout');
+    expect(score.modifier).toBeGreaterThan(0);
+    t.render();
+    // An unmodified level keeps the difficulty's ghost level.
+    t.app.goTo('play', { run: { ...run, level: 1 } });
+    expect((t.scenes.current as unknown as typeof scene).world.ghostAlpha).toBeGreaterThan(0);
+  });
+
   it('every screen renders without errors', () => {
     const t = testApp();
     const score = {
@@ -899,6 +930,7 @@ describe('screen flow', () => {
       ghostBonus: 0,
       stuns: 1,
       closeCalls: 2,
+      modifier: 0,
       total: 980,
     };
     const run = newRun(1, 'hard');

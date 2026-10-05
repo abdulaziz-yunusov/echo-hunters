@@ -4,6 +4,8 @@ import type { HunterTypeId } from '@/config/hunters';
 import type { LevelDef } from '@/config/levels';
 import type { SoundKindId } from '@/config/sounds';
 import type { UpgradeId } from '@/config/upgrades';
+import type { ModifierId } from '@/config/modifiers';
+import { levelModifier } from './modifiers';
 import { EventBus } from '@/core/events';
 import { deriveSeed, Rng } from '@/core/rng';
 import { setHunterState, updateHunters } from './ai/hunterBrain';
@@ -60,6 +62,8 @@ export interface SimulationOptions {
   coresToWin?: number;
   /** The run's upgrades (Phase 20), in the order picked; their effects go into state.rules. */
   upgrades?: readonly UpgradeId[];
+  /** The level's modifier (Phase 21); its effects go into state.rules. */
+  modifier?: ModifierId | null;
   /** A hand-made map (Phase 13): pickups and emitters exactly where they were put. */
   placed?: Pick<CustomRound, 'pickups' | 'emitters'>;
 }
@@ -97,7 +101,13 @@ export class Simulation implements SimContext {
         }))
       : placePickups(layout, options.pickups ?? def.pickups);
     const pickupTiles = pickups.map((p) => ({ tx: tiles.toTile(p.x), ty: tiles.toTile(p.y) }));
-    const rules = buildRules({ level, variant: options.variant, upgrades: options.upgrades });
+    const modifier = options.modifier ?? null;
+    const rules = buildRules({
+      level,
+      variant: options.variant,
+      upgrades: options.upgrades,
+      modifier,
+    });
     const start = { hp: rules.maxHp, stones: rules.startStones };
 
     this.state = {
@@ -153,6 +163,7 @@ export class Simulation implements SimContext {
       hearings: [],
       trail: [],
       rules,
+      modifier,
       hearingModel: GAME.hearing.model,
       stats: { huntersStunned: 0, closeCalls: 0 },
     };
@@ -238,6 +249,7 @@ export function createSimulation({
   level,
   hunters,
   upgrades,
+  modifier = levelModifier(seed, level),
 }: {
   seed: number;
   level: number;
@@ -245,10 +257,17 @@ export function createSimulation({
   hunters?: readonly HunterTypeId[];
   /** The run's upgrades so far (Phase 20). */
   upgrades?: readonly UpgradeId[];
+  /** Override the level's modifier (null: none). By default the run seed's (Phase 21). */
+  modifier?: ModifierId | null;
 }): Simulation {
   const options = mapOptionsFromConfig(levelSeed(seed, level), { scale: levelMapScale(level) });
   const layout = generateMap(options);
-  return new Simulation(layout, buildWallGeometry(layout.tiles), { level, hunters, upgrades });
+  return new Simulation(layout, buildWallGeometry(layout.tiles), {
+    level,
+    hunters,
+    upgrades,
+    modifier,
+  });
 }
 
 /**
