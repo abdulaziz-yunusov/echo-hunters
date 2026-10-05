@@ -42,6 +42,8 @@ export interface SimulationOptions {
   emitters?: LevelDef['emitters'];
   /** Solo (default), or which side of a duel this machine is. */
   mode?: SimMode;
+  /** Duel: the host starts in the guest's corner and the guest in the host's (series rounds alternate). */
+  swapSpawns?: boolean;
 }
 
 /**
@@ -58,10 +60,14 @@ export class Simulation implements SimContext {
     const mode = options.mode ?? 'solo';
     const duel = mode !== 'solo';
     const { tiles } = layout;
-    // Ids and spawns match on both duel machines: the host is 1 (spawn 0), the guest 2 (spawn 1).
+    // Ids and spawns match on both duel machines: the host is 1 (spawn 0), the guest 2 (spawn 1),
+    // or the other way round with swapSpawns.
     const localId = mode === 'client' ? GUEST_ID : PLAYER_ID;
-    const spawnOf = (id: EntityId) =>
-      tiles.center(layout.spawns[Math.min(id - 1, layout.spawns.length - 1)]);
+    const swap = duel && options.swapSpawns === true;
+    const spawnOf = (id: EntityId) => {
+      const index = swap ? 2 - id : id - 1;
+      return tiles.center(layout.spawns[Math.max(0, Math.min(index, layout.spawns.length - 1))]);
+    };
     const def = levelDef(level);
     const hunterTypes = options.hunters ?? def.hunters;
     const pickups = placePickups(layout, options.pickups ?? def.pickups);
@@ -200,14 +206,18 @@ export function createDuelSimulation({
   seed,
   role,
   hunters = GAME.duel.hunters,
+  swapSpawns = false,
 }: {
   seed: number;
   role: 'host' | 'client';
   hunters?: readonly HunterTypeId[];
+  /** Series rounds alternate corners (Phase 27). */
+  swapSpawns?: boolean;
 }): Simulation {
   const layout = generateMap(mapOptionsFromConfig(seed, { players: 2 }));
   return new Simulation(layout, buildWallGeometry(layout.tiles), {
     mode: role,
+    swapSpawns,
     hunters,
     pickups: GAME.duel.pickups,
     emitters: GAME.duel.emitters,

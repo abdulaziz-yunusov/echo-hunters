@@ -94,6 +94,14 @@ describe('replay wire format', () => {
       { ...wire, hunters: [{ id: 100, type: 'ghost', track: wire.player }] },
       { ...wire, outcome: 'won' },
       { ...wire, v: 99 },
+      // Duel events (Phase 27): unknown kinds and missing players are refused.
+      ...[
+        { kind: 'dance', time: 1, by: 1 },
+        { kind: 'hit', time: 1, by: 1 },
+      ].map((event) => ({
+        ...wire,
+        duel: { rivalId: 2, rival: wire.player, winner: null, events: [event] },
+      })),
     ];
     for (const w of broken) expect(await unpack(await gzipBase64(JSON.stringify(w)))).toBeNull();
   });

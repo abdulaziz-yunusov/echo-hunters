@@ -1,3 +1,4 @@
+import { GAME } from '@/config/game';
 import type { HunterTypeId } from '@/config/hunters';
 import type { Action } from '@/config/input';
 import { THEME } from '@/config/theme';
@@ -26,18 +27,68 @@ const TIPS = [
   'The drone rises when a hunter is near. Headphones help: steps come from their side.',
 ];
 
-/** Rules, controls (as currently bound), the three hunters, and a few tips. */
+const { duel } = GAME;
+
+/** The duel page (Phase 27): [heading, lines]. */
+const DUEL_RULES: readonly [string, readonly string[]][] = [
+  [
+    'GOAL',
+    [
+      `Two players, one maze, and a Stalker that hunts you both. Carry ${duel.coresToWin} cores to the beacon first.`,
+      'The beacon wakes as soon as someone carries enough cores: everyone hears it.',
+      'You see your rival only when your rings pass over them; you hear their steps, pings and stones.',
+    ],
+  ],
+  [
+    'DROPS AND STEALS',
+    [
+      `${duel.hitsToDropCores} hits (your rival's shockwave or a hunter) and you drop every core you carry.`,
+      `You must wait ${duel.dropLockSeconds} s to take your own cores back; whoever hit you can take them at once.`,
+      'Picking up cores your rival dropped is a steal. A lead is never safe.',
+    ],
+  ],
+  [
+    'SERIES',
+    [
+      `The host picks one round or best of ${duel.series.bestOf.filter((n) => n > 1).join(' / ')}. Spawn corners swap every round.`,
+      `Both press READY between rounds (${duel.series.countdown} s countdown). REMATCH starts a new series, same room.`,
+      'Duel End shows both players side by side: cores, steals, hits, pings, stones, distance, time in the lead.',
+    ],
+  ],
+  [
+    'PRACTICE',
+    ['DUEL → PRACTICE VS BOT: the same duel offline, against an EASY, NORMAL or HARD bot.'],
+  ],
+];
+
+/** Rules, controls (as currently bound), the three hunters, and a few tips; a second page for duels. */
 export class HowToPlayScene implements Scene {
   readonly name = 'HowToPlay';
   private readonly app: AppContext;
-  private readonly menu: MenuList;
+  private menu!: MenuList;
   private readonly keys: (action: Action) => string;
+  private page: 'solo' | 'duel' = 'solo';
 
   constructor(app: AppContext) {
     this.app = app;
     const bindings = withOverrides(loadSave().bindings);
     this.keys = (action) => bindings[action].map(inputLabel).join('/');
-    this.menu = new MenuList([{ kind: 'action', label: 'BACK', onSelect: () => app.close() }]);
+    this.buildMenu();
+  }
+
+  private buildMenu(): void {
+    const other = this.page === 'solo' ? 'duel' : 'solo';
+    this.menu = new MenuList([
+      {
+        kind: 'action',
+        label: other === 'duel' ? 'DUEL RULES' : 'SOLO RULES',
+        onSelect: () => {
+          this.page = other;
+          this.buildMenu();
+        },
+      },
+      { kind: 'action', label: 'BACK', onSelect: () => this.app.close() },
+    ]);
   }
 
   update(_dt: number, input: InputFrame): void {
@@ -58,12 +109,21 @@ export class HowToPlayScene implements Scene {
     const k = this.keys;
     let y = Math.max(56, height * 0.09);
 
-    drawTitle(ctx, 'HOW TO PLAY', cx, y);
+    drawTitle(ctx, this.page === 'solo' ? 'HOW TO PLAY' : 'DUEL IN THE DARK', cx, y);
     y += 40;
     const line = (text: string, color: string = white, alpha = 0.85, size = 13) => {
       drawText(ctx, text, left, y, { size, color, alpha });
       y += size + 9;
     };
+    if (this.page === 'duel') {
+      for (const [heading, lines] of DUEL_RULES) {
+        line(heading, THEME.colors.cyan, 1, 14);
+        for (const text of lines) line(text);
+        y += 8;
+      }
+      drawMenu(ctx, this.menu, cx, Math.min(height - 70, y + 30), 220);
+      return;
+    }
 
     line('It is pitch dark. You only see what sound touches.', THEME.colors.cyan, 1, 14);
     line('Find the 3 Signal Cores, then reach the Extraction Beacon.');
@@ -88,6 +148,6 @@ export class HowToPlayScene implements Scene {
     line('TIPS', THEME.colors.cyan, 1, 14);
     for (const tip of TIPS) line(`· ${tip}`, white, 0.7, 12);
 
-    drawMenu(ctx, this.menu, cx, Math.min(height - 40, y + 30), 200);
+    drawMenu(ctx, this.menu, cx, Math.min(height - 70, y + 30), 220);
   }
 }

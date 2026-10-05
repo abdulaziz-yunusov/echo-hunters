@@ -63,11 +63,23 @@ export interface ReplayEmitter extends Vec2 {
   spells: number[];
 }
 
-/** A duel recording (made by the host) also has the other player and the winner. */
+/**
+ * Who did what in a duel, for the stats (Phase 27).
+ * - core: `by` took a core; `from` is who had dropped it (null: one of the map's own).
+ * - hit: `by` (a player or a hunter) hit `target`.
+ * - drop: `by` was hit too often and dropped every core they carried.
+ */
+export type DuelEvent =
+  | { kind: 'core'; time: number; by: number; from: number | null }
+  | { kind: 'hit'; time: number; by: number; target: number }
+  | { kind: 'drop'; time: number; by: number };
+
+/** A duel recording (made by the host) also has the other player, the winner and who did what. */
 export interface ReplayDuel {
   rivalId: number;
   rival: ReplayTrack;
   winner: number | null;
+  events: DuelEvent[];
 }
 
 /**

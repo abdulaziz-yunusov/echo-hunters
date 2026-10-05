@@ -25,10 +25,11 @@ describe('save data', () => {
       bindings: {},
       display: DISPLAY.defaults,
       duelBot: 'normal',
+      duelBestOf: 3,
     });
   });
 
-  it('remembers the practice bot level, ignoring unknown ones', () => {
+  it('remembers the practice bot level and series length, ignoring unknown ones', () => {
     vi.stubGlobal('localStorage', fakeStorage());
     updateSave({ duelBot: 'hard' });
     expect(loadSave().duelBot).toBe('hard');
@@ -37,6 +38,13 @@ describe('save data', () => {
       fakeStorage({ 'pulse-echo-hunters': JSON.stringify({ version: 3, duelBot: 'genius' }) }),
     );
     expect(loadSave().duelBot).toBe('normal');
+    updateSave({ duelBestOf: 5 });
+    expect(loadSave().duelBestOf).toBe(5);
+    vi.stubGlobal(
+      'localStorage',
+      fakeStorage({ 'pulse-echo-hunters': JSON.stringify({ version: 3, duelBestOf: 4 }) }),
+    );
+    expect(loadSave().duelBestOf).toBe(3);
   });
 
   it('remembers rebound keys, keeping only valid ones', () => {

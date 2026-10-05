@@ -1,6 +1,7 @@
 import type { HunterTypeId } from '@/config/hunters';
 import { createLoopbackPair } from '@/net/loopback';
 import { NetSession } from '@/net/netSession';
+import { DuelSeries } from '@/net/series';
 import { ReplayRecorder } from '@/replay/recorder';
 import type { Player } from '@/sim/entities/player';
 import { IDLE_INPUT, type PlayerInput } from '@/sim/playerInput';
@@ -35,6 +36,18 @@ export function duel(latency = 3, hunters: HunterTypeId[] = [], seed = DUEL_SEED
   };
   const settle = () => step({}, {}, 40);
   return { host, client, hostNet, clientNet, link, step, settle, afterHostStep };
+}
+
+/**
+ * The two sides of an online series on one in-memory link. Map seeds come
+ * from a counter, so a test always sees the same maps.
+ */
+export function seriesPair(bestOf = 3, latency = 2) {
+  const link = createLoopbackPair(latency);
+  let seed = 100;
+  const host = new DuelSeries(link.a, 'host', bestOf, () => ++seed);
+  const client = new DuelSeries(link.b, 'client', bestOf, () => ++seed);
+  return { link, host, client, firstSeed: DUEL_SEED };
 }
 
 /** Center of the floor tile under (x, y): a safe place to put someone. */

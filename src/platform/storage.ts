@@ -1,6 +1,7 @@
 import { AUDIO } from '@/config/audio';
 import { DEFAULT_DIFFICULTY, DIFFICULTIES, type DifficultyId } from '@/config/difficulty';
 import { DISPLAY, type DisplaySettings } from '@/config/display';
+import { GAME } from '@/config/game';
 import { DEFAULT_DUEL_BOT, DUEL_BOTS, type DuelBotId } from '@/config/duelBots';
 import { PALETTES } from '@/config/theme';
 import { REMAPPABLE } from '@/config/input';
@@ -27,6 +28,8 @@ export interface SaveData {
   display: DisplaySettings;
   /** Last practice bot level picked in the duel lobby. */
   duelBot: DuelBotId;
+  /** Last series length (best of N) a host picked in the duel lobby. */
+  duelBestOf: number;
 }
 
 const KEY = 'pulse-echo-hunters';
@@ -40,6 +43,7 @@ function defaults(): SaveData {
     bindings: {},
     display: { ...DISPLAY.defaults },
     duelBot: DEFAULT_DUEL_BOT,
+    duelBestOf: GAME.duel.series.defaultBestOf,
   };
 }
 
@@ -89,6 +93,9 @@ function migrate(data: Record<string, unknown>): SaveData {
   }
   if (typeof data.duelBot === 'string' && data.duelBot in DUEL_BOTS) {
     result.duelBot = data.duelBot as DuelBotId;
+  }
+  if ((GAME.duel.series.bestOf as readonly unknown[]).includes(data.duelBestOf)) {
+    result.duelBestOf = data.duelBestOf as number;
   }
   result.bindings = validBindings(data.bindings);
   result.display = validDisplay(data.display);

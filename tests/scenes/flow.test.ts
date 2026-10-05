@@ -18,8 +18,9 @@ import { SceneManager } from '@/scenes/sceneManager';
 import { ROW_HEIGHT, type MenuList } from '@/ui/menuList';
 import type { DuelEndScene } from '@/scenes/duelEndScene';
 import { GUEST_ID } from '@/sim/entities/entity';
-import { flushLink, recordedDuel } from '../helpers/duel';
-import { createLoopbackPair } from '@/net/loopback';
+import { flushLink, recordedDuel, seriesPair } from '../helpers/duel';
+import { GAME } from '@/config/game';
+import { PLAYER_ID } from '@/sim/entities/entity';
 import { ReplayRecorder } from '@/replay/recorder';
 import { toWire } from '@/replay/wire';
 import { IDLE_INPUT } from '@/sim/playerInput';
@@ -363,36 +364,119 @@ describe('screen flow', () => {
     expect(map).toMatchObject({ label: 'MAP', disabled: true, note: 'NOT RECEIVED' });
   });
 
-  it('a duel played in the scenes ends with the same debrief on both sides', async () => {
-    const link = createLoopbackPair(2);
+  /** Both sides of an online series, each in its own app, on one link. */
+  function seriesApps(bestOf: number) {
+    const pair = seriesPair(bestOf);
     const host = testApp();
     const client = testApp();
-    host.app.goTo('duel', { transport: link.a, role: 'host', seed: 9 });
-    client.app.goTo('duel', { transport: link.b, role: 'client', seed: 9 });
-    const tick = (n: number) => {
+    host.app.goTo('duel', { series: pair.host, seed: 9 });
+    client.app.goTo('duel', { series: pair.client, seed: 9 });
+    const tick = (n: number, hostInput: Partial<InputFrame> = {}, clientInput = hostInput) => {
       for (let i = 0; i < n; i++) {
-        host.press({});
-        client.press({});
-        link.pump();
+        host.press(hostInput);
+        client.press(clientInput);
+        pair.link.pump();
       }
     };
-    // The client walks onto two cores, then onto the beacon.
-    const me = (client.scenes.current as unknown as { sim: Simulation }).sim.state;
-    for (const spot of [...me.cores.slice(0, 2), me.beacon]) {
-      me.player.x = me.player.prevX = spot.x;
-      me.player.y = me.player.prevY = spot.y;
-      tick(30);
-    }
-    expect(me.status).toBe('extracted');
-    tick(150); // the end lingers 2 s
-    await flushLink(link);
-    expect(host.current()).toBe('DuelEnd');
-    expect(client.current()).toBe('DuelEnd');
-    const hostDebrief = (host.scenes.current as DuelEndScene).debrief;
-    const clientDebrief = (client.scenes.current as DuelEndScene).debrief;
+    const simOf = (t: ReturnType<typeof testApp>) =>
+      (t.scenes.current as unknown as { sim: Simulation }).sim.state;
+    /** `side` walks (teleports) onto two cores, then the beacon; the end lingers, both reach Duel End. */
+    const win = async (side: 'host' | 'client') => {
+      const me = simOf(side === 'host' ? host : client);
+      for (const spot of [...me.cores.slice(0, 2), me.beacon]) {
+        me.player.x = me.player.prevX = spot.x;
+        me.player.y = me.player.prevY = spot.y;
+        tick(30);
+      }
+      expect(me.status).toBe('extracted');
+      tick(150); // the end lingers 2 s
+      await flushLink(pair.link);
+      tick(60); // past Duel End's input grace
+      expect(host.current()).toBe('DuelEnd');
+      expect(client.current()).toBe('DuelEnd');
+    };
+    const end = (t: ReturnType<typeof testApp>) => t.scenes.current as DuelEndScene;
+    const labels = (t: ReturnType<typeof testApp>) =>
+      (end(t) as unknown as { menu: MenuList }).menu.items.map((i) => i.label);
+    return { pair, host, client, tick, simOf, win, end, labels };
+  }
+
+  it('a duel played in the scenes ends with the same debrief and stats on both sides', async () => {
+    const { host, client, win, end } = seriesApps(1);
+    await win('client');
+    const hostDebrief = end(host).debrief;
+    const clientDebrief = end(client).debrief;
     expect(hostDebrief?.duel?.winner).toBe(2);
     expect(clientDebrief).not.toBeNull();
     expect(toWire(clientDebrief!)).toEqual(toWire(hostDebrief!));
+    expect(end(client).roundStats).toEqual(end(host).roundStats);
+    expect(end(host).roundStats![2].cores).toBe(2);
+    host.render();
+    client.render();
+  });
+
+  it('a best of 3 in the scenes: READY, countdown, swapped corners, the series, then REMATCH', async () => {
+    const s = seriesApps(3);
+    const { host, client, tick, win, labels, pair } = s;
+    await win('host');
+    expect(labels(host)).toEqual(['READY', 'MAP', 'LEAVE SERIES', 'MAIN MENU']);
+    host.press({ confirm: true }); // READY
+    tick(5);
+    expect(labels(host)[0]).toBe('READY'); // disabled now, waiting
+    expect(pair.client.rivalIsReady).toBe(true);
+    client.press({ confirm: true });
+    tick(5);
+    expect(host.current()).toBe('DuelEnd'); // the countdown
+    host.render();
+    tick((GAME.duel.series.countdown - 0.5) / DT);
+    expect(host.current()).toBe('DuelEnd');
+    tick(60);
+    expect(host.current()).toBe('Duel');
+    expect(client.current()).toBe('Duel');
+    // Round 2: corners swapped.
+    const round2 = s.simOf(host);
+    const { layout } = round2;
+    expect({ x: round2.player.x, y: round2.player.y }).toEqual(
+      layout.tiles.center(layout.spawns[1]),
+    );
+    host.render();
+
+    await win('host');
+    expect(pair.host.over).toBe(true);
+    expect(pair.client.champion).toBe(PLAYER_ID);
+    expect(labels(client)).toEqual(['REMATCH', 'MAP', 'NEW DUEL', 'MAIN MENU']);
+    client.render();
+    // Rematch: straight into a new round 1, same link.
+    host.press({ confirm: true });
+    client.press({ confirm: true });
+    tick(5);
+    expect(host.current()).toBe('Duel');
+    expect(client.current()).toBe('Duel');
+    expect(pair.host.round).toBe(1);
+    expect(pair.host.history).toEqual([]);
+  });
+
+  it('a rival who leaves between rounds: "Rival left", and no READY', async () => {
+    const { host, client, tick, win, labels, end } = seriesApps(3);
+    await win('client');
+    client.choose(2); // READY, MAP, LEAVE SERIES
+    expect(client.current()).toBe('DuelLobby');
+    tick(5);
+    expect(labels(host)).toEqual(['MAP', 'NEW DUEL', 'MAIN MENU']);
+    expect((end(host) as unknown as { statusLine(): string }).statusLine()).toBe('Rival left.');
+  });
+
+  it('a rival who leaves during the countdown stops it', async () => {
+    const { host, client, tick, win, pair } = seriesApps(3);
+    await win('client');
+    host.press({ confirm: true });
+    client.press({ confirm: true });
+    tick(30);
+    expect(pair.host.upcoming).not.toBeNull();
+    client.press({ back: true }); // ESC: leaves
+    tick(10 / DT);
+    expect(host.current()).toBe('DuelEnd');
+    expect(pair.host.rivalLeft).toBe(true);
   });
 
   it('duel lobby → pick the bot level → PRACTICE VS BOT starts an offline duel', () => {
@@ -406,11 +490,13 @@ describe('screen flow', () => {
       t.app.goTo('menu');
       t.choose(1); // DUEL
       expect(t.current()).toBe('DuelLobby');
-      t.press({ navY: 1 });
-      t.press({ navY: 1 });
-      t.press({ navY: 1 }); // HOST, JOIN, PRACTICE, BOT
+      for (let i = 0; i < 4; i++) t.press({ navY: 1 }); // HOST, SERIES, JOIN, PRACTICE, BOT
       t.press({ navX: 1 }); // NORMAL → HARD
       expect(loadSave().duelBot).toBe('hard');
+      t.press({ navY: -3 }); // SERIES
+      t.press({ navX: 1 }); // BEST OF 3 → 5
+      expect(loadSave().duelBestOf).toBe(5);
+      t.press({ navY: 3 }); // back to BOT
       t.press({ navY: -1 });
       t.press({ confirm: true }); // PRACTICE VS BOT
       expect(t.current()).toBe('Duel');
@@ -492,11 +578,12 @@ describe('screen flow', () => {
       ['gameOver', { run, score }],
       ['replay', { replay: recordedRound() }],
       ['duelLobby'],
-      ['duel', { transport: createLoopbackPair().a, role: 'host', seed: 5 }],
-      ['duel', { transport: createLoopbackPair().b, role: 'client', seed: 5 }],
+      ['duel', { series: seriesPair().host, seed: 5 }],
+      ['duel', { series: seriesPair().client, seed: 5 }],
       ['duel', { practice: 'normal', seed: 5 }],
       ['duelEnd', { outcome: 'won' }],
       ['duelEnd', { outcome: 'lost', replay: duelReplay, viewerId: 1 }],
+      ['duelEnd', { outcome: 'lost', replay: duelReplay, viewerId: 1, series: seriesPair().host }],
       ['duelEnd', { outcome: 'won', replay: duelReplay, viewerId: 1, practice: 'hard' }],
       ['replay', { replay: duelReplay, viewerId: 2 }],
     ];

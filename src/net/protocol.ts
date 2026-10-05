@@ -3,7 +3,7 @@ import { SOUND_KINDS, type SoundKindId } from '@/config/sounds';
 import type { TakeKind } from '@/sim/gameState';
 
 /** Bump when messages change shape; mismatched players are told to reload. */
-export const PROTOCOL_VERSION = 3;
+export const PROTOCOL_VERSION = 4;
 
 export type { TakeKind };
 
@@ -26,8 +26,8 @@ export interface CoreSnap {
  * is the referee for anything contested; each player owns its own movement.
  */
 export type NetMessage =
-  /** Host → client, once connected: the shared map seed. */
-  | { t: 'hello'; v: number; seed: number }
+  /** Host → client, once connected: the first round's map seed and the series length. */
+  | { t: 'hello'; v: number; seed: number; bestOf: number }
   /** Own position (15 Hz). */
   | { t: 'p'; x: number; y: number }
   /** A sound made by the sender (or, from the host, by a hunter); `dir` aims a beam. */
@@ -65,8 +65,15 @@ export type NetMessage =
     }
   /** Host → client: the duel is over. */
   | { t: 'end'; winner: number }
-  /** Host → client, after the end: the round's recording for the debrief (replay/wire.ts). */
-  | { t: 'rec'; data: string }
+  /** Host → client, after the end: round `round`'s recording for the debrief (replay/wire.ts). */
+  | { t: 'rec'; data: string; round: number }
+  /** After a round: "I'm ready for the next round" (or, once the series is over, a rematch). */
+  | { t: 'ready' }
+  /**
+   * Host → client, once both are ready: round `round` of the series is on
+   * this map, starting in `countdown` s. Round 1 is a rematch: a new series.
+   */
+  | { t: 'next'; seed: number; round: number; countdown: number }
   /** Leaving on purpose. */
   | { t: 'bye' };
 
@@ -102,7 +109,7 @@ const cores = (v: unknown) =>
   v.every((c: Rec) => c && int(c.id) && num(c.x) && num(c.y) && typeof c.collected === 'boolean');
 
 const VALIDATORS: Record<MessageType, (m: Rec) => boolean> = {
-  hello: (m) => int(m.v) && num(m.seed),
+  hello: (m) => int(m.v) && num(m.seed) && int(m.bestOf) && (m.bestOf as number) >= 1,
   p: (m) => num(m.x) && num(m.y),
   snd: (m) =>
     typeof m.kind === 'string' &&
@@ -130,6 +137,8 @@ const VALIDATORS: Record<MessageType, (m: Rec) => boolean> = {
     typeof m.beacon === 'boolean' &&
     (m.winner === null || int(m.winner)),
   end: (m) => int(m.winner),
-  rec: (m) => typeof m.data === 'string' && m.data.length <= REPLAY.maxPackedChars,
+  rec: (m) => typeof m.data === 'string' && m.data.length <= REPLAY.maxPackedChars && int(m.round),
+  ready: () => true,
+  next: (m) => num(m.seed) && int(m.round) && (m.round as number) >= 1 && num(m.countdown),
   bye: () => true,
 };

@@ -157,5 +157,7 @@ export const GAME = {
     codeAlphabet: 'ABCDEFGHJKMNPQRSTUVWXYZ23456789',
     /** Practice vs bot: ticks of lag each way on the in-memory link (3 ≈ 50 ms, a good connection). */
     practiceLagTicks: 3,
+    /** Series (Phase 27): the lengths the host can pick, and the wait before each next round (s). */
+    series: { bestOf: [1, 3, 5], defaultBestOf: 3, countdown: 5 },
   },
 };

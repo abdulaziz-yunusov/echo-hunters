@@ -6,7 +6,7 @@ import { THEME } from '@/config/theme';
 import type { InputFrame } from '@/input/inputFrame';
 import { toPlayerInput } from '@/input/toPlayerInput';
 import { NetSession } from '@/net/netSession';
-import type { Transport } from '@/net/transport';
+import type { DuelSeries } from '@/net/series';
 import { Camera } from '@/render/camera';
 import { drawHud } from '@/render/hud';
 import { drawAimGuide, playerDrawPosition } from '@/render/playerRenderer';
@@ -26,10 +26,9 @@ const END_DELAY = 2;
 /** Seconds the rules banner stays up. */
 const BANNER_TIME = 4;
 
-/** An online duel (one side of a real link), or practice against a bot (Phase 26). */
+/** A round of an online series (Phase 27), or practice against a bot (Phase 26). */
 export type DuelParams =
-  | { transport: Transport; role: 'host' | 'client'; seed: number }
-  | { practice: DuelBotId; seed: number };
+  { series: DuelSeries; seed: number } | { practice: DuelBotId; seed: number };
 
 /**
  * One duel (GDD §8). Like a solo level, but the other player is out there,
@@ -53,6 +52,8 @@ export class DuelScene implements Scene {
   /** The bot's side of a practice duel; null online. */
   private readonly rival: PracticeRival | null;
   private readonly practice: DuelBotId | null;
+  /** The online series this round belongs to; null in practice. */
+  private readonly series: DuelSeries | null;
   /** The host records the round for both players' debrief (Phase 25). */
   private readonly recorder: ReplayRecorder | null;
   private replay: Replay | null = null;
@@ -65,20 +66,26 @@ export class DuelScene implements Scene {
   constructor(app: AppContext, params: DuelParams) {
     this.app = app;
     this.practice = 'practice' in params ? params.practice : null;
+    this.series = 'series' in params ? params.series : null;
     this.rival = this.practice ? new PracticeRival(params.seed, this.practice) : null;
-    const transport = 'transport' in params ? params.transport : this.rival!.transport;
-    this.role = 'role' in params ? params.role : 'host';
+    const transport = this.series?.transport ?? this.rival!.transport;
+    this.role = this.series?.role ?? 'host';
     this.camera = new Camera(app.viewport);
-    this.sim = createDuelSimulation({ seed: params.seed, role: this.role });
+    this.sim = createDuelSimulation({
+      seed: params.seed,
+      role: this.role,
+      swapSpawns: this.series?.swapSpawns ?? false,
+    });
     this.world = new WorldRenderer(this.sim, DIFFICULTIES.easy.ghostAlpha);
     this.display = new RoundDisplay(this.camera, this.world);
     this.audio = new AudioDirector(this.sim, this.display.output(app.sound));
-    this.net = new NetSession(this.sim, transport);
+    this.net = new NetSession(this.sim, transport, this.series?.round ?? 1);
     this.recorder = this.role === 'host' ? new ReplayRecorder(this.sim, params.seed) : null;
     this.net.onDisconnect(() => {
       if (this.sim.state.status === 'playing') app.goTo('duelEnd', { outcome: 'disconnected' });
     });
     this.sim.events.on('roundEnded', (e) => (this.endedAt = e.time));
+    this.sim.events.on('duelEnded', (e) => this.series?.finishRound(e.winner));
     this.sim.events.on('playerHit', (e) => {
       if (e.target !== this.sim.state.player.id) return;
       const { strength, duration } = THEME.shake.hit;
@@ -93,7 +100,8 @@ export class DuelScene implements Scene {
       },
     ]);
     const who = this.practice ? `practice vs ${this.practice} bot` : this.role;
-    app.debug.watch('duel', `${who}, seed ${params.seed}`);
+    const round = this.series ? `, round ${this.series.round}/${this.series.bestOf}` : '';
+    app.debug.watch('duel', `${who}, seed ${params.seed}${round}`);
   }
 
   /** Practice only: a hidden tab opens the menu, which pauses. */
@@ -134,6 +142,7 @@ export class DuelScene implements Scene {
         replay: this.replay ?? undefined,
         viewerId: state.player.id,
         practice: this.practice ?? undefined,
+        series: this.series ?? undefined,
       });
       return;
     }
@@ -144,9 +153,27 @@ export class DuelScene implements Scene {
 
   exit(): void {
     // The player's side first: closing the bot's side would look like the rival leaving.
-    if (!this.handedOver) this.net.dispose();
+    if (!this.handedOver) {
+      this.net.dispose();
+      this.series?.leave();
+    }
     this.rival?.dispose();
     this.audio.dispose();
+  }
+
+  private bannerTitle(): string {
+    if (this.practice) return `PRACTICE · ${DUEL_BOTS[this.practice].label} BOT`;
+    const series = this.series;
+    if (!series || series.bestOf === 1) return 'DUEL';
+    return `ROUND ${series.round} · BEST OF ${series.bestOf}`;
+  }
+
+  private cornerLabel(): string {
+    if (this.practice) return 'PRACTICE';
+    const side = this.role === 'host' ? 'HOSTING' : 'JOINED';
+    const series = this.series;
+    if (!series || series.bestOf === 1) return side;
+    return `${side} · YOU ${series.wins(series.myId)} – ${series.wins(series.rivalId)} RIVAL`;
   }
 
   render(ctx: CanvasRenderingContext2D, alpha: number): void {
@@ -169,7 +196,7 @@ export class DuelScene implements Scene {
     drawHud(ctx, state);
     if (state.time < BANNER_TIME && !this.menuOpen) {
       const a = Math.min(1, (BANNER_TIME - state.time) / 0.6);
-      const title = this.practice ? `PRACTICE · ${DUEL_BOTS[this.practice].label} BOT` : 'DUEL';
+      const title = this.bannerTitle();
       drawText(ctx, title, width / 2, height * 0.3, {
         size: 34,
         color: THEME.colors.cyan,
@@ -190,7 +217,7 @@ export class DuelScene implements Scene {
         },
       );
     }
-    const corner = this.practice ? 'PRACTICE' : this.role === 'host' ? 'HOSTING' : 'JOINED';
+    const corner = this.cornerLabel();
     drawText(ctx, corner, width - 12, height - 12, {
       size: 11,
       color: THEME.colors.white,

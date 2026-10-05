@@ -3,6 +3,7 @@ import { GAME } from '@/config/game';
 import { THEME } from '@/config/theme';
 import type { InputFrame } from '@/input/inputFrame';
 import { PROTOCOL_VERSION } from '@/net/protocol';
+import { DuelSeries } from '@/net/series';
 import type { Transport } from '@/net/transport';
 import { randomSeed } from '@/platform/seed';
 import { loadSave, updateSave } from '@/platform/storage';
@@ -26,6 +27,8 @@ const MENU_WIDTH = 320;
  * Set up a 1v1 duel (GDD §8): host a room and share its code, or join one
  * by code. PeerJS is loaded only here, so solo play never touches the network.
  * Or practice offline against a bot, at the level picked here (Phase 26).
+ * The host picks the series length (best of 1 / 3 / 5); the joiner learns it
+ * from `hello` and sees it on the first round's banner.
  */
 export class DuelLobbyScene implements Scene {
   readonly name = 'DuelLobby';
@@ -37,10 +40,13 @@ export class DuelLobbyScene implements Scene {
   /** Set once the scene is left, so late network answers are ignored. */
   private left = false;
   private bot: DuelBotId;
+  private bestOf: number;
 
   constructor(app: AppContext) {
     this.app = app;
-    this.bot = loadSave().duelBot;
+    const save = loadSave();
+    this.bot = save.duelBot;
+    this.bestOf = save.duelBestOf;
     this.setPhase({ kind: 'choose' });
   }
 
@@ -82,6 +88,7 @@ export class DuelLobbyScene implements Scene {
       if (p.code) {
         say('ROOM CODE', white, 13);
         say(p.code, THEME.colors.cyan, 44);
+        say(seriesLabel(this.bestOf), white, 13);
         say('Send this code to your opponent. Waiting for them to join…', white, 13);
       } else {
         say('Opening a room…', white, 14);
@@ -114,6 +121,12 @@ export class DuelLobbyScene implements Scene {
       case 'choose':
         this.menu = new MenuList([
           { kind: 'action', label: 'HOST A DUEL', onSelect: () => void this.host() },
+          {
+            kind: 'adjust',
+            label: 'SERIES',
+            value: () => seriesLabel(this.bestOf),
+            onChange: (step) => this.cycleBestOf(step),
+          },
           {
             kind: 'action',
             label: 'JOIN A DUEL',
@@ -171,6 +184,13 @@ export class DuelLobbyScene implements Scene {
     this.setPhase({ kind: 'choose' });
   }
 
+  private cycleBestOf(step: number): void {
+    const options = GAME.duel.series.bestOf;
+    const n = options.length;
+    this.bestOf = options[(options.indexOf(this.bestOf) + step + n) % n];
+    updateSave({ duelBestOf: this.bestOf });
+  }
+
   private cycleBot(step: number): void {
     const n = DUEL_BOT_ORDER.length;
     this.bot = DUEL_BOT_ORDER[(DUEL_BOT_ORDER.indexOf(this.bot) + step + n) % n];
@@ -197,8 +217,9 @@ export class DuelLobbyScene implements Scene {
         return;
       }
       const seed = randomSeed();
-      transport.send({ t: 'hello', v: PROTOCOL_VERSION, seed });
-      this.app.goTo('duel', { transport, role: 'host', seed });
+      transport.send({ t: 'hello', v: PROTOCOL_VERSION, seed, bestOf: this.bestOf });
+      const series = new DuelSeries(transport, 'host', this.bestOf, randomSeed);
+      this.app.goTo('duel', { series, seed });
     } catch (error) {
       if (!this.left && this.phase.kind === 'hosting') this.fail(error);
     }
@@ -215,12 +236,13 @@ export class DuelLobbyScene implements Scene {
         transport.close();
         return;
       }
-      const seed = await waitForHello(transport);
+      const { seed, bestOf } = await waitForHello(transport);
       if (this.left) {
         transport.close();
         return;
       }
-      this.app.goTo('duel', { transport, role: 'client', seed });
+      const series = new DuelSeries(transport, 'client', bestOf, randomSeed);
+      this.app.goTo('duel', { series, seed });
     } catch (error) {
       if (!this.left && this.phase.kind === 'connecting') this.fail(error);
     }
@@ -232,8 +254,12 @@ export class DuelLobbyScene implements Scene {
   }
 }
 
-/** The host speaks first: its protocol version and the map seed. */
-function waitForHello(transport: Transport): Promise<number> {
+function seriesLabel(bestOf: number): string {
+  return bestOf === 1 ? 'ONE ROUND' : `BEST OF ${bestOf}`;
+}
+
+/** The host speaks first: its protocol version, the first map seed and the series length. */
+function waitForHello(transport: Transport): Promise<{ seed: number; bestOf: number }> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       transport.close();
@@ -249,7 +275,7 @@ function waitForHello(transport: Transport): Promise<number> {
         );
         return;
       }
-      resolve(m.seed);
+      resolve({ seed: m.seed, bestOf: m.bestOf });
     });
   });
 }

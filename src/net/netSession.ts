@@ -32,11 +32,17 @@ const isHunterId = (id: number | null) => id !== null && id >= 100;
  * full snapshot (10 Hz) that corrects anything the client got wrong.
  *
  * Client: asks instead of deciding, and applies what the host says.
+ *
+ * One session per round. In a series the connection outlives it: the
+ * finished round's session is detached, and the next round starts a new
+ * session on the same transport (Phase 27).
  */
 export class NetSession {
   private readonly sim: Simulation;
   private readonly transport: Transport;
   private readonly isHost: boolean;
+  /** Which round of the series this is, so a late recording can't land in the wrong round. */
+  private readonly round: number;
   private readonly unsubscribe: (() => void)[] = [];
   private readonly rivalTrack = new Interpolator();
   private readonly hunterTracks = new Map<number, Interpolator>();
@@ -44,16 +50,23 @@ export class NetSession {
   private positionTimer = 0;
   private snapshotTimer = 0;
   private closed = false;
+  /** The round is over and the connection went on to the next one: ignore everything. */
+  private detached = false;
   private closeListeners: (() => void)[] = [];
   private recording: Replay | null = null;
   private recordingListeners: ((replay: Replay) => void)[] = [];
 
-  constructor(sim: Simulation, transport: Transport) {
+  constructor(sim: Simulation, transport: Transport, round = 1) {
     this.sim = sim;
     this.transport = transport;
     this.isHost = sim.state.mode === 'host';
-    transport.onMessage((m) => this.receive(m));
-    transport.onClose(() => this.markClosed());
+    this.round = round;
+    transport.onMessage((m) => {
+      if (!this.detached) this.receive(m);
+    });
+    transport.onClose(() => {
+      if (!this.detached) this.markClosed();
+    });
 
     const on = sim.events.on.bind(sim.events);
     this.unsubscribe.push(on('soundEmitted', (s) => this.shareSound(s)));
@@ -101,7 +114,7 @@ export class NetSession {
    */
   shareRecording(replay: Replay): void {
     packReplay(replay).then(
-      (data) => this.send({ t: 'rec', data }),
+      (data) => this.send({ t: 'rec', data, round: this.round }),
       () => {}, // no debrief for the client; the duel itself is unaffected
     );
   }
@@ -148,6 +161,13 @@ export class NetSession {
     }
   }
 
+  /** The round is over but the connection lives on (the next round of a series): stop, quietly. */
+  detach(): void {
+    for (const off of this.unsubscribe) off();
+    this.unsubscribe.length = 0;
+    this.detached = true;
+  }
+
   /** Leave on purpose: tell the rival, then close. */
   dispose(): void {
     for (const off of this.unsubscribe) off();
@@ -157,7 +177,7 @@ export class NetSession {
   }
 
   private send(message: NetMessage): void {
-    if (!this.closed) this.transport.send(message);
+    if (!this.closed && !this.detached) this.transport.send(message);
   }
 
   /** Own sounds go to the rival; the host also sends its hunters' sounds. */
@@ -233,13 +253,17 @@ export class NetSession {
         if (!this.isHost) declareWinner(sim, m.winner);
         break;
       case 'rec':
-        if (!this.isHost && !this.recording) void this.receiveRecording(m.data);
+        if (!this.isHost && !this.recording && m.round === this.round) {
+          void this.receiveRecording(m.data);
+        }
         break;
       case 'bye':
         this.markClosed();
         break;
       case 'hello':
-        break; // handled by the lobby before the duel starts
+      case 'ready':
+      case 'next':
+        break; // the lobby and the series (net/series.ts) handle these
     }
   }
 

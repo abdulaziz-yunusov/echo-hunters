@@ -51,7 +51,9 @@ export class ReplayRecorder {
       emitters: state.emitters.map((e) => ({ id: e.id, type: e.type, x: e.x, y: e.y, spells: [] })),
       beacon: { x: state.beacon.x, y: state.beacon.y, activeAt: null },
       outcome: null,
-      duel: state.rival ? { rivalId: state.rival.id, rival: emptyTrack(), winner: null } : null,
+      duel: state.rival
+        ? { rivalId: state.rival.id, rival: emptyTrack(), winner: null, events: [] }
+        : null,
     };
     this.listen();
     this.sample();
@@ -111,10 +113,14 @@ export class ReplayRecorder {
       }
       r.longestSound = Math.max(r.longestSound, wave.maxRadius / wave.speed);
     });
+    /** Duel: who dropped each core that is on the floor because of a drop. */
+    const droppedBy = new Map<number, number>();
     on('coreCollected', (e) => {
       const core = r.cores.find((c) => c.id === e.coreId);
       if (core) core.takenAt = state.time;
       mark('core', e.x, e.y);
+      const from = droppedBy.get(e.coreId) ?? null;
+      r.duel?.events.push({ kind: 'core', time: state.time, by: e.by, from });
     });
     on('pickupCollected', (e) => {
       const pickup = r.pickups.find((p) => p.id === e.pickupId);
@@ -125,12 +131,17 @@ export class ReplayRecorder {
       r.beacon.activeAt = state.time;
       mark('beacon', e.x, e.y);
     });
-    on('playerHit', (e) => mark('hit', e.x, e.y));
+    on('playerHit', (e) => {
+      mark('hit', e.x, e.y);
+      r.duel?.events.push({ kind: 'hit', time: state.time, by: e.by, target: e.target });
+    });
     // Duel: cores knocked loose are new cores on the floor from now on.
     on('coresDropped', (e) => {
       for (const c of e.cores) {
         r.cores.push({ id: c.id, x: c.x, y: c.y, takenAt: null, appearedAt: state.time });
+        droppedBy.set(c.id, e.by);
       }
+      r.duel?.events.push({ kind: 'drop', time: state.time, by: e.by });
     });
     on('duelEnded', (e) => {
       if (r.duel) r.duel.winner = e.winner;

@@ -4,7 +4,7 @@ import { decode, encode, PROTOCOL_VERSION, type NetMessage } from '@/net/protoco
 
 describe('protocol', () => {
   const samples: NetMessage[] = [
-    { t: 'hello', v: PROTOCOL_VERSION, seed: 42 },
+    { t: 'hello', v: PROTOCOL_VERSION, seed: 42, bestOf: 3 },
     { t: 'p', x: 1.5, y: 2 },
     { t: 'snd', kind: 'ping', x: 3, y: 4, owner: 2, fx: 3, fy: 4 },
     { t: 'snd', kind: 'pingBeam', x: 3, y: 4, owner: 2, fx: 3, fy: 4, dir: -1.25 },
@@ -24,6 +24,9 @@ describe('protocol', () => {
       winner: null,
     },
     { t: 'end', winner: 1 },
+    { t: 'rec', data: 'H4sI', round: 2 },
+    { t: 'ready' },
+    { t: 'next', seed: 7, round: 2, countdown: 5 },
     { t: 'bye' },
   ];
 
@@ -41,6 +44,11 @@ describe('protocol', () => {
       '{"t":"snd","kind":"pingBeam","x":1,"y":1,"owner":1,"fx":1,"fy":1,"dir":"up"}',
       '{"t":"take","kind":"core","id":1.5}',
       '{"t":"hello","v":1,"seed":null}',
+      '{"t":"hello","v":4,"seed":1}',
+      '{"t":"hello","v":4,"seed":1,"bestOf":0}',
+      '{"t":"rec","data":"x"}',
+      '{"t":"next","seed":1,"round":0,"countdown":5}',
+      '{"t":"next","seed":1,"round":2}',
       '{"t":"p","x":1e999,"y":0}',
       'null',
       '42',

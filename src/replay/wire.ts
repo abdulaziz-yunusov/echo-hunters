@@ -7,6 +7,7 @@ import { createWave } from '@/sim/sound/soundWave';
 import type { WallGeometry } from '@/sim/world/edges';
 import type { MapLayout } from '@/sim/world/mapGen';
 import type {
+  DuelEvent,
   Replay,
   ReplayEmitter,
   ReplayMarkKind,
@@ -22,7 +23,7 @@ import type {
  * sample times to 1 ms, stored as differences (small numbers), then gzipped.
  */
 
-const WIRE_VERSION = 1;
+const WIRE_VERSION = 2;
 /** Tenths of a pixel; milliseconds. */
 const POS = 10;
 const MS = 1000;
@@ -53,7 +54,12 @@ export interface WireReplay {
   emitters: ReplayEmitter[];
   beacon: Replay['beacon'];
   outcome: Replay['outcome'];
-  duel: { rivalId: number; rival: WireTrack; winner: number | null } | null;
+  duel: {
+    rivalId: number;
+    rival: WireTrack;
+    winner: number | null;
+    events: DuelEvent[];
+  } | null;
 }
 
 export function toWire(r: Replay): WireReplay {
@@ -86,6 +92,7 @@ export function toWire(r: Replay): WireReplay {
       rivalId: r.duel.rivalId,
       rival: packTrack(r.duel.rival),
       winner: r.duel.winner,
+      events: r.duel.events.map((e) => ({ ...e, time: round(e.time, MS) })),
     },
   };
 }
@@ -119,6 +126,7 @@ export function fromWire(w: WireReplay, layout: MapLayout, walls: WallGeometry):
       rivalId: w.duel.rivalId,
       rival: unpackTrack(w.duel.rival),
       winner: w.duel.winner,
+      events: w.duel.events,
     },
   };
 }
@@ -256,6 +264,13 @@ const sound = (v: unknown) =>
   v[1] in SOUND_KINDS &&
   v.slice(2).every(num) &&
   int(v[4]);
+const duelEvent = (v: unknown) =>
+  obj(v) &&
+  num(v.time) &&
+  int(v.by) &&
+  ((v.kind === 'core' && (v.from === null || int(v.from))) ||
+    (v.kind === 'hit' && int(v.target)) ||
+    v.kind === 'drop');
 const mark = (v: unknown) =>
   Array.isArray(v) &&
   v.length === 4 &&
@@ -299,6 +314,7 @@ function isWireReplay(w: unknown): w is WireReplay {
       (obj(duel) &&
         int(duel.rivalId) &&
         track(duel.rival, n) &&
-        (duel.winner === null || int(duel.winner))))
+        (duel.winner === null || int(duel.winner)) &&
+        list(duel.events, duelEvent)))
   );
 }
