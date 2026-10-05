@@ -5,7 +5,16 @@ import type { ColorKey } from './theme';
  * so a new sound only needs the right tags to be heard correctly.
  */
 export type SoundTag =
-  'footstep' | 'ping' | 'impact' | 'shockwave' | 'hunter' | 'scream' | 'beacon' | 'ambient';
+  | 'footstep'
+  | 'ping'
+  | 'impact'
+  | 'shockwave'
+  | 'hunter'
+  | 'scream'
+  | 'beacon'
+  | 'ambient'
+  /** Duel: cores being carried (Phase 28). */
+  | 'carry';
 
 export interface SoundKindDef {
   /** How far the visible ring spreads, lighting walls (px). */
@@ -78,6 +87,9 @@ export const SOUND_KINDS = {
     tags: ['footstep', 'impact'],
   },
   coreHum: { maxRadius: 40, hearRadius: 40, speed: 120, color: 'cyan', tags: ['ambient'] },
+  // Phase 28 carrier pressure: cores you carry hum; with enough to win, 1.4x louder.
+  carriedHum: { maxRadius: 60, hearRadius: 220, speed: 160, color: 'cyan', tags: ['carry'] },
+  carriedHumHeavy: { maxRadius: 84, hearRadius: 308, speed: 160, color: 'cyan', tags: ['carry'] },
   // Phase 17 sound cover: machine noise no hunter reacts to, lighting the walls nearby.
   ventHum: { maxRadius: 150, hearRadius: 150, speed: 110, color: 'dim', tags: ['ambient'] },
   drip: { maxRadius: 70, hearRadius: 70, speed: 160, color: 'dim', tags: ['ambient'] },

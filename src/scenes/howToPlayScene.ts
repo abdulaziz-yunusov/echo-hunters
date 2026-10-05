@@ -35,7 +35,8 @@ const DUEL_RULES: readonly [string, readonly string[]][] = [
     'GOAL',
     [
       `Two players, one maze, and a Stalker that hunts you both. Carry ${duel.coresToWin} cores to the beacon first.`,
-      'The beacon wakes as soon as someone carries enough cores: everyone hears it.',
+      `The beacon wakes when someone carries enough cores. Extracting takes ${duel.extractTime} s standing there:`,
+      'the beacon pulses faster, and a hit or a step away starts it over.',
       'You see your rival only when your rings pass over them; you hear their steps, pings and stones.',
     ],
   ],
@@ -45,6 +46,7 @@ const DUEL_RULES: readonly [string, readonly string[]][] = [
       `${duel.hitsToDropCores} hits (your rival's shockwave or a hunter) and you drop every core you carry.`,
       `You must wait ${duel.dropLockSeconds} s to take your own cores back; whoever hit you can take them at once.`,
       'Picking up cores your rival dropped is a steal. A lead is never safe.',
+      `Carried cores hum every ${duel.carryHumInterval} s, even when you sneak. Only a running vent or pipe hides it.`,
     ],
   ],
   [

@@ -3,7 +3,7 @@ import { GAME } from '@/config/game';
 import { Rng } from '@/core/rng';
 import type { Simulation } from '@/sim/simulation';
 import { hitPlayer } from '@/sim/systems/duel';
-import { duel, DUEL_DT, floorAt, teleport } from '../helpers/duel';
+import { duel, DUEL_DT, floorAt, teleport, EXTRACT_TICKS } from '../helpers/duel';
 
 const DT = DUEL_DT;
 
@@ -174,6 +174,8 @@ describe('duel (GDD §8)', () => {
     teleport(client.state.player, b.x, b.y);
     step();
     settle();
+    expect(host.state.duel!.winner).toBeNull(); // extraction takes time now (Phase 28)
+    step({}, {}, EXTRACT_TICKS);
     expect(host.state.duel!.winner).toBe(2);
     expect(client.state.status).toBe('extracted');
     expect(host.state.status).toBe('lost');

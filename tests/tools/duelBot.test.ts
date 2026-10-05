@@ -72,6 +72,20 @@ describe('duel bot', () => {
     expect(near.bot.lastKnownRival).toMatchObject({ x: near.rival.x, y: near.rival.y });
   });
 
+  it('hunts a rival who carries more cores once it hears them nearby (Phase 28)', () => {
+    const { sim, bot, player, rival } = setup([
+      '##################',
+      '#C...P...........#',
+      '#...............P#',
+      '##################',
+    ]);
+    // A core to the left; the rival, carrying one, hums to the right.
+    sim.emitSound('carriedHum', player.x + 150, player.y, rival.id);
+    expect(bot.input().moveX).toBeLessThan(0); // nothing carried: the core comes first
+    rival.cores = 1;
+    expect(bot.input().moveX).toBeGreaterThan(0);
+  });
+
   it('heads for the beacon when the rival carries the cores, and chases them once heard', () => {
     const { sim, bot, player, rival } = setup([
       '##################',

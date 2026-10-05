@@ -1,7 +1,7 @@
 import { GAME } from '@/config/game';
 import type { Player } from '../entities/player';
 import type { SimContext } from '../gameState';
-import { coresNeeded, extract, take } from './duel';
+import { coresNeeded, take, updateCarryHum, updateExtraction, updateExtractionClock } from './duel';
 
 /**
  * The round's goal (GDD §2, §8): collect Signal Cores, which wakes the
@@ -40,12 +40,20 @@ export function updateObjectives(ctx: SimContext, player: Player, dt: number): v
   }
   if (!beacon.active) return;
 
-  beacon.pulseTimer -= dt;
+  // Someone extracting: the beacon pulses faster, so everyone knows (Phase 28).
+  beacon.pulseTimer -= state.duel?.extracting ? dt * GAME.duel.extractPulseSpeedup : dt;
   if (beacon.pulseTimer <= 0) {
     ctx.emitSound('beacon', beacon.x, beacon.y, null);
     beacon.pulseTimer += cfg.beaconPulseInterval;
   }
-  if (player.cores >= need && Math.hypot(player.x - beacon.x, player.y - beacon.y) <= reach) {
-    extract(ctx);
-  }
+}
+
+/**
+ * After the objectives, every tick: carried cores hum (duel), and the
+ * extraction starts, stops and completes.
+ */
+export function updateExtracting(ctx: SimContext, player: Player, dt: number): void {
+  updateCarryHum(ctx, player, dt);
+  updateExtraction(ctx, player);
+  updateExtractionClock(ctx);
 }

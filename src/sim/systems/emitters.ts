@@ -1,5 +1,5 @@
 import { EMITTER_TYPES } from '@/config/emitters';
-import type { SoundTag } from '@/config/sounds';
+import { SOUND_KINDS, type SoundKindId, type SoundTag } from '@/config/sounds';
 import type { GameState, SimContext } from '../gameState';
 
 /** Run each vent and pipe's cycle: at the start of each active spell, it makes its noise. */
@@ -17,7 +17,7 @@ export function updateEmitters(ctx: SimContext, dt: number): void {
 }
 
 /** Sound tags that noise can hide. Pings, stones and shockwaves always cut through. */
-const MASKABLE: readonly SoundTag[] = ['footstep'];
+const MASKABLE: readonly SoundTag[] = ['footstep', 'carry'];
 
 /**
  * Is a sound with these tags, starting at (x, y), lost in machine noise?
@@ -40,4 +40,9 @@ export function isMasked(
 export function playerMasked(state: GameState): boolean {
   const { player } = state;
   return isMasked(state, player.x, player.y, MASKABLE);
+}
+
+/** Would a sound of this kind made here be lost in the noise? */
+export function soundMasked(state: GameState, kind: SoundKindId, x: number, y: number): boolean {
+  return isMasked(state, x, y, SOUND_KINDS[kind].tags);
 }

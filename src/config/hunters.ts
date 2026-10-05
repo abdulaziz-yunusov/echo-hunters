@@ -29,7 +29,7 @@ export const HUNTER_TYPES = {
     behaviour: 'stalker',
     speed: 90,
     // The beacon too: "it is loud, so everyone knows where it is" (GDD §2).
-    hears: ['footstep', 'ping', 'impact', 'shockwave', 'scream', 'beacon'],
+    hears: ['footstep', 'ping', 'impact', 'shockwave', 'scream', 'beacon', 'carry'],
     searchTime: 4,
     searchRadius: 100,
     footstepInterval: 0.45,
@@ -45,7 +45,7 @@ export const HUNTER_TYPES = {
   listener: {
     behaviour: 'listener',
     speed: 0,
-    hears: ['footstep', 'ping', 'impact', 'shockwave'],
+    hears: ['footstep', 'ping', 'impact', 'shockwave', 'carry'],
     searchTime: 0,
     searchRadius: 0,
     footstepInterval: 0,

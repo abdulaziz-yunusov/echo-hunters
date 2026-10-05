@@ -19,7 +19,7 @@ import { updateAbilities } from './systems/abilities';
 import { updateCloseCalls } from './systems/closeCalls';
 import { updateCombat } from './systems/combat';
 import { updateEmitters } from './systems/emitters';
-import { updateObjectives } from './systems/objectives';
+import { updateExtracting, updateObjectives } from './systems/objectives';
 import { updatePickups } from './systems/pickups';
 import { updatePlayerMovement } from './systems/playerMovement';
 import { updateStones } from './systems/stones';
@@ -95,7 +95,8 @@ export class Simulation implements SimContext {
             hits: {},
             winner: null,
             pending: [],
-            extractPending: false,
+            atBeacon: false,
+            extracting: null,
           }
         : null,
       hunters: hunterTypes.slice(0, layout.hunterSpawns.length).map((type, i) => {
@@ -146,6 +147,7 @@ export class Simulation implements SimContext {
       updateStones(this, dt);
       updatePickups(this, s.player, dt);
       updateObjectives(this, s.player, dt);
+      updateExtracting(this, s.player, dt);
       updateEmitters(this, dt);
       // A duel client copies the host's hunters and hits instead of running them.
       if (s.mode !== 'client') {

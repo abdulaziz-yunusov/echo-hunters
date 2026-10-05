@@ -42,8 +42,10 @@ export interface DuelState {
   winner: EntityId | null;
   /** Client: takes asked of the host, not answered yet ("core:3"). */
   pending: string[];
-  /** Client: extraction asked of the host, not answered yet. */
-  extractPending: boolean;
+  /** Client: has told the host it stands at the beacon with enough cores (Phase 28). */
+  atBeacon: boolean;
+  /** Someone is extracting: who, and since when (this machine's sim time). Host decides. */
+  extracting: { by: EntityId; since: number } | null;
 }
 
 /** Everything that describes one round. Plain data, the single source of truth. */

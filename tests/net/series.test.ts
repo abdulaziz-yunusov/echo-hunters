@@ -6,7 +6,15 @@ import { packReplay } from '@/replay/wire';
 import { GUEST_ID, PLAYER_ID } from '@/sim/entities/entity';
 import { IDLE_INPUT } from '@/sim/playerInput';
 import { createDuelSimulation } from '@/sim/simulation';
-import { DUEL_DT, DUEL_SEED, flushLink, recordedDuel, seriesPair, teleport } from '../helpers/duel';
+import {
+  DUEL_DT,
+  DUEL_SEED,
+  EXTRACT_TICKS,
+  flushLink,
+  recordedDuel,
+  seriesPair,
+  teleport,
+} from '../helpers/duel';
 
 type Pair = ReturnType<typeof seriesPair>;
 
@@ -41,7 +49,7 @@ function playRound(s: Pair, seed: number, winner: 'host' | 'client') {
     teleport(me.player, spot.x, spot.y);
     tick(30);
   }
-  tick(30);
+  tick(EXTRACT_TICKS);
   return { sims, nets };
 }
 

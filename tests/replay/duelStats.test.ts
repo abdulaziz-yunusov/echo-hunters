@@ -6,7 +6,7 @@ import type { Replay } from '@/replay/replay';
 import { fromWire, toWire } from '@/replay/wire';
 import { GUEST_ID, PLAYER_ID } from '@/sim/entities/entity';
 import { hitPlayer } from '@/sim/systems/duel';
-import { duel, DUEL_SEED, flushLink, teleport } from '../helpers/duel';
+import { duel, DUEL_SEED, EXTRACT_TICKS, flushLink, teleport } from '../helpers/duel';
 
 /**
  * A scripted duel with a bit of everything, recorded by the host:
@@ -45,7 +45,7 @@ function eventfulDuel() {
     settle();
   }
   teleport(me, client.state.beacon.x, client.state.beacon.y);
-  step();
+  step({}, {}, EXTRACT_TICKS);
   settle();
   return { ...d, replay: recorder.finish() };
 }

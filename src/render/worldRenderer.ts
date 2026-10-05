@@ -1,5 +1,6 @@
 import { GAME } from '@/config/game';
 import type { GameState } from '@/sim/gameState';
+import { extractionProgress } from '@/sim/systems/duel';
 import { playerMasked } from '@/sim/systems/emitters';
 import type { Simulation } from '@/sim/simulation';
 import type { Camera } from './camera';
@@ -140,7 +141,7 @@ export class WorldRenderer {
     const { state } = this.sim;
     const args = [this.reveal, state.time, this.fadeSeconds, this.ghostAlpha] as const;
     drawCores(ctx, state.cores, ...args);
-    drawBeacon(ctx, state.beacon, ...args, pixel);
+    drawBeacon(ctx, state.beacon, ...args, pixel, extractionProgress(state));
     drawPickups(ctx, state.pickups, ...args, pixel);
     drawEmitters(ctx, state.emitters, ...args, pixel);
   }

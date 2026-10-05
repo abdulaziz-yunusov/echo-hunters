@@ -22,6 +22,8 @@ const SHOCK_FRESH = 0.5;
 const GIVE_UP = 24;
 /** A shaky hand may fire once the rival is this many shock radii away (a miss). */
 const EARLY_REACH = 1.8;
+/** Hunt a rival who carries more cores when last known within this distance (px), Phase 28. */
+const HUNT_RANGE = 300;
 
 /** Where the rival was heard or seen, and when the bot knew it (sim time). */
 export interface Sighting extends Vec2 {
@@ -97,6 +99,11 @@ export class DuelBot extends Bot {
     const chase = this.chaseTarget();
     // The beacon is awake and not for us: the rival carries the cores. Stop them.
     if (beacon.active) return chase ?? beacon;
+    // The rival leads and we know where they are: knock the cores loose (2 hits) and steal them.
+    const rival = state.rival;
+    if (chase && rival && rival.cores > player.cores && dist(player, chase) <= HUNT_RANGE) {
+      return chase;
+    }
     const free = state.cores.filter((c) => !c.collected && !isLockedFor(state, c, player.id));
     if (free.length > 0) return this.nearest(free);
     return chase ?? beacon;

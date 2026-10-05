@@ -134,8 +134,22 @@ export const GAME = {
     hitsToDropCores: 2,
     /** Seconds before the player who dropped cores may take them back (the attacker can at once). */
     dropLockSeconds: 2,
+    /**
+     * Carrier pressure (Phase 28). Carried cores hum every carryHumInterval s
+     * (`carriedHum`, louder with enough cores to win: `carriedHumHeavy`).
+     * Extraction takes extractTime s standing at the active beacon; a hit or
+     * stepping away starts it over.
+     */
+    carryHumInterval: 4,
+    extractTime: 1.5,
+    /** While someone extracts, the beacon pulses this many times as often. */
+    extractPulseSpeedup: 2,
+    /** Dropped cores scatter up to this many tiles from where the player was hit (0 = one stack). */
+    dropScatterTiles: 0,
     /** Most tile steps one player may be closer to the beacon than the other. */
     beaconMaxStepDifference: 2,
+    /** Most tile steps one player's best route (spawn → cores → beacon) may be longer (Phase 28). */
+    coreMaxRouteDifference: 4,
     /** AI hunters that threaten both players (GDD: "optional 1–2"). */
     hunters: ['stalker'] as HunterTypeId[],
     /** No hearts: duels have no HP. */

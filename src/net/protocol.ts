@@ -3,7 +3,7 @@ import { SOUND_KINDS, type SoundKindId } from '@/config/sounds';
 import type { TakeKind } from '@/sim/gameState';
 
 /** Bump when messages change shape; mismatched players are told to reload. */
-export const PROTOCOL_VERSION = 4;
+export const PROTOCOL_VERSION = 5;
 
 export type { TakeKind };
 
@@ -47,8 +47,14 @@ export type NetMessage =
   | { t: 'taken'; kind: TakeKind; id: number; by: number }
   /** Host → client: too late, it's gone. */
   | { t: 'denied'; kind: TakeKind; id: number }
-  /** Client → host: "I'm at the beacon with enough cores." */
+  /** Client → host: "I'm at the beacon with enough cores" (the host may start the extraction). */
   | { t: 'extract' }
+  /** Client → host: "I've left the beacon." */
+  | { t: 'extract_leave' }
+  /** Host → client: `by` started extracting (Phase 28). */
+  | { t: 'extract_start'; by: number }
+  /** Host → client: `by`'s extraction stopped short. */
+  | { t: 'extract_cancel'; by: number }
   /** Host → client: you were hit (now `hits` hits). */
   | { t: 'hit'; hits: number; fromX: number; fromY: number }
   /** Host → client: a player dropped their cores here. */
@@ -62,6 +68,8 @@ export type NetMessage =
       hits: [number, number][];
       beacon: boolean;
       winner: number | null;
+      /** Who is extracting, if anyone. */
+      ex: number | null;
     }
   /** Host → client: the duel is over. */
   | { t: 'end'; winner: number }
@@ -124,6 +132,9 @@ const VALIDATORS: Record<MessageType, (m: Rec) => boolean> = {
   taken: (m) => takeKind(m.kind) && int(m.id) && int(m.by),
   denied: (m) => takeKind(m.kind) && int(m.id),
   extract: () => true,
+  extract_leave: () => true,
+  extract_start: (m) => int(m.by),
+  extract_cancel: (m) => int(m.by),
   hit: (m) => int(m.hits) && num(m.fromX) && num(m.fromY),
   drop: (m) => int(m.by) && cores(m.cores),
   snap: (m) =>
@@ -135,7 +146,8 @@ const VALIDATORS: Record<MessageType, (m: Rec) => boolean> = {
     pairs(m.held) &&
     pairs(m.hits) &&
     typeof m.beacon === 'boolean' &&
-    (m.winner === null || int(m.winner)),
+    (m.winner === null || int(m.winner)) &&
+    (m.ex === null || int(m.ex)),
   end: (m) => int(m.winner),
   rec: (m) => typeof m.data === 'string' && m.data.length <= REPLAY.maxPackedChars && int(m.round),
   ready: () => true,

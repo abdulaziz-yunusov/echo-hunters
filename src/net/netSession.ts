@@ -3,13 +3,16 @@ import type { HunterStateId } from '@/sim/entities/hunter';
 import type { SoundEmitted } from '@/sim/events';
 import type { Simulation } from '@/sim/simulation';
 import {
+  cancelExtraction,
   clearPending,
   declareWinner,
+  extractionCancelled,
+  extractionStarted,
   grant,
   playerById,
   receiveHit,
   resolveShockwave,
-  tryExtract,
+  startExtraction,
   tryGrant,
 } from '@/sim/systems/duel';
 import type { Replay } from '@/replay/replay';
@@ -90,11 +93,14 @@ export class NetSession {
           }),
         ),
         on('duelEnded', (e) => this.send({ t: 'end', winner: e.winner })),
+        on('extractStarted', (e) => this.send({ t: 'extract_start', by: e.by })),
+        on('extractCancelled', (e) => this.send({ t: 'extract_cancel', by: e.by })),
       );
     } else {
       this.unsubscribe.push(
         on('takeRequested', (e) => this.send({ t: 'take', kind: e.kind, id: e.id })),
         on('extractRequested', () => this.send({ t: 'extract' })),
+        on('extractLeft', () => this.send({ t: 'extract_leave' })),
       );
     }
   }
@@ -207,6 +213,7 @@ export class NetSession {
       hits: players.map((p) => [p.id, state.duel?.hits[p.id] ?? 0]),
       beacon: state.beacon.active,
       winner: state.duel?.winner ?? null,
+      ex: state.duel?.extracting?.by ?? null,
     });
   }
 
@@ -238,7 +245,16 @@ export class NetSession {
         if (!this.isHost) clearPending(state, m.kind, m.id);
         break;
       case 'extract':
-        if (this.isHost) tryExtract(sim, rivalId);
+        if (this.isHost) startExtraction(sim, rivalId);
+        break;
+      case 'extract_leave':
+        if (this.isHost) cancelExtraction(sim, rivalId);
+        break;
+      case 'extract_start':
+        if (!this.isHost) extractionStarted(sim, m.by);
+        break;
+      case 'extract_cancel':
+        if (!this.isHost) extractionCancelled(sim, m.by);
         break;
       case 'hit':
         if (!this.isHost) receiveHit(sim, m.hits, m.fromX, m.fromY);
@@ -319,7 +335,11 @@ export class NetSession {
         const list = kind === 'core' ? state.cores : state.pickups;
         return !list.find((x) => x.id === Number(id))?.collected;
       });
-      if (state.player.cores < state.duel.coresToWin) state.duel.extractPending = false;
+      const ex = state.duel.extracting?.by ?? null;
+      if (m.ex !== ex) {
+        if (ex !== null) extractionCancelled(this.sim, ex);
+        if (m.ex !== null) extractionStarted(this.sim, m.ex);
+      }
     }
     if (m.winner !== null) declareWinner(this.sim, m.winner);
   }

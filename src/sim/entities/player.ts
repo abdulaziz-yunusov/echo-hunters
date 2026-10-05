@@ -46,6 +46,8 @@ export interface Player {
   shockCooldown: number;
   /** Seconds of Silent Boots left. */
   silentTime: number;
+  /** Duel: seconds until the cores this player carries hum again (Phase 28). */
+  carryHumTimer: number;
 }
 
 export function createPlayer(id: EntityId, x: number, y: number): Player {
@@ -77,6 +79,7 @@ export function createPlayer(id: EntityId, x: number, y: number): Player {
     facingY: 0,
     shockCooldown: 0,
     silentTime: 0,
+    carryHumTimer: GAME.duel.carryHumInterval,
   };
 }
 

@@ -148,6 +148,13 @@ export const SYNTHS: Record<SynthName, Synth> = {
     tone(ctx, out, 'sine', 780 * p, 776 * p, 0.6, 0.08, 0.1, 0.45);
   },
 
+  // Cores being carried (Phase 28): the core's two notes, lower and with a wobble, so a
+  // carrier sounds different from a core lying on the floor.
+  carryHum: (ctx, out, _n, p) => {
+    tone(ctx, out, 'triangle', 330 * p, 350 * p, 0.25, 0.28, 0.05, 0.45);
+    tone(ctx, out, 'sine', 495 * p, 470 * p, 0.25, 0.14, 0.05, 0.45, 0.12);
+  },
+
   // A fan spinning up for a couple of seconds: a low rumble and airy hiss (covers footsteps).
   vent: (ctx, out, n, p) => {
     noiseBurst(ctx, out, n, 'lowpass', 420 * p, 0.6, 0.55, 0.35, 2.1);
@@ -197,6 +204,20 @@ export const SYNTHS: Record<SynthName, Synth> = {
   extract: (ctx, out) => {
     tone(ctx, out, 'sine', 300, 900, 0.6, 0.35, 0.02, 1);
     for (const f of [440, 554, 660]) tone(ctx, out, 'triangle', f, f, 0, 0.15, 0.4, 1, 0.4);
+  },
+
+  // Duel (Phase 28): a core snatched from the rival's drop. A quick upward grab.
+  steal: (ctx, out, n) => {
+    noiseBurst(ctx, out, n, 'highpass', 2500, 0.7, 0.25, 0.002, 0.08);
+    tone(ctx, out, 'square', 440, 1320, 0.12, 0.2, 0.005, 0.22);
+    tone(ctx, out, 'triangle', 880, 880, 0, 0.18, 0.01, 0.3, 0.12);
+  },
+
+  // Duel: someone started extracting. A rising two-tone alarm.
+  extracting: (ctx, out) => {
+    for (let i = 0; i < 3; i++) {
+      tone(ctx, out, 'sawtooth', 300, 600, 0.18, 0.12, 0.01, 0.2, i * 0.22);
+    }
   },
 
   death: (ctx, out, n) => {

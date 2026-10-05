@@ -25,6 +25,8 @@ import type { AppContext, Scene } from './scene';
 const END_DELAY = 2;
 /** Seconds the rules banner stays up. */
 const BANNER_TIME = 4;
+/** Seconds a cue such as "STEAL!" stays up. */
+const CUE_TIME = 1.6;
 
 /** A round of an online series (Phase 27), or practice against a bot (Phase 26). */
 export type DuelParams =
@@ -62,6 +64,8 @@ export class DuelScene implements Scene {
   private menuOpen = false;
   private endedAt: number | null = null;
   private aimScreen: InputFrame['aim'] = null;
+  /** "STEAL!" / "STOLEN!" (Phase 28) and when it appeared (sim time). */
+  private cue: { text: string; color: 'green' | 'red'; at: number } | null = null;
 
   constructor(app: AppContext, params: DuelParams) {
     this.app = app;
@@ -86,6 +90,16 @@ export class DuelScene implements Scene {
     });
     this.sim.events.on('roundEnded', (e) => (this.endedAt = e.time));
     this.sim.events.on('duelEnded', (e) => this.series?.finishRound(e.winner));
+    this.sim.events.on('coreStolen', (e) => {
+      const mine = e.by === this.sim.state.player.id;
+      const victim = e.from === this.sim.state.player.id;
+      if (!mine && !victim) return;
+      this.cue = {
+        text: mine ? 'STEAL!' : 'STOLEN!',
+        color: mine ? 'green' : 'red',
+        at: this.sim.state.time,
+      };
+    });
     this.sim.events.on('playerHit', (e) => {
       if (e.target !== this.sim.state.player.id) return;
       const { strength, duration } = THEME.shake.hit;
@@ -161,6 +175,22 @@ export class DuelScene implements Scene {
     this.audio.dispose();
   }
 
+  /** A big, short cue under the HUD: "STEAL!" for the thief, "STOLEN!" for the one robbed. */
+  private drawCue(ctx: CanvasRenderingContext2D, width: number, time: number): void {
+    const cue = this.cue;
+    if (!cue) return;
+    const age = time - cue.at;
+    if (age > CUE_TIME) return;
+    const alpha = Math.min(1, age / 0.08, (CUE_TIME - age) / 0.4);
+    drawText(ctx, cue.text, width / 2, 96, {
+      size: 30 + 8 * Math.max(0, 1 - age / 0.2),
+      color: THEME.colors[cue.color],
+      align: 'center',
+      glow: THEME.glowBlur * 2,
+      alpha,
+    });
+  }
+
   private bannerTitle(): string {
     if (this.practice) return `PRACTICE · ${DUEL_BOTS[this.practice].label} BOT`;
     const series = this.series;
@@ -194,6 +224,7 @@ export class DuelScene implements Scene {
 
     this.display.draw(ctx, width, height, focus);
     drawHud(ctx, state);
+    this.drawCue(ctx, width, state.time);
     if (state.time < BANNER_TIME && !this.menuOpen) {
       const a = Math.min(1, (BANNER_TIME - state.time) / 0.6);
       const title = this.bannerTitle();

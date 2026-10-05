@@ -139,6 +139,27 @@ describe('generateMap', () => {
     expect(all).toEqual([]);
   });
 
+  it("duel cores leave both players' best routes within the allowed difference (Phase 28)", () => {
+    /** Shortest spawn → 2 cores (either order) → beacon, by the independent BFS. */
+    const route = (layout: MapLayout, spawn: TileCoord) => {
+      const { tiles, cores, beacon } = layout;
+      const d = (a: TileCoord, b: TileCoord) => steps(tiles, a).get(tiles.index(b.tx, b.ty))!;
+      let best = Infinity;
+      for (const a of cores) {
+        for (const b of cores) {
+          if (a !== b) best = Math.min(best, d(spawn, a) + d(a, b) + d(b, beacon));
+        }
+      }
+      return best;
+    };
+    for (let seed = 0; seed < 60; seed++) {
+      const o = opts(seed, { players: 2 });
+      const layout = generateMap(o);
+      const [a, b] = layout.spawns.map((s) => route(layout, s));
+      expect(Math.abs(a - b), `seed ${seed}`).toBeLessThanOrEqual(o.coreMaxRouteDifference);
+    }
+  });
+
   it('scaled maps grow and stay valid', () => {
     const base = generateMap(opts(7));
     const o = opts(7, { scale: 1.6 });

@@ -8,6 +8,7 @@ import type { Pickup } from '../entities/pickup';
 import type { Player } from '../entities/player';
 import type { GameState, SimContext, TakeKind } from '../gameState';
 import { hasLineOfSight } from '../world/visibility';
+import { soundMasked } from './emitters';
 
 /*
  * Taking, hitting, dropping and winning. Solo play decides everything at
@@ -65,6 +66,11 @@ export function grant(ctx: SimContext, kind: TakeKind, id: number, by: EntityId)
   if (kind === 'core') {
     if (holder) holder.cores++;
     ctx.events.emit('coreCollected', { coreId: id, by, x: item.x, y: item.y });
+    // A core the other player dropped: a steal (Phase 28).
+    const from = (item as Core).lockedFor;
+    if (from !== undefined && from !== by) {
+      ctx.events.emit('coreStolen', { by, from, x: item.x, y: item.y });
+    }
   } else {
     const pickup = item as Pickup;
     if (holder === state.player) applyPickup(holder, pickup);
@@ -114,31 +120,117 @@ function find(state: GameState, kind: TakeKind, id: number) {
     : state.pickups.find((p) => p.id === id);
 }
 
+// ─── Carried cores (Phase 28) ───────────────────────────────────────────────
+
+/**
+ * Duel: the cores a player carries hum every `carryHumInterval` s, louder
+ * with enough of them to win. Sneaking and Silent Boots don't quiet it;
+ * only machine noise (sound cover) does, and then nobody hears it, the
+ * rival included. Each side hums its own player, like footsteps.
+ */
+export function updateCarryHum(ctx: SimContext, player: Player, dt: number): void {
+  const { state } = ctx;
+  if (!state.duel) return;
+  if (player.cores === 0) {
+    player.carryHumTimer = GAME.duel.carryHumInterval;
+    return;
+  }
+  player.carryHumTimer -= dt;
+  if (player.carryHumTimer > 1e-9) return;
+  player.carryHumTimer += GAME.duel.carryHumInterval;
+  const kind = player.cores >= coresNeeded(state) ? 'carriedHumHeavy' : 'carriedHum';
+  if (!soundMasked(state, kind, player.x, player.y)) {
+    ctx.emitSound(kind, player.x, player.y, player.id);
+  }
+}
+
 // ─── Extraction and the end of a round ──────────────────────────────────────
 
-/** The local player reached the active beacon with enough cores. */
-export function extract(ctx: SimContext): void {
+/**
+ * Where the local player stands with respect to extraction, every tick.
+ * Solo: reaching the active beacon with every core ends the round at once.
+ * Duel: standing there with enough cores starts an extraction that takes
+ * `extractTime`; the host decides (its own player directly, the client
+ * by asking), and leaving cancels it.
+ */
+export function updateExtraction(ctx: SimContext, player: Player): void {
   const { state } = ctx;
-  if (!state.duel) {
-    endRound(ctx, 'extracted');
+  const { beacon } = state;
+  const reach = GAME.objectives.pickupRadius + player.radius;
+  const there =
+    beacon.active &&
+    player.cores >= coresNeeded(state) &&
+    Math.hypot(player.x - beacon.x, player.y - beacon.y) <= reach;
+  const duel = state.duel;
+  if (!duel) {
+    if (there) endRound(ctx, 'extracted');
     return;
   }
   if (state.mode === 'client') {
-    if (state.duel.extractPending) return;
-    state.duel.extractPending = true;
-    ctx.events.emit('extractRequested');
+    if (there !== duel.atBeacon) {
+      duel.atBeacon = there;
+      ctx.events.emit(there ? 'extractRequested' : 'extractLeft');
+    }
     return;
   }
-  tryExtract(ctx, state.player.id);
+  if (there && !duel.extracting) startExtraction(ctx, player.id);
+  else if (!there) cancelExtraction(ctx, player.id);
 }
 
-/** Referee: does `by` really carry enough cores at an active beacon? If so, they win. */
-export function tryExtract(ctx: SimContext, by: EntityId): boolean {
+/** Referee: `by` is at the active beacon with enough cores; start the clock. */
+export function startExtraction(ctx: SimContext, by: EntityId): boolean {
   const { state } = ctx;
+  const duel = state.duel;
   const holder = playerById(state, by);
-  if (!holder || !state.beacon.active || holder.cores < coresNeeded(state)) return false;
-  declareWinner(ctx, by);
+  if (!duel || duel.extracting || !holder || !canExtract(state, holder)) return false;
+  duel.extracting = { by, since: state.time };
+  ctx.events.emit('extractStarted', { by });
   return true;
+}
+
+/** Referee (and the client, told by the host): `by` is no longer extracting. */
+export function cancelExtraction(ctx: SimContext, by: EntityId): void {
+  const duel = ctx.state.duel;
+  if (duel?.extracting?.by !== by) return;
+  duel.extracting = null;
+  ctx.events.emit('extractCancelled', { by });
+}
+
+/** Duel client: the host says `by` started extracting. */
+export function extractionStarted(ctx: SimContext, by: EntityId): void {
+  const duel = ctx.state.duel;
+  if (!duel || duel.extracting?.by === by) return;
+  duel.extracting = { by, since: ctx.state.time };
+  ctx.events.emit('extractStarted', { by });
+}
+
+/** Duel client: the host cancelled `by`'s extraction. Ours? Ask again if we're still there. */
+export function extractionCancelled(ctx: SimContext, by: EntityId): void {
+  const duel = ctx.state.duel;
+  if (!duel) return;
+  if (by === ctx.state.player.id) duel.atBeacon = false;
+  cancelExtraction(ctx, by);
+}
+
+/** Referee, every tick: an extraction that lasted `extractTime` wins; one that can't go on stops. */
+export function updateExtractionClock(ctx: SimContext): void {
+  const { state } = ctx;
+  const ex = state.duel?.extracting;
+  if (!ex || state.mode === 'client' || state.status !== 'playing') return;
+  const holder = playerById(state, ex.by);
+  if (!holder || !canExtract(state, holder)) cancelExtraction(ctx, ex.by);
+  else if (state.time - ex.since >= GAME.duel.extractTime - 1e-9) declareWinner(ctx, ex.by);
+}
+
+/** How far along the current extraction is, 0..1 (null: nobody is extracting). */
+export function extractionProgress(state: GameState): number | null {
+  const ex = state.duel?.extracting;
+  if (!ex) return null;
+  return Math.min(1, (state.time - ex.since) / GAME.duel.extractTime);
+}
+
+function canExtract(state: GameState, holder: Player): boolean {
+  return state.beacon.active && holder.cores >= coresNeeded(state);
 }
 
 export function declareWinner(ctx: SimContext, winner: EntityId): void {
@@ -177,6 +269,8 @@ export function hitPlayer(
 
   let hits = 0;
   if (state.duel) {
+    // Any hit starts an extraction over (Phase 28).
+    cancelExtraction(ctx, target.id);
     hits = (state.duel.hits[target.id] ?? 0) + 1;
     state.duel.hits[target.id] = hits;
     if (hits >= state.duel.hitsToDrop) {
@@ -216,14 +310,18 @@ function knockAway(p: Player, fromX: number, fromY: number): void {
   p.knockVy = d > 0 ? (dy / d) * speed : 0;
 }
 
-/** Referee: the carried cores become new cores on the floor, where the player stands. */
+/**
+ * Referee: the carried cores become new cores on the floor, where the
+ * player stands (or, with `dropScatterTiles`, on open floor around it).
+ */
 export function dropCores(ctx: SimContext, target: Player): void {
   const { state } = ctx;
   if (target.cores === 0) return;
   const cores = [];
   let id = Math.max(0, ...state.cores.map((c) => c.id));
   for (let i = 0; i < target.cores; i++) {
-    const core = { id: ++id, x: target.x, y: target.y };
+    const at = scatter(state, target.x, target.y);
+    const core = { id: ++id, x: at.x, y: at.y };
     state.cores.push({
       ...core,
       collected: false,
@@ -236,6 +334,24 @@ export function dropCores(ctx: SimContext, target: Player): void {
   }
   target.cores = 0;
   ctx.events.emit('coresDropped', { by: target.id, cores });
+}
+
+/** A floor tile center within `dropScatterTiles` of (x, y), in sight, from the host's seeded stream. */
+function scatter(state: GameState, x: number, y: number): { x: number; y: number } {
+  const range = GAME.duel.dropScatterTiles;
+  if (range <= 0) return { x, y };
+  const { tiles } = state.layout;
+  const tx = tiles.toTile(x);
+  const ty = tiles.toTile(y);
+  const spots: { x: number; y: number }[] = [];
+  for (let dy = -range; dy <= range; dy++) {
+    for (let dx = -range; dx <= range; dx++) {
+      if (!tiles.isFloor(tx + dx, ty + dy)) continue;
+      const c = tiles.center({ tx: tx + dx, ty: ty + dy });
+      if (hasLineOfSight(state.walls, x, y, c.x, c.y)) spots.push(c);
+    }
+  }
+  return spots.length > 0 ? state.rng.pick(spots) : { x, y };
 }
 
 // ─── Shockwave effects ───────────────────────────────────────────────────────

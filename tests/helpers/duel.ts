@@ -1,3 +1,4 @@
+import { GAME } from '@/config/game';
 import type { HunterTypeId } from '@/config/hunters';
 import { createLoopbackPair } from '@/net/loopback';
 import { NetSession } from '@/net/netSession';
@@ -10,6 +11,8 @@ import { hitPlayer } from '@/sim/systems/duel';
 
 export const DUEL_DT = 1 / 60;
 export const DUEL_SEED = 20260929;
+/** Ticks to stand at the beacon to finish an extraction, with room for the link's lag (Phase 28). */
+export const EXTRACT_TICKS = Math.ceil(GAME.duel.extractTime / DUEL_DT) + 20;
 
 /** Host and client simulations joined by an in-memory link with `latency` ticks each way. */
 export function duel(latency = 3, hunters: HunterTypeId[] = [], seed = DUEL_SEED) {
@@ -88,7 +91,7 @@ export function recordedDuel(latency = 3) {
     settle();
   }
   teleport(me, client.state.beacon.x, client.state.beacon.y);
-  step();
+  step({}, {}, EXTRACT_TICKS);
   settle();
   return { ...d, recorder, replay: recorder.finish() };
 }

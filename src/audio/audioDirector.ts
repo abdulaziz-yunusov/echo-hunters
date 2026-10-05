@@ -36,6 +36,9 @@ export class AudioDirector {
       on('closeCall', centered('closeCall')),
       on('pickupCollected', (e) => this.ifMine(e.by, 'pickupCollected')),
       on('stoneThrown', centered('stoneThrown')),
+      // Duel (Phase 28): both players hear a steal and an extraction starting.
+      on('coreStolen', centered('coreStolen')),
+      on('extractStarted', centered('extractStarted')),
       on('roundEnded', (e) => {
         this.out.stopDrone();
         this.playCentered(e.status === 'extracted' ? 'extracted' : 'died');

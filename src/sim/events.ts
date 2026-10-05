@@ -34,8 +34,16 @@ export interface GameEvents {
   roundEnded: { status: Exclude<RoundStatus, 'playing'>; time: number };
   /** Duel client: asking the host for something contested. */
   takeRequested: { kind: TakeKind; id: number };
-  /** Duel client: asking the host to confirm an extraction. */
+  /** Duel client: "I'm at the beacon with enough cores" (the host starts the extraction). */
   extractRequested: undefined;
+  /** Duel client: "I've left the beacon." */
+  extractLeft: undefined;
+  /** Duel: `by` started extracting (Phase 28). */
+  extractStarted: { by: EntityId };
+  /** Duel: `by`'s extraction was cut short (hit, stepped away, lost the cores). */
+  extractCancelled: { by: EntityId };
+  /** Duel: `by` took a core that `from` had dropped. */
+  coreStolen: { by: EntityId; from: EntityId; x: number; y: number };
   /** Duel: a player's carried cores fell to the floor as new cores. */
   coresDropped: { by: EntityId; cores: { id: number; x: number; y: number }[] };
   /** Duel: someone extracted with enough cores. */

@@ -2,6 +2,7 @@ import { GAME } from '@/config/game';
 import { THEME } from '@/config/theme';
 import { beamCharged, beamReady } from '@/sim/entities/player';
 import type { GameState } from '@/sim/gameState';
+import { extractionProgress } from '@/sim/systems/duel';
 import { playerMasked } from '@/sim/systems/emitters';
 import { drawText } from './text';
 
@@ -75,6 +76,28 @@ export function drawHud(ctx: CanvasRenderingContext2D, state: GameState): void {
       glow: 6,
     });
     line += 18;
+  }
+  // Phase 28: an extraction under way, yours (with its progress) or the rival's.
+  const progress = extractionProgress(state);
+  if (duel?.extracting && progress !== null) {
+    const mine = duel.extracting.by === player.id;
+    const filled = Math.floor(progress * 8);
+    drawText(
+      ctx,
+      mine
+        ? `EXTRACTING ${'▓'.repeat(filled)}${'░'.repeat(8 - filled)}: HOLD STILL`
+        : 'RIVAL EXTRACTING: HIT THEM!',
+      12,
+      line,
+      {
+        size: 13,
+        color: mine ? THEME.colors.green : THEME.colors.red,
+        glow: 8,
+        // The rival's warning blinks.
+        alpha: mine || Math.floor(state.time * 4) % 2 === 0 ? 1 : 0.45,
+      },
+    );
+    return;
   }
   if (beacon.active) {
     const rivalCarries = duel && player.cores < duel.coresToWin;

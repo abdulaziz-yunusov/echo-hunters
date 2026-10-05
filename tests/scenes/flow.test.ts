@@ -18,7 +18,7 @@ import { SceneManager } from '@/scenes/sceneManager';
 import { ROW_HEIGHT, type MenuList } from '@/ui/menuList';
 import type { DuelEndScene } from '@/scenes/duelEndScene';
 import { GUEST_ID } from '@/sim/entities/entity';
-import { flushLink, recordedDuel, seriesPair } from '../helpers/duel';
+import { EXTRACT_TICKS, flushLink, recordedDuel, seriesPair } from '../helpers/duel';
 import { GAME } from '@/config/game';
 import { PLAYER_ID } from '@/sim/entities/entity';
 import { ReplayRecorder } from '@/replay/recorder';
@@ -388,6 +388,7 @@ describe('screen flow', () => {
         me.player.y = me.player.prevY = spot.y;
         tick(30);
       }
+      tick(EXTRACT_TICKS);
       expect(me.status).toBe('extracted');
       tick(150); // the end lingers 2 s
       await flushLink(pair.link);

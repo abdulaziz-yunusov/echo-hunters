@@ -16,6 +16,7 @@ export const SYNTHS = [
   'beacon',
   'wallBump',
   'coreHum',
+  'carryHum',
   'vent',
   'drip',
   'scream',
@@ -26,6 +27,8 @@ export const SYNTHS = [
   'closeCall',
   'pickup',
   'extract',
+  'steal',
+  'extracting',
   'death',
 ] as const;
 
@@ -55,6 +58,9 @@ export const AUDIO_SOUNDS = {
   beacon: { synth: 'beacon', range: 1600, volume: 0.8 },
   wallBump: { synth: 'wallBump', range: 320, volume: 0.6 },
   coreHum: { synth: 'coreHum', range: 280, volume: 0.4 },
+  // The rival hears a carrier as far as hunters do (Phase 28).
+  carriedHum: { synth: 'carryHum', range: 220, volume: 0.5 },
+  carriedHumHeavy: { synth: 'carryHum', range: 308, volume: 0.65 },
   ventHum: { synth: 'vent', range: 420, volume: 0.45 },
   drip: { synth: 'drip', range: 300, volume: 0.35 },
 } as const satisfies Record<SoundKindId, SpatialSoundDef>;
@@ -69,6 +75,10 @@ export const AUDIO_EVENTS = {
   pickupCollected: { synth: 'pickup', volume: 0.5 },
   stoneThrown: { synth: 'throw', volume: 0.35 },
   extracted: { synth: 'extract', volume: 0.7 },
+  /** Duel (Phase 28): a core taken from the rival's drop, heard by both. */
+  coreStolen: { synth: 'steal', volume: 0.7 },
+  /** Duel: someone started extracting, heard by both. */
+  extractStarted: { synth: 'extracting', volume: 0.6 },
   died: { synth: 'death', volume: 0.9 },
 } as const satisfies Record<string, { synth: SynthName; volume: number }>;
 

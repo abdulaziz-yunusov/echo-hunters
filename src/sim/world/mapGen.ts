@@ -31,6 +31,10 @@ export interface MapGenOptions {
   players: 1 | 2;
   /** Duel fairness: most steps one player may be closer to the beacon than the other. */
   beaconMaxStepDifference: number;
+  /** Duel: cores a player must carry to the beacon (their route takes this many cores). */
+  duelCoresToWin: number;
+  /** Duel fairness: most steps one player's best route to win may be longer than the other's. */
+  coreMaxRouteDifference: number;
   /** Seeds tried (seed, seed+1, …) before giving up. */
   maxAttempts: number;
 }
@@ -69,6 +73,8 @@ export function mapOptionsFromConfig(
     hunterSpawnsNeeded: ENDLESS.maxHunters,
     players,
     beaconMaxStepDifference: GAME.duel.beaconMaxStepDifference,
+    duelCoresToWin: GAME.duel.coresToWin,
+    coreMaxRouteDifference: GAME.duel.coreMaxRouteDifference,
     maxAttempts: map.maxAttempts,
   };
 }
@@ -102,10 +108,15 @@ function tryGenerate(o: MapGenOptions, seed: number): MapLayout | null {
   if (!allFloorReachable(tiles, fields[0])) return null;
 
   const beacon = pickBeacon(tiles, fields, o.beaconMaxStepDifference);
-  const cores = rng
+  const shuffled = rng
     .shuffle([...rooms])
-    .slice(0, o.coreCount)
     .map((r) => ({ tx: r.x + (r.w - 1) / 2, ty: r.y + (r.h - 1) / 2 }));
+  const fair =
+    o.players === 2
+      ? pickFairCores(tiles, shuffled, fields, beacon, o.coreCount, o.duelCoresToWin)
+      : { cores: shuffled.slice(0, o.coreCount), gap: 0 };
+  if (fair.gap > o.coreMaxRouteDifference) return null;
+  const { cores } = fair;
   if (cores.some((c) => sameTile(c, beacon))) return null;
 
   const hunterSpawns = pickHunterSpawns(tiles, fields, o.hunterSpawnMinTiles, [beacon, ...cores]);
@@ -224,6 +235,83 @@ function carveRooms(
  * qualify), pick the one farthest from the nearest spawn. Solo has one
  * spawn, so this is simply the farthest tile. Ties go to the lowest index.
  */
+/**
+ * Duel (Phase 28): of every way to put the cores in the rooms, the one where
+ * both players' best route (spawn → enough cores → beacon) is closest in
+ * length. Ties go to the earliest rooms in the (seeded) shuffled order.
+ * Without this, the player whose spawn happened to be nearer the cores won
+ * about 80% of bot duels: the map decided the race, not the players.
+ */
+function pickFairCores(
+  tiles: TileMap,
+  rooms: readonly TileCoord[],
+  spawnFields: readonly Int32Array[],
+  beacon: TileCoord,
+  count: number,
+  need: number,
+): { cores: TileCoord[]; gap: number } {
+  const at = (field: Int32Array, t: TileCoord) => field[tiles.index(t.tx, t.ty)];
+  const roomFields = rooms.map((r) => distanceField(tiles, [r]));
+  const toBeacon = rooms.map((_, i) => at(roomFields[i], beacon));
+  let best: number[] = [];
+  let bestGap = Infinity;
+  for (const combo of combinations(rooms.length, count)) {
+    const routes = spawnFields.map((f) =>
+      shortestRoute(
+        combo,
+        need,
+        (i) => at(f, rooms[i]),
+        (i, j) => at(roomFields[i], rooms[j]),
+        toBeacon,
+      ),
+    );
+    const gap = Math.max(...routes) - Math.min(...routes);
+    if (gap < bestGap) {
+      best = combo;
+      bestGap = gap;
+    }
+  }
+  return { cores: best.map((i) => rooms[i]), gap: bestGap };
+}
+
+/** Shortest walk from a spawn through `need` of these rooms (any order), ending at the beacon. */
+function shortestRoute(
+  rooms: readonly number[],
+  need: number,
+  fromSpawn: (room: number) => number,
+  between: (a: number, b: number) => number,
+  toBeacon: readonly number[],
+): number {
+  let best = Infinity;
+  const walk = (last: number, used: number[], length: number) => {
+    if (length >= best) return;
+    if (used.length === need) {
+      best = Math.min(best, length + toBeacon[last]);
+      return;
+    }
+    for (const r of rooms) {
+      if (used.includes(r)) continue;
+      walk(r, [...used, r], length + between(last, r));
+    }
+  };
+  for (const r of rooms) walk(r, [r], fromSpawn(r));
+  return best;
+}
+
+/** Every way to choose k of 0..n-1, in increasing (lexicographic) order. */
+function combinations(n: number, k: number): number[][] {
+  const out: number[][] = [];
+  const pick = (from: number, chosen: number[]) => {
+    if (chosen.length === k) {
+      out.push(chosen);
+      return;
+    }
+    for (let i = from; i < n; i++) pick(i + 1, [...chosen, i]);
+  };
+  pick(0, []);
+  return out;
+}
+
 function pickBeacon(
   tiles: TileMap,
   fields: readonly Int32Array[],

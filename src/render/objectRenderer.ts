@@ -60,7 +60,9 @@ export function drawBeacon(
   fadeSeconds: number,
   ghostAlpha: number,
   pixel: number,
+  extraction: number | null = null,
 ): void {
+  if (extraction !== null) drawExtraction(ctx, beacon, extraction, pixel);
   const a = revealAlpha(reveal.objectRevealTime(BEACON_KEY), now, fadeSeconds, ghostAlpha);
   if (a <= 0) return;
   ctx.save();
@@ -78,6 +80,33 @@ export function drawBeacon(
     ctx.arc(beacon.x, beacon.y, BEACON_RADIUS * 0.45, 0, Math.PI * 2);
     ctx.fill();
   }
+  ctx.restore();
+}
+
+/**
+ * Duel (Phase 28): a ring around the beacon fills as an extraction goes on.
+ * Shown even in the dark: the faster pulses already tell everyone.
+ */
+function drawExtraction(
+  ctx: CanvasRenderingContext2D,
+  beacon: Beacon,
+  progress: number,
+  pixel: number,
+): void {
+  const r = BEACON_RADIUS * 1.9;
+  ctx.save();
+  ctx.strokeStyle = THEME.colors.green;
+  ctx.shadowColor = THEME.colors.green;
+  ctx.shadowBlur = THEME.glowBlur;
+  ctx.lineWidth = 3 * pixel;
+  ctx.globalAlpha = 0.25;
+  ctx.beginPath();
+  ctx.arc(beacon.x, beacon.y, r, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  ctx.beginPath();
+  ctx.arc(beacon.x, beacon.y, r, -Math.PI / 2, -Math.PI / 2 + progress * Math.PI * 2);
+  ctx.stroke();
   ctx.restore();
 }
 
