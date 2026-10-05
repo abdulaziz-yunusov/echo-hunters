@@ -1,13 +1,13 @@
 import { THEME } from '@/config/theme';
 import type { InputFrame } from '@/input/inputFrame';
-import { submitScore } from '@/platform/storage';
+import { loadSave, submitScore } from '@/platform/storage';
 import { drawText } from '@/render/text';
 import { formatTime } from '@/ui/format';
-import { MenuList } from '@/ui/menuList';
+import { MenuList, type MenuItem } from '@/ui/menuList';
 import { drawMenu } from '@/ui/menuRenderer';
 import type { Replay } from '@/replay/replay';
 import type { ScoreBreakdown } from '@/sim/scoring';
-import { replayItem } from './menuItems';
+import { customMapItems, replayItem } from './menuItems';
 import { nextLevel, type RunState } from './run';
 import type { AppContext, Scene } from './scene';
 
@@ -37,15 +37,23 @@ export class LevelEndScene implements Scene {
     this.score = params.score;
     this.seconds = params.seconds;
     this.next = nextLevel(this.run, this.score.total);
-    const high = submitScore(this.next.score);
+    // A hand-made map can be made easy, so it never counts for the high score (Phase 13).
+    const high = this.run.custom
+      ? { highScore: loadSave().highScore, isNew: false }
+      : submitScore(this.next.score);
     this.highScore = high.highScore;
     this.isNewHigh = high.isNew;
+    const onward: MenuItem[] = this.run.custom
+      ? customMapItems(app, this.run)
+      : [
+          {
+            kind: 'action',
+            label: `NEXT: LEVEL ${this.next.level}`,
+            onSelect: () => app.goTo('play', { run: this.next }),
+          },
+        ];
     this.menu = new MenuList([
-      {
-        kind: 'action',
-        label: `NEXT: LEVEL ${this.next.level}`,
-        onSelect: () => app.goTo('play', { run: this.next }),
-      },
+      ...onward,
       ...replayItem(app, params.replay),
       { kind: 'action', label: 'MAIN MENU', onSelect: () => app.goTo('menu') },
     ]);
@@ -71,7 +79,8 @@ export class LevelEndScene implements Scene {
       glow: THEME.glowBlur * 2,
     });
     y += 30;
-    drawText(ctx, `LEVEL ${this.run.level} · ${formatTime(this.seconds)}`, cx, y, {
+    const what = this.run.custom ? 'CUSTOM MAP' : `LEVEL ${this.run.level}`;
+    drawText(ctx, `${what} · ${formatTime(this.seconds)}`, cx, y, {
       size: 14,
       color: white,
       align: 'center',
@@ -98,14 +107,22 @@ export class LevelEndScene implements Scene {
     y += LINE;
     this.row(ctx, 'RUN TOTAL', `${this.next.score}`, y, 1, THEME.colors.cyan);
     y += LINE;
-    this.row(
-      ctx,
-      this.isNewHigh ? 'NEW HIGH SCORE!' : 'HIGH SCORE',
-      `${this.highScore}`,
-      y,
-      1,
-      this.isNewHigh ? THEME.colors.green : white,
-    );
+    if (this.run.custom) {
+      drawText(ctx, 'Custom maps don’t count for the high score.', cx, y, {
+        size: 13,
+        color: white,
+        align: 'center',
+        alpha: 0.5,
+      });
+    } else
+      this.row(
+        ctx,
+        this.isNewHigh ? 'NEW HIGH SCORE!' : 'HIGH SCORE',
+        `${this.highScore}`,
+        y,
+        1,
+        this.isNewHigh ? THEME.colors.green : white,
+      );
 
     if (this.time >= INPUT_GRACE) drawMenu(ctx, this.menu, cx, y + 60, 300, height - 8);
   }

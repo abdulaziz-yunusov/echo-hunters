@@ -8,6 +8,7 @@ import { InputManager } from '@/input/inputManager';
 import { startFrameDriver } from '@/platform/frameDriver';
 import { loadSave, updateSave } from '@/platform/storage';
 import { Viewport } from '@/platform/viewport';
+import { sharedMapFromHash } from '@/platform/shareLink';
 import { DebugLayer } from '@/render/debugLayer';
 import { applyPalette } from '@/render/palette';
 import { glow, installGlowSwitch } from '@/render/quality';
@@ -93,6 +94,9 @@ export function startApp(canvas: HTMLCanvasElement): void {
     },
   });
 
-  app.goTo('menu');
+  // A shared map link (#map=…, Phase 13) opens straight in the editor.
+  const shared = sharedMapFromHash(location.hash);
+  if (shared) app.goTo('editor', { map: shared });
+  else app.goTo('menu');
   startFrameDriver(loop);
 }

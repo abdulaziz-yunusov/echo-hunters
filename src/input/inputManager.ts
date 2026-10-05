@@ -120,6 +120,7 @@ export class InputManager {
       useTool: s.wasPressed('useTool'),
       confirm: s.wasPressed('confirm'),
       click: s.wasPressed('click'),
+      clickHeld: s.isDown('click'),
       back: s.wasPressed('back'),
       pause: s.wasPressed('pause'),
       toggleDebug: s.wasPressed('toggleDebug'),

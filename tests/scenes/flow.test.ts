@@ -22,6 +22,11 @@ import { EXTRACT_TICKS, flushLink, recordedDuel, seriesPair } from '../helpers/d
 import { GAME } from '@/config/game';
 import { PLAYER_ID } from '@/sim/entities/entity';
 import { ReplayRecorder } from '@/replay/recorder';
+import { EDITOR_TOOLS } from '@/config/editor';
+import { dailyDate, dailySeed } from '@/platform/daily';
+import { emptyMap, encodeMap, mapFromLayout } from '@/sim/world/customMap';
+import { generateMap, mapOptionsFromConfig } from '@/sim/world/mapGen';
+import type { RunState } from '@/scenes/run';
 import { toWire } from '@/replay/wire';
 import { IDLE_INPUT } from '@/sim/playerInput';
 import { createSimulation, type Simulation } from '@/sim/simulation';
@@ -127,7 +132,7 @@ describe('screen flow', () => {
   it('menu → settings → controls, and back with ESC each time', () => {
     const t = testApp();
     t.app.goTo('menu');
-    t.choose(4); // PLAY, DUEL, DIFFICULTY, HOW TO PLAY, SETTINGS
+    t.choose(6); // PLAY, DAILY, DUEL, DIFFICULTY, MAP EDITOR, HOW TO PLAY, SETTINGS
     expect(t.current()).toBe('Settings');
     t.choose(9); // … SOUND, SOUND CUES, SCREEN SHAKE, FLASHES, COLORS, GLOW, CONTROLS
     expect(t.current()).toBe('Controls');
@@ -140,7 +145,7 @@ describe('screen flow', () => {
   it('menu → how to play → back', () => {
     const t = testApp();
     t.app.goTo('menu');
-    t.choose(3); // HOW TO PLAY
+    t.choose(5); // HOW TO PLAY
     expect(t.current()).toBe('HowToPlay');
     t.press({ back: true });
     expect(t.current()).toBe('Menu');
@@ -594,7 +599,7 @@ describe('screen flow', () => {
     try {
       const t = testApp();
       t.app.goTo('menu');
-      t.choose(1); // DUEL
+      t.choose(2); // DUEL
       expect(t.current()).toBe('DuelLobby');
       // HOST, SERIES, VARIANT, JOIN, PRACTICE, BOT
       for (let i = 0; i < 5; i++) t.press({ navY: 1 });
@@ -672,6 +677,150 @@ describe('screen flow', () => {
     expect((t.scenes.current as unknown as { practice: string }).practice).toBe('easy');
   });
 
+  describe('map editor and daily run (Phase 13)', () => {
+    type Editor = {
+      encoded: string;
+      playable: boolean;
+      toolChips: { x: number; y: number; w: number; h: number }[];
+      actionChips: { x: number; y: number; w: number; h: number }[];
+      grid: { x: number; y: number; cell: number };
+    };
+    const editorOf = (t: ReturnType<typeof testApp>) => t.scenes.current as unknown as Editor;
+    const centre = (c: { x: number; y: number; w: number; h: number }) => ({
+      x: c.x + c.w / 2,
+      y: c.y + c.h / 2,
+    });
+    /** Click at a spot (press, then release). */
+    const clickAt = (t: ReturnType<typeof testApp>, at: { x: number; y: number }) => {
+      t.press({ click: true, clickHeld: true, aim: at });
+      t.press({ aim: at });
+    };
+    const tool = (t: ReturnType<typeof testApp>, label: string) =>
+      clickAt(t, centre(editorOf(t).toolChips[EDITOR_TOOLS.findIndex((x) => x.label === label)]));
+    const action = (t: ReturnType<typeof testApp>, index: number) =>
+      clickAt(t, centre(editorOf(t).actionChips[index]));
+    const cell = (t: ReturnType<typeof testApp>, tx: number, ty: number) => {
+      const g = editorOf(t).grid;
+      return { x: g.x + (tx + 0.5) * g.cell, y: g.y + (ty + 0.5) * g.cell };
+    };
+
+    it('build a map from empty, see what is missing, then test-play it', () => {
+      const t = testApp();
+      t.app.goTo('menu');
+      t.choose(4); // PLAY, DAILY, DUEL, DIFFICULTY, MAP EDITOR
+      expect(t.current()).toBe('Editor');
+      t.render(); // lays out the palette and the grid
+      action(t, 4); // NEW EMPTY
+      t.render();
+      expect(editorOf(t).playable).toBe(false);
+      action(t, 0); // TEST PLAY: not yet
+      expect(t.current()).toBe('Editor');
+
+      // Drag a wall across, then undo the whole stroke.
+      tool(t, 'WALL');
+      t.press({ click: true, clickHeld: true, aim: cell(t, 3, 2) });
+      for (let x = 4; x < 9; x++) t.press({ clickHeld: true, aim: cell(t, x, 2) });
+      t.press({ aim: cell(t, 9, 2) });
+      const walled = editorOf(t).encoded;
+      expect(walled).not.toBe(encodeMap(emptyMap(41, 25)));
+      action(t, 2); // UNDO
+      expect(editorOf(t).encoded).toBe(encodeMap(emptyMap(41, 25)));
+
+      for (const [label, tx, ty] of [
+        ['START', 2, 2],
+        ['CORE', 10, 5],
+        ['BEACON', 30, 20],
+        ['STALKER', 20, 10],
+      ] as const) {
+        tool(t, label);
+        clickAt(t, cell(t, tx, ty));
+      }
+      t.render();
+      expect(editorOf(t).playable).toBe(true);
+      const map = editorOf(t).encoded;
+      action(t, 0); // TEST PLAY
+      expect(t.current()).toBe('Play');
+      const run = (t.scenes.current as unknown as { run: { custom?: string } }).run;
+      expect(run.custom).toBe(map);
+      t.render();
+    });
+
+    it('a shared map opens in the editor as it was', () => {
+      const t = testApp();
+      const text = encodeMap(mapFromLayout(generateMap(mapOptionsFromConfig(3))));
+      t.app.goTo('editor', { map: text });
+      t.render();
+      expect(editorOf(t).encoded).toBe(text);
+      expect(editorOf(t).playable).toBe(true);
+    });
+
+    it('a custom map ends with PLAY AGAIN and EDIT MAP, and never touches the high score', () => {
+      const data = new Map<string, string>();
+      vi.stubGlobal('localStorage', {
+        getItem: (k: string) => data.get(k) ?? null,
+        setItem: (k: string, v: string) => void data.set(k, v),
+      });
+      try {
+        const t = testApp();
+        const custom = encodeMap(mapFromLayout(generateMap(mapOptionsFromConfig(3))));
+        const run = newRun(1, 'easy', { custom });
+        const score = {
+          cores: 300,
+          extraction: 500,
+          timeBonus: 0,
+          ghostBonus: 0,
+          stuns: 0,
+          closeCalls: 0,
+          total: 800,
+        };
+        t.app.goTo('levelEnd', { run, score, seconds: 40 });
+        expect(loadSave().highScore).toBe(0);
+        const labels = (t.scenes.current as unknown as { menu: MenuList }).menu.items.map(
+          (i) => i.label,
+        );
+        expect(labels).toEqual(['PLAY AGAIN', 'EDIT MAP', 'MAIN MENU']);
+        t.render();
+        t.idle(1);
+        t.choose(1); // EDIT MAP
+        expect(t.current()).toBe('Editor');
+        t.render();
+        expect(editorOf(t).encoded).toBe(custom);
+
+        t.app.goTo('gameOver', { run, score });
+        expect(loadSave().highScore).toBe(0);
+        t.render();
+      } finally {
+        vi.unstubAllGlobals();
+      }
+    });
+
+    it("the daily run is today's seed, and its game over offers a result to share", () => {
+      const t = testApp();
+      t.app.goTo('menu');
+      t.choose(1); // DAILY RUN
+      expect(t.current()).toBe('Play');
+      const run = (t.scenes.current as unknown as { run: RunState }).run;
+      expect(run.daily).toBe(dailyDate());
+      expect(run.seed).toBe(dailySeed(dailyDate()));
+      t.render();
+      const score = {
+        cores: 100,
+        extraction: 0,
+        timeBonus: 0,
+        ghostBonus: 0,
+        stuns: 0,
+        closeCalls: 0,
+        total: 100,
+      };
+      t.app.goTo('gameOver', { run, score });
+      const labels = (t.scenes.current as unknown as { menu: MenuList }).menu.items.map(
+        (i) => i.label,
+      );
+      expect(labels).toEqual(['COPY RESULT', 'TRY TODAY AGAIN', 'MAIN MENU']);
+      t.render();
+    });
+  });
+
   it('every screen renders without errors', () => {
     const t = testApp();
     const score = {
@@ -696,6 +845,7 @@ describe('screen flow', () => {
       ['gameOver', { run, score }],
       ['replay', { replay: recordedRound() }],
       ['duelLobby'],
+      ['editor', {}],
       ['duel', { series: seriesPair().host, seed: 5 }],
       ['duel', { series: seriesPair().client, seed: 5 }],
       ['duel', { practice: 'normal', seed: 5 }],

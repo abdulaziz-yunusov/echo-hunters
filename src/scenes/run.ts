@@ -10,10 +10,18 @@ export interface RunState {
   score: number;
   /** Fixed for the whole run. */
   difficulty: DifficultyId;
+  /** Daily Seed run (Phase 13): the UTC date it belongs to. */
+  daily?: string;
+  /** A hand-made map (Phase 13), as text: a one-level run that doesn't count for the high score. */
+  custom?: string;
 }
 
-export function newRun(seed: number, difficulty: DifficultyId): RunState {
-  return { seed, level: 1, score: 0, difficulty };
+export function newRun(
+  seed: number,
+  difficulty: DifficultyId,
+  extra: Pick<RunState, 'daily' | 'custom'> = {},
+): RunState {
+  return { seed, level: 1, score: 0, difficulty, ...extra };
 }
 
 /** The run after finishing a level worth `levelScore`. */

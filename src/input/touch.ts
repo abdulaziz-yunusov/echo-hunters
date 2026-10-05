@@ -123,6 +123,8 @@ export class TouchControls {
   }
 
   move(finger: number, x: number, y: number): void {
+    // A finger dragging in a menu (or the map editor) moves the pointer, like a mouse.
+    if (this.tapping.has(finger)) this.sink.pointer(x, y);
     if (finger !== this.stickFinger || !this.stickState) return;
     const s = this.stickState;
     const dx = x - s.originX;

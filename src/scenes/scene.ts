@@ -53,6 +53,8 @@ export interface SceneParams {
   duelLobby: undefined;
   duel: DuelParams;
   duelEnd: DuelEndParams;
+  /** Map editor (Phase 13), optionally opened on a map (its text, as in a #map= link). */
+  editor: { map?: string };
 }
 
 export type SceneId = keyof SceneParams;

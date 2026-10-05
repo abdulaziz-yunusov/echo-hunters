@@ -13,7 +13,8 @@ import { ReplayRecorder } from '@/replay/recorder';
 import { WorldRenderer } from '@/render/worldRenderer';
 import { roundResult, scoreRound } from '@/sim/scoring';
 import { levelDef } from '@/sim/level';
-import { createSimulation, type Simulation } from '@/sim/simulation';
+import { createCustomSimulation, createSimulation, type Simulation } from '@/sim/simulation';
+import { decodeMap } from '@/sim/world/customMap';
 import { warpToObjective } from './debugWarp';
 import type { RunState } from './run';
 import { Tutorial } from './tutorial';
@@ -144,7 +145,10 @@ export class PlayScene implements Scene {
       this.drawTutorial(ctx);
       this.drawPopup(ctx, state.time);
     }
-    drawText(ctx, `LEVEL ${this.run.level} · SEED ${this.run.seed}`, width - 12, height - 12, {
+    const corner = this.run.custom
+      ? 'CUSTOM MAP'
+      : `${this.run.daily ? `DAILY ${this.run.daily} · ` : ''}LEVEL ${this.run.level} · SEED ${this.run.seed}`;
+    drawText(ctx, corner, width - 12, height - 12, {
       size: 11,
       color: THEME.colors.white,
       align: 'right',
@@ -188,13 +192,17 @@ export class PlayScene implements Scene {
 
   private start(): void {
     this.exit();
-    this.sim = createSimulation({ seed: this.run.seed, level: this.run.level });
+    // A hand-made map (Phase 13), or the run's next generated level.
+    const custom = this.run.custom ? decodeMap(this.run.custom) : null;
+    this.sim = custom
+      ? createCustomSimulation(custom)
+      : createSimulation({ seed: this.run.seed, level: this.run.level });
     this.world = new WorldRenderer(this.sim, DIFFICULTIES[this.run.difficulty].ghostAlpha);
     this.display = new RoundDisplay(this.camera, this.world);
     this.audio = new AudioDirector(this.sim, this.display.output(this.app.sound));
     this.popup = null;
     this.recorder = new ReplayRecorder(this.sim, this.run.seed);
-    const prompts = levelDef(this.run.level).tutorial;
+    const prompts = custom ? undefined : levelDef(this.run.level).tutorial;
     if (prompts) this.tutorial = new Tutorial(this.sim, prompts, () => this.app.input.usingTouch);
     this.endedAt = null;
     this.sim.events.on('roundEnded', (e) => (this.endedAt = e.time));
@@ -223,7 +231,12 @@ export class PlayScene implements Scene {
     const alpha = Math.min(1, (BANNER_TIME - time) / 0.6, time / 0.3);
     const { width, height } = this.app.viewport;
     const { hunters, rules, layout } = this.sim.state;
-    drawText(ctx, `LEVEL ${this.run.level}`, width / 2, height * 0.3, {
+    const title = this.run.custom
+      ? 'CUSTOM MAP'
+      : this.run.daily
+        ? `DAILY ${this.run.daily} · LEVEL ${this.run.level}`
+        : `LEVEL ${this.run.level}`;
+    drawText(ctx, title, width / 2, height * 0.3, {
       size: 34,
       color: THEME.colors.cyan,
       align: 'center',
@@ -236,7 +249,7 @@ export class PlayScene implements Scene {
     if (rules.pingCooldown !== GAME.abilities.ping.cooldown)
       parts.push(`PING ${rules.pingCooldown}s`);
     const scale = layout.tiles.width / (GAME.map.cellsX * 2 + 1);
-    if (scale > 1.01) parts.push(`MAP +${Math.round((scale - 1) * 100)}%`);
+    if (scale > 1.01 && !this.run.custom) parts.push(`MAP +${Math.round((scale - 1) * 100)}%`);
     parts.push(DIFFICULTIES[this.run.difficulty].label);
     drawText(ctx, parts.join(' · '), width / 2, height * 0.3 + 28, {
       size: 13,

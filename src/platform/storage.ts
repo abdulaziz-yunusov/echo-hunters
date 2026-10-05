@@ -33,6 +33,8 @@ export interface SaveData {
   duelBestOf: number;
   /** Last arena variant (or RANDOM) picked in the duel lobby (Phase 30). */
   duelVariant: VariantChoice;
+  /** Best Daily Seed score (Phase 13), for that day only. */
+  dailyBest: { date: string; score: number } | null;
 }
 
 const KEY = 'pulse-echo-hunters';
@@ -48,6 +50,7 @@ function defaults(): SaveData {
     duelBot: DEFAULT_DUEL_BOT,
     duelBestOf: GAME.duel.series.defaultBestOf,
     duelVariant: DEFAULT_VARIANT_CHOICE,
+    dailyBest: null,
   };
 }
 
@@ -77,6 +80,15 @@ export function updateSave(changes: Partial<Omit<SaveData, 'version'>>): SaveDat
   return next;
 }
 
+/** Record a Daily Seed run's score (Phase 13). Returns that day's best and whether this beat it. */
+export function submitDaily(date: string, score: number): { best: number; isNew: boolean } {
+  const { dailyBest } = loadSave();
+  const before = dailyBest?.date === date ? dailyBest.score : -1;
+  if (score <= before) return { best: before, isNew: false };
+  updateSave({ dailyBest: { date, score } });
+  return { best: score, isNew: true };
+}
+
 /** Record a run score. Returns the high score and whether this beat it. */
 export function submitScore(score: number): { highScore: number; isNew: boolean } {
   const { highScore } = loadSave();
@@ -103,6 +115,10 @@ function migrate(data: Record<string, unknown>): SaveData {
   }
   if ((VARIANT_CHOICES as readonly unknown[]).includes(data.duelVariant)) {
     result.duelVariant = data.duelVariant as VariantChoice;
+  }
+  const daily = data.dailyBest as { date?: unknown; score?: unknown } | null | undefined;
+  if (daily && typeof daily.date === 'string' && typeof daily.score === 'number') {
+    result.dailyBest = { date: daily.date, score: daily.score };
   }
   result.bindings = validBindings(data.bindings);
   result.display = validDisplay(data.display);

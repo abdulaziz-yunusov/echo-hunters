@@ -27,6 +27,7 @@ describe('save data', () => {
       duelBot: 'normal',
       duelBestOf: 3,
       duelVariant: 'classic',
+      dailyBest: null,
     });
   });
 

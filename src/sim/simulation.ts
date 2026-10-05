@@ -30,6 +30,9 @@ import { updateStones } from './systems/stones';
 import { buildWallGeometry, type WallGeometry } from './world/edges';
 import { generateMap, mapOptionsFromConfig, type MapLayout } from './world/mapGen';
 import { placeEmitters } from './world/emitterPlacement';
+import { customRound, type CustomMap, type CustomRound } from './world/customMap';
+import type { Emitter } from './entities/emitter';
+import { EMITTER_TYPES } from '@/config/emitters';
 import { duelPickupCounts, placePickups } from './world/pickupPlacement';
 
 /** Hunter ids start here (the player is 1). */
@@ -52,6 +55,8 @@ export interface SimulationOptions {
   variant?: DuelVariantId;
   /** Duel: cores to carry to the beacon (default GAME.duel.coresToWin). */
   coresToWin?: number;
+  /** A hand-made map (Phase 13): pickups and emitters exactly where they were put. */
+  placed?: Pick<CustomRound, 'pickups' | 'emitters'>;
 }
 
 /**
@@ -78,7 +83,14 @@ export class Simulation implements SimContext {
     };
     const def = levelDef(level);
     const hunterTypes = options.hunters ?? def.hunters;
-    const pickups = placePickups(layout, options.pickups ?? def.pickups);
+    const pickups = options.placed
+      ? options.placed.pickups.map((p, i) => ({
+          id: i + 1,
+          type: p.type,
+          ...tiles.center(p.at),
+          collected: false,
+        }))
+      : placePickups(layout, options.pickups ?? def.pickups);
     const pickupTiles = pickups.map((p) => ({ tx: tiles.toTile(p.x), ty: tiles.toTile(p.y) }));
 
     this.state = {
@@ -119,7 +131,9 @@ export class Simulation implements SimContext {
       cores: createCores(layout.cores.map((c) => tiles.center(c))),
       beacon: createBeacon(tiles.center(layout.beacon)),
       pickups,
-      emitters: placeEmitters(layout, options.emitters ?? def.emitters ?? {}, pickupTiles),
+      emitters: options.placed
+        ? placedEmitters(layout, options.placed.emitters)
+        : placeEmitters(layout, options.emitters ?? def.emitters ?? {}, pickupTiles),
       stones: [],
       nextStoneId: 1,
       traps: [],
@@ -219,6 +233,31 @@ export function createSimulation({
   const options = mapOptionsFromConfig(levelSeed(seed, level), { scale: levelMapScale(level) });
   const layout = generateMap(options);
   return new Simulation(layout, buildWallGeometry(layout.tiles), { level, hunters });
+}
+
+/**
+ * Play a hand-made map (Phase 13): its own hunters, pickups and emitters,
+ * with level 1's rules. Deterministic: the map's text is its seed.
+ */
+export function createCustomSimulation(map: CustomMap): Simulation {
+  const round = customRound(map);
+  return new Simulation(round.layout, buildWallGeometry(round.layout.tiles), {
+    level: 1,
+    hunters: round.hunters,
+    placed: round,
+  });
+}
+
+/** Vents and pipes where the map put them, each starting its cycle at a seeded point. */
+function placedEmitters(layout: MapLayout, at: CustomRound['emitters']): Emitter[] {
+  const rng = new Rng(deriveSeed(layout.seed, 'emitters'));
+  return at.map((e, i) => ({
+    id: i + 1,
+    type: e.type,
+    ...layout.tiles.center(e.at),
+    timer: rng.range(0, EMITTER_TYPES[e.type].period),
+    activeLeft: 0,
+  }));
 }
 
 /**

@@ -29,6 +29,8 @@ export interface InputFrame {
   confirm: boolean;
   /** Mouse button pressed this tick (also sets confirm); menus use it with `aim`. */
   click: boolean;
+  /** The click (mouse button or finger) is still down (Phase 13: drag to paint in the editor). */
+  clickHeld: boolean;
   back: boolean;
   pause: boolean;
   toggleDebug: boolean;
@@ -56,6 +58,7 @@ export const EMPTY_INPUT: Readonly<InputFrame> = {
   useTool: false,
   confirm: false,
   click: false,
+  clickHeld: false,
   back: false,
   pause: false,
   toggleDebug: false,

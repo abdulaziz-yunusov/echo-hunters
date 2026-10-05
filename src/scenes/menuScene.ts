@@ -3,6 +3,7 @@ import { THEME } from '@/config/theme';
 import type { InputFrame } from '@/input/inputFrame';
 import { randomSeed, seedFromUrl } from '@/platform/seed';
 import { isTouchDevice } from '@/platform/device';
+import { dailyDate, dailySeed } from '@/platform/daily';
 import { loadSave, updateSave } from '@/platform/storage';
 import { drawText } from '@/render/text';
 import { MenuList, ROW_HEIGHT } from '@/ui/menuList';
@@ -31,6 +32,16 @@ export class MenuScene implements Scene {
     this.difficulty = save.difficulty;
     this.menu = new MenuList([
       { kind: 'action', label: 'PLAY SOLO', onSelect: () => this.play() },
+      // Phase 13: today's run, the same for everyone.
+      {
+        kind: 'action',
+        label: 'DAILY RUN',
+        value: () => {
+          const best = loadSave().dailyBest;
+          return best?.date === dailyDate() ? `BEST ${best.score}` : dailyDate();
+        },
+        onSelect: () => this.daily(),
+      },
       { kind: 'action', label: 'DUEL (1v1)', onSelect: () => app.goTo('duelLobby') },
       {
         kind: 'adjust',
@@ -38,6 +49,7 @@ export class MenuScene implements Scene {
         value: () => DIFFICULTIES[this.difficulty].label,
         onChange: (step) => this.cycleDifficulty(step),
       },
+      { kind: 'action', label: 'MAP EDITOR', onSelect: () => app.goTo('editor', {}) },
       { kind: 'action', label: 'HOW TO PLAY', onSelect: () => app.open('howToPlay') },
       { kind: 'action', label: 'SETTINGS', onSelect: () => app.open('settings') },
     ]);
@@ -114,6 +126,11 @@ export class MenuScene implements Scene {
 
   private play(): void {
     this.app.goTo('play', { run: newRun(seedFromUrl() ?? randomSeed(), this.difficulty) });
+  }
+
+  private daily(): void {
+    const date = dailyDate();
+    this.app.goTo('play', { run: newRun(dailySeed(date), this.difficulty, { daily: date }) });
   }
 
   private cycleDifficulty(step: number): void {
