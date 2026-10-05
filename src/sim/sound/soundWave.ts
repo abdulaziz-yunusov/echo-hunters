@@ -44,6 +44,8 @@ export interface SoundOptions {
   dir?: number;
   /** A fake footstep from Decoy Steps. */
   decoy?: boolean;
+  /** The round's sound rules (Phase 30): × on the ring radius and on the speed. */
+  scale?: { rings: number; speed: number };
 }
 
 export function createWave(
@@ -54,7 +56,7 @@ export function createWave(
   y: number,
   owner: EntityId | null,
   time: number,
-  { focus = { x, y }, dir = 0, decoy = false }: SoundOptions = {},
+  { focus = { x, y }, dir = 0, decoy = false, scale = { rings: 1, speed: 1 } }: SoundOptions = {},
 ): SoundWave {
   const def = SOUND_KINDS[kind];
   const halfAngle = arcHalfAngle(kind);
@@ -66,10 +68,10 @@ export function createWave(
     y,
     owner,
     startTime: time,
-    maxRadius: def.maxRadius,
-    speed: def.speed,
+    maxRadius: def.maxRadius * scale.rings,
+    speed: def.speed * scale.speed,
     radius: 0,
-    polygon: visibilityPolygon(walls, x, y, def.maxRadius, arc),
+    polygon: visibilityPolygon(walls, x, y, def.maxRadius * scale.rings, arc),
     focusX: focus.x,
     focusY: focus.y,
     arc,

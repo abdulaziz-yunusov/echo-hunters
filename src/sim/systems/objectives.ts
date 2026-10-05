@@ -22,7 +22,7 @@ export function updateObjectives(ctx: SimContext, player: Player, dt: number): v
     core.humTimer -= dt;
     if (core.humTimer <= 0) {
       ctx.emitSound('coreHum', core.x, core.y, null);
-      core.humTimer += cfg.coreHumInterval;
+      core.humTimer += state.rules.coreHumInterval;
     }
   }
 

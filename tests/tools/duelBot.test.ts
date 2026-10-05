@@ -328,6 +328,8 @@ describe('duel balance', () => {
       drops: 0,
       tools: {},
       toolUses: 0,
+      variant: 'classic',
+      overtime: false,
       ...r,
     });
     const stats = summarize([
@@ -348,6 +350,7 @@ describe('duel balance', () => {
       meanDrops: 0.25,
       timeouts: 1,
       meanToolUses: 0.5,
+      overtime: 0,
       // Per tool, the decided rounds in which it was picked up, and how often its picker won.
       toolWins: {
         trapKit: { rounds: 1, pickerWins: 1 },
@@ -375,6 +378,8 @@ describe('duel balance', () => {
       drops: 0,
       tools: {},
       toolUses: 0,
+      variant: 'classic',
+      overtime: false,
     });
     const stats = summarize(
       [round(['hard', 'easy'], 1), round(['easy', 'hard'], 2), round(['easy', 'hard'], 1)],

@@ -154,6 +154,12 @@ export const GAME = {
     hunters: ['stalker'] as HunterTypeId[],
     /** No hearts: duels have no HP. */
     pickups: { stoneBag: 2, silentBoots: 1 },
+    /**
+     * Overtime (Phase 30): nobody has extracted by `at` s, so it's sudden
+     * death. Cores needed drops to `coresToWin`, loose cores hum
+     * `humSpeedup` times as often, and one more `hunter` wakes at the beacon.
+     */
+    overtime: { at: 240, coresToWin: 1, humSpeedup: 2, hunter: 'stalker' as HunterTypeId },
     /** Tools on each duel map, picked from DUEL_TOOLS by the seed (Phase 29). */
     toolsPerMap: 2,
     /** Sound cover in the arena (Phase 17). */

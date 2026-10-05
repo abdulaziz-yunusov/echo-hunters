@@ -123,6 +123,28 @@ describe('duel series', () => {
     expect(new Set([DUEL_SEED, second.seed, third.seed, rematch.seed]).size).toBe(4);
   });
 
+  it('variants (Phase 30): RANDOM gives each round a new one, the same on both sides', () => {
+    const s = seriesPair(5, 2, 'random');
+    expect(s.client.variant).toBe(s.host.variant);
+    const seen = [s.host.variant];
+    const winners = ['host', 'client', 'host', 'client', 'host'] as const;
+    for (const [i, winner] of winners.entries()) {
+      playRound(s, i === 0 ? DUEL_SEED : (s.host.upcoming?.seed ?? DUEL_SEED), winner);
+      if (s.host.over) break;
+      bothReady(s);
+      const next = begin(s);
+      expect(next.variant).not.toBe(seen.at(-1)); // never twice in a row
+      expect(s.client.variant).toBe(next.variant);
+      seen.push(next.variant);
+    }
+    expect(new Set(seen).size).toBeGreaterThan(1);
+
+    const fixed = seriesPair(3, 2, 'heavyAir');
+    playRound(fixed, DUEL_SEED, 'host');
+    bothReady(fixed);
+    expect(begin(fixed).variant).toBe('heavyAir');
+  });
+
   it('a best of 1 is over after one round, and READY means a rematch', () => {
     const s = seriesPair(1);
     playRound(s, DUEL_SEED, 'client');

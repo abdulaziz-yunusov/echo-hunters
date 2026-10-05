@@ -491,19 +491,31 @@ describe('screen flow', () => {
       t.app.goTo('menu');
       t.choose(1); // DUEL
       expect(t.current()).toBe('DuelLobby');
-      for (let i = 0; i < 4; i++) t.press({ navY: 1 }); // HOST, SERIES, JOIN, PRACTICE, BOT
+      // HOST, SERIES, VARIANT, JOIN, PRACTICE, BOT
+      for (let i = 0; i < 5; i++) t.press({ navY: 1 });
       t.press({ navX: 1 }); // NORMAL → HARD
       expect(loadSave().duelBot).toBe('hard');
-      t.press({ navY: -3 }); // SERIES
+      t.press({ navY: -4 }); // SERIES
       t.press({ navX: 1 }); // BEST OF 3 → 5
       expect(loadSave().duelBestOf).toBe(5);
-      t.press({ navY: 3 }); // back to BOT
-      t.press({ navY: -1 });
-      t.press({ confirm: true }); // PRACTICE VS BOT
+      t.press({ navY: 1 }); // VARIANT
+      t.press({ navX: -1 }); // CLASSIC → RANDOM (wraps)
+      expect(loadSave().duelVariant).toBe('random');
+      t.press({ navX: -1 }); // RANDOM → ECHO CHAMBER
+      expect(loadSave().duelVariant).toBe('echoChamber');
+      t.press({ navY: 2 }); // PRACTICE VS BOT
+      t.press({ confirm: true });
       expect(t.current()).toBe('Duel');
-      const duel = t.scenes.current as unknown as { practice: string; rival: unknown };
+      const duel = t.scenes.current as unknown as {
+        practice: string;
+        rival: unknown;
+        variant: string;
+        sim: Simulation;
+      };
       expect(duel.practice).toBe('hard');
       expect(duel.rival).not.toBeNull();
+      expect(duel.variant).toBe('echoChamber');
+      expect(duel.sim.state.rules.soundHearing).toBe(1.5);
       t.render();
     } finally {
       vi.unstubAllGlobals();

@@ -58,7 +58,20 @@ export interface MapLayout {
 /** Map options from CONFIG. `scale` grows both dimensions (endless levels). */
 export function mapOptionsFromConfig(
   seed: number,
-  { players = 1, scale = 1 }: { players?: 1 | 2; scale?: number } = {},
+  {
+    players = 1,
+    scale = 1,
+    cores,
+    coresToWin,
+    rooms,
+  }: {
+    players?: 1 | 2;
+    scale?: number;
+    cores?: number;
+    coresToWin?: number;
+    /** Room count (duel variants, Phase 30); the size stays GAME.map.rooms'. */
+    rooms?: { min: number; max: number };
+  } = {},
 ): MapGenOptions {
   const { map } = GAME;
   return {
@@ -67,13 +80,13 @@ export function mapOptionsFromConfig(
     cellsY: Math.round(map.cellsY * scale),
     tileSize: map.tileSize,
     loopRatio: map.loopRatio,
-    rooms: map.rooms,
-    coreCount: GAME.objectives.coresPerLevel,
+    rooms: rooms ? { ...map.rooms, ...rooms } : map.rooms,
+    coreCount: cores ?? GAME.objectives.coresPerLevel,
     hunterSpawnMinTiles: HUNTER_COMMON.spawnMinTiles,
     hunterSpawnsNeeded: ENDLESS.maxHunters,
     players,
     beaconMaxStepDifference: GAME.duel.beaconMaxStepDifference,
-    duelCoresToWin: GAME.duel.coresToWin,
+    duelCoresToWin: coresToWin ?? GAME.duel.coresToWin,
     coreMaxRouteDifference: GAME.duel.coreMaxRouteDifference,
     maxAttempts: map.maxAttempts,
   };

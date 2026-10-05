@@ -75,6 +75,15 @@ export function drawHud(ctx: CanvasRenderingContext2D, state: GameState): void {
     });
     line += 18;
   }
+  if (duel && duel.overtimeAt !== null) {
+    // Overtime (Phase 30): sudden death.
+    drawText(ctx, `OVERTIME: ${duel.coresToWin} CORE WINS`, 12, line, {
+      size: 13,
+      color: THEME.colors.red,
+      glow: 8,
+    });
+    line += 18;
+  }
   if (duel && state.time < duel.seenUntil) {
     // The rival's flare (Phase 29): they can see you right now.
     drawText(ctx, 'YOU ARE SEEN', 12, line, {

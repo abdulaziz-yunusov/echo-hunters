@@ -39,6 +39,7 @@ export class AudioDirector {
       // Duel tools (Phase 29): your flare going up, or the rival's finding you.
       on('toolUsed', (e) => (e.tool === 'flare' ? this.ifMine(e.by, 'flare') : undefined)),
       on('flareSeen', centered('flare')),
+      on('overtimeStarted', centered('overtimeStarted')),
       // Duel (Phase 28): both players hear a steal and an extraction starting.
       on('coreStolen', centered('coreStolen')),
       on('extractStarted', centered('extractStarted')),
@@ -72,7 +73,8 @@ export class AudioDirector {
     const dx = sound.x - player.x;
     const dy = sound.y - player.y;
     const distance = Math.hypot(dx, dy);
-    const gain = def.volume * distanceGain(distance, def.range);
+    // The round's rules (Phase 30: Echo Chamber) carry sound further for the ears too.
+    const gain = def.volume * distanceGain(distance, def.range * this.sim.state.rules.soundHearing);
     if (gain <= 0.001) return;
 
     const muffled = distance > 1 && !hasLineOfSight(walls, sound.x, sound.y, player.x, player.y);

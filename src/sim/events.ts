@@ -54,6 +54,8 @@ export interface GameEvents {
   coreStolen: { by: EntityId; from: EntityId; x: number; y: number };
   /** Duel: a player's carried cores fell to the floor as new cores. */
   coresDropped: { by: EntityId; cores: { id: number; x: number; y: number }[] };
+  /** Duel (Phase 30): overtime began: sudden death. */
+  overtimeStarted: { time: number };
   /** Duel: someone extracted with enough cores. */
   duelEnded: { winner: EntityId };
 }

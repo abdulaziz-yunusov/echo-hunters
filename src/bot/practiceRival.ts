@@ -1,3 +1,4 @@
+import type { DuelVariantId } from '@/config/duel';
 import type { DuelBotId } from '@/config/duelBots';
 import { GAME } from '@/config/game';
 import { deriveSeed } from '@/core/rng';
@@ -21,10 +22,10 @@ export class PracticeRival {
   private readonly net: NetSession;
   private readonly bot: DuelBot;
 
-  constructor(seed: number, level: DuelBotId) {
+  constructor(seed: number, level: DuelBotId, variant: DuelVariantId = 'classic') {
     this.link = createLoopbackPair(GAME.duel.practiceLagTicks);
     this.transport = this.link.a;
-    this.sim = createDuelSimulation({ seed, role: 'client' });
+    this.sim = createDuelSimulation({ seed, role: 'client', variant });
     this.net = new NetSession(this.sim, this.link.b);
     this.bot = new DuelBot(this.sim, { level, seed: deriveSeed(seed, 'practice-bot') });
   }

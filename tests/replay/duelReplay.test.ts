@@ -10,10 +10,39 @@ import {
 } from '@/replay/replay';
 import { toWire } from '@/replay/wire';
 import { isTool } from '@/config/pickups';
+import { GAME } from '@/config/game';
+import { SOUND_KINDS } from '@/config/sounds';
+import { fromWire } from '@/replay/wire';
 import { ReplayRecorder } from '@/replay/recorder';
 import { duel, DUEL_SEED, flushLink, recordedDuel, teleport } from '../helpers/duel';
 
 describe('duel recording (Phase 25)', () => {
+  it("holds the variant and the overtime, and rebuilds the variant's rings (Phase 30)", () => {
+    const overtime = GAME.duel.overtime as { at: number };
+    const at = overtime.at;
+    overtime.at = 1;
+    try {
+      const d = duel(2, [], DUEL_SEED, 'echoChamber');
+      const recorder = new ReplayRecorder(d.host, DUEL_SEED);
+      d.afterHostStep.push(() => recorder.afterStep());
+      d.step({ ping: true }, {}, 1);
+      d.step({}, {}, 90);
+      const replay = recorder.finish();
+      expect(replay.duel).toMatchObject({ variant: 'echoChamber' });
+      expect(replay.duel!.overtimeAt).toBeCloseTo(1, 1);
+      expect(replay.marks.some((m) => m.kind === 'overtime')).toBe(true);
+      const { layout, walls } = d.host.state;
+      const back = fromWire(toWire(replay), layout, walls);
+      expect(back.duel!.variant).toBe('echoChamber');
+      expect(back.duel!.overtimeAt).toBeCloseTo(replay.duel!.overtimeAt!, 3);
+      const ping = (r: Replay) => r.sounds.find((s) => s.kind === 'ping')!;
+      expect(ping(back).maxRadius).toBeCloseTo(ping(replay).maxRadius);
+      expect(ping(back).maxRadius).toBeCloseTo(SOUND_KINDS.ping.maxRadius * 1.5);
+    } finally {
+      overtime.at = at;
+    }
+  });
+
   it('a tool swapped out mid-round shows up in the debrief from that moment (Phase 29)', () => {
     const { host, client, settle, afterHostStep } = duel(2);
     const recorder = new ReplayRecorder(host, DUEL_SEED);

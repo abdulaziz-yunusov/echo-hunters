@@ -52,7 +52,14 @@ export class ReplayRecorder {
       beacon: { x: state.beacon.x, y: state.beacon.y, activeAt: null },
       outcome: null,
       duel: state.rival
-        ? { rivalId: state.rival.id, rival: emptyTrack(), winner: null, events: [] }
+        ? {
+            rivalId: state.rival.id,
+            rival: emptyTrack(),
+            winner: null,
+            events: [],
+            variant: state.duel?.variant ?? 'classic',
+            overtimeAt: null,
+          }
         : null,
     };
     this.listen();
@@ -146,6 +153,10 @@ export class ReplayRecorder {
         droppedBy.set(c.id, e.by);
       }
       r.duel?.events.push({ kind: 'drop', time: state.time, by: e.by });
+    });
+    on('overtimeStarted', (e) => {
+      if (r.duel) r.duel.overtimeAt = e.time;
+      mark('overtime', state.beacon.x, state.beacon.y);
     });
     on('duelEnded', (e) => {
       if (r.duel) r.duel.winner = e.winner;

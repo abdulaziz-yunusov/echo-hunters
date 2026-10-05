@@ -19,6 +19,7 @@ export const SYNTHS = [
   'carryHum',
   'trapSnap',
   'hiss',
+  'overtime',
   'vent',
   'drip',
   'scream',
@@ -82,6 +83,8 @@ export const AUDIO_EVENTS = {
   coreStolen: { synth: 'steal', volume: 0.7 },
   /** Duel (Phase 29): you fired a flare, or the rival's flare found you. */
   flare: { synth: 'hiss', volume: 0.6 },
+  /** Duel (Phase 30): sudden death begins. */
+  overtimeStarted: { synth: 'overtime', volume: 0.8 },
   /** Duel: someone started extracting, heard by both. */
   extractStarted: { synth: 'extracting', volume: 0.6 },
   died: { synth: 'death', volume: 0.9 },

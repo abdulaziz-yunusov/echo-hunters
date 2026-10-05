@@ -213,6 +213,14 @@ export const SYNTHS: Record<SynthName, Synth> = {
     tone(ctx, out, 'triangle', 1320 * p, 1300 * p, 0, 0.18, 0.01, 0.7, 0.05);
   },
 
+  // Duel overtime (Phase 30): a low bell, struck twice.
+  overtime: (ctx, out) => {
+    for (const t of [0, 0.45]) {
+      tone(ctx, out, 'triangle', 110, 104, 1.2, 0.5, 0.005, 1.6, t);
+      tone(ctx, out, 'sine', 277, 270, 1.2, 0.2, 0.005, 1.2, t);
+    }
+  },
+
   // A flare burning: a long hiss.
   hiss: (ctx, out, n) => {
     noiseBurst(ctx, out, n, 'highpass', 4500, 0.5, 0.35, 0.05, 1.1);

@@ -47,7 +47,8 @@ export function scheduleHearing(state: GameState, wave: SoundWave): void {
 
     const ahead = waveFaces(wave, hunter.x, hunter.y);
     const reach = ahead ? sound.hearRadius : (sound.sideHearRadius ?? sound.hearRadius);
-    const range = Math.min(reach, def.hearRange ?? Infinity);
+    // The round's rules (Phase 30) scale how far everything carries.
+    const range = Math.min(reach, def.hearRange ?? Infinity) * state.rules.soundHearing;
     const straight = Math.hypot(hunter.x - wave.x, hunter.y - wave.y);
     if (straight > range) continue;
 

@@ -1,3 +1,4 @@
+import { DUEL_VARIANTS, type DuelVariantId, type VariantMap } from '@/config/duel';
 import { GAME } from '@/config/game';
 import type { HunterTypeId } from '@/config/hunters';
 import type { LevelDef } from '@/config/levels';
@@ -13,6 +14,7 @@ import type { GameEvents } from './events';
 import type { GameState, SimContext, SimMode } from './gameState';
 import { levelDef, levelMapScale } from './level';
 import type { PlayerInput } from './playerInput';
+import { buildRules } from './rules';
 import { deliverHearings, scheduleHearing } from './sound/hearing';
 import { createWave, growWaves, pruneWaves, type SoundOptions } from './sound/soundWave';
 import { updateAbilities } from './systems/abilities';
@@ -21,6 +23,7 @@ import { updateCombat } from './systems/combat';
 import { updateEmitters } from './systems/emitters';
 import { updateExtracting, updateObjectives } from './systems/objectives';
 import { updateTools } from './systems/tools';
+import { updateOvertime } from './systems/duel';
 import { updatePickups } from './systems/pickups';
 import { updatePlayerMovement } from './systems/playerMovement';
 import { updateStones } from './systems/stones';
@@ -45,6 +48,10 @@ export interface SimulationOptions {
   mode?: SimMode;
   /** Duel: the host starts in the guest's corner and the guest in the host's (series rounds alternate). */
   swapSpawns?: boolean;
+  /** Duel: the arena variant (Phase 30); its rule effects go into state.rules. */
+  variant?: DuelVariantId;
+  /** Duel: cores to carry to the beacon (default GAME.duel.coresToWin). */
+  coresToWin?: number;
 }
 
 /**
@@ -91,7 +98,7 @@ export class Simulation implements SimContext {
       mode,
       duel: duel
         ? {
-            coresToWin: GAME.duel.coresToWin,
+            coresToWin: options.coresToWin ?? GAME.duel.coresToWin,
             hitsToDrop: GAME.duel.hitsToDropCores,
             hits: {},
             winner: null,
@@ -100,6 +107,8 @@ export class Simulation implements SimContext {
             extracting: null,
             revealRivalUntil: 0,
             seenUntil: 0,
+            variant: options.variant ?? 'classic',
+            overtimeAt: null,
           }
         : null,
       hunters: hunterTypes.slice(0, layout.hunterSpawns.length).map((type, i) => {
@@ -118,7 +127,7 @@ export class Simulation implements SimContext {
       nextWaveId: 1,
       rng: new Rng(deriveSeed(layout.seed, 'ai')),
       hearings: [],
-      rules: { pingCooldown: def.overrides?.pingCooldown ?? GAME.abilities.ping.cooldown },
+      rules: buildRules({ level, variant: options.variant }),
       hearingModel: GAME.hearing.model,
       stats: { huntersStunned: 0, closeCalls: 0 },
     };
@@ -154,6 +163,7 @@ export class Simulation implements SimContext {
       updatePickups(this, s.player, dt);
       updateObjectives(this, s.player, dt);
       updateExtracting(this, s.player, dt);
+      updateOvertime(this);
       updateEmitters(this, dt);
       // A duel client copies the host's hunters and hits instead of running them.
       if (s.mode !== 'client') {
@@ -175,7 +185,11 @@ export class Simulation implements SimContext {
     options?: SoundOptions,
   ): void {
     const s = this.state;
-    const wave = createWave(s.walls, s.nextWaveId++, kind, x, y, owner, s.time, options);
+    const scale = { rings: s.rules.soundRings, speed: s.rules.soundSpeed };
+    const wave = createWave(s.walls, s.nextWaveId++, kind, x, y, owner, s.time, {
+      ...options,
+      scale,
+    });
     s.waves.push(wave);
     if (s.status === 'playing' && s.mode !== 'client') scheduleHearing(s, wave);
     this.events.emit('soundEmitted', { kind, x, y, owner, time: s.time, wave });
@@ -213,20 +227,30 @@ export function createSimulation({
 export function createDuelSimulation({
   seed,
   role,
-  hunters = GAME.duel.hunters,
+  hunters,
   swapSpawns = false,
+  variant = 'classic',
 }: {
   seed: number;
   role: 'host' | 'client';
+  /** Overrides the variant's (and GAME.duel's) hunters. */
   hunters?: readonly HunterTypeId[];
   /** Series rounds alternate corners (Phase 27). */
   swapSpawns?: boolean;
+  /** The arena variant (Phase 30): rule effects plus map settings. */
+  variant?: DuelVariantId;
 }): Simulation {
-  const layout = generateMap(mapOptionsFromConfig(seed, { players: 2 }));
+  const map: VariantMap = DUEL_VARIANTS[variant].map;
+  const coresToWin = map.coresToWin ?? GAME.duel.coresToWin;
+  const layout = generateMap(
+    mapOptionsFromConfig(seed, { players: 2, cores: map.cores, coresToWin, rooms: map.rooms }),
+  );
   return new Simulation(layout, buildWallGeometry(layout.tiles), {
     mode: role,
     swapSpawns,
-    hunters,
+    variant,
+    coresToWin,
+    hunters: hunters ?? map.hunters ?? GAME.duel.hunters,
     pickups: duelPickupCounts(layout.seed),
     emitters: GAME.duel.emitters,
   });

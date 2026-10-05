@@ -45,6 +45,7 @@ export const MARK_COLORS: Record<ReplayMarkKind, ColorKey> = {
   stun: 'orange',
   close: 'dim',
   end: 'white',
+  overtime: 'red',
 };
 
 /** The duel rival's path and dot (the HUD shows the rival in this color too). */

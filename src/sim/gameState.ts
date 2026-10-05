@@ -1,4 +1,6 @@
 import type { HearingModel } from '@/config/game';
+import type { DuelVariantId } from '@/config/duel';
+import type { Rules } from '@/config/rules';
 import type { SoundKindId } from '@/config/sounds';
 import type { EventBus } from '@/core/events';
 import type { Rng } from '@/core/rng';
@@ -15,10 +17,8 @@ import type { SoundOptions, SoundWave } from './sound/soundWave';
 import type { WallGeometry } from './world/edges';
 import type { MapLayout } from './world/mapGen';
 
-/** Tunables a level may change (LevelDef.overrides). */
-export interface LevelRules {
-  pingCooldown: number;
-}
+/** The round's rule values (config/rules.ts), built by sim/rules.ts. */
+export type LevelRules = Rules;
 
 /** How a round stands: running, or over and why ('lost' = the duel rival extracted first). */
 export type RoundStatus = 'playing' | 'extracted' | 'dead' | 'lost';
@@ -50,6 +50,10 @@ export interface DuelState {
   revealRivalUntil: number;
   /** The rival's flare shows this machine's player until then: YOU ARE SEEN (sim time). */
   seenUntil: number;
+  /** The round's arena variant (Phase 30). */
+  variant: DuelVariantId;
+  /** When overtime began (sim time); null before. */
+  overtimeAt: number | null;
 }
 
 /** A duel trap on the floor (Phase 29). Each side knows its own; the host knows all. */

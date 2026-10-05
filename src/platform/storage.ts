@@ -1,6 +1,7 @@
 import { AUDIO } from '@/config/audio';
 import { DEFAULT_DIFFICULTY, DIFFICULTIES, type DifficultyId } from '@/config/difficulty';
 import { DISPLAY, type DisplaySettings } from '@/config/display';
+import { DEFAULT_VARIANT_CHOICE, VARIANT_CHOICES, type VariantChoice } from '@/config/duel';
 import { GAME } from '@/config/game';
 import { DEFAULT_DUEL_BOT, DUEL_BOTS, type DuelBotId } from '@/config/duelBots';
 import { PALETTES } from '@/config/theme';
@@ -30,6 +31,8 @@ export interface SaveData {
   duelBot: DuelBotId;
   /** Last series length (best of N) a host picked in the duel lobby. */
   duelBestOf: number;
+  /** Last arena variant (or RANDOM) picked in the duel lobby (Phase 30). */
+  duelVariant: VariantChoice;
 }
 
 const KEY = 'pulse-echo-hunters';
@@ -44,6 +47,7 @@ function defaults(): SaveData {
     display: { ...DISPLAY.defaults },
     duelBot: DEFAULT_DUEL_BOT,
     duelBestOf: GAME.duel.series.defaultBestOf,
+    duelVariant: DEFAULT_VARIANT_CHOICE,
   };
 }
 
@@ -96,6 +100,9 @@ function migrate(data: Record<string, unknown>): SaveData {
   }
   if ((GAME.duel.series.bestOf as readonly unknown[]).includes(data.duelBestOf)) {
     result.duelBestOf = data.duelBestOf as number;
+  }
+  if ((VARIANT_CHOICES as readonly unknown[]).includes(data.duelVariant)) {
+    result.duelVariant = data.duelVariant as VariantChoice;
   }
   result.bindings = validBindings(data.bindings);
   result.display = validDisplay(data.display);

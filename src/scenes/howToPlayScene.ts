@@ -1,3 +1,4 @@
+import { DUEL_VARIANT_ORDER, DUEL_VARIANTS } from '@/config/duel';
 import { GAME } from '@/config/game';
 import { TOOLS } from '@/config/pickups';
 import type { HunterTypeId } from '@/config/hunters';
@@ -71,13 +72,36 @@ const DUEL_RULES: readonly [string, readonly string[]][] = [
   ],
 ];
 
-/** Rules, controls (as currently bound), the three hunters, and a few tips; a second page for duels. */
+/** The variants page (Phase 30): one line per arena variant, from DUEL_VARIANTS, then overtime. */
+const VARIANT_RULES: readonly [string, readonly string[]][] = [
+  [
+    'ARENA VARIANTS (THE HOST PICKS ONE, OR RANDOM: A NEW ONE EACH ROUND)',
+    DUEL_VARIANT_ORDER.map((v) => `${DUEL_VARIANTS[v].label}: ${DUEL_VARIANTS[v].blurb}`),
+  ],
+  [
+    'OVERTIME',
+    [
+      `Nobody out after ${GAME.duel.overtime.at / 60} minutes? Sudden death: ${GAME.duel.overtime.coresToWin} core is enough,`,
+      'loose cores hum twice as often, and one more Stalker wakes at the beacon.',
+    ],
+  ],
+];
+
+type Page = 'solo' | 'duel' | 'variants';
+const PAGES: readonly Page[] = ['solo', 'duel', 'variants'];
+const PAGE_LABELS: Record<Page, { title: string; button: string }> = {
+  solo: { title: 'HOW TO PLAY', button: 'SOLO RULES' },
+  duel: { title: 'DUEL IN THE DARK', button: 'DUEL RULES' },
+  variants: { title: 'DUEL VARIANTS', button: 'DUEL VARIANTS' },
+};
+
+/** Rules, controls (as currently bound), the three hunters, and a few tips; then the duel pages. */
 export class HowToPlayScene implements Scene {
   readonly name = 'HowToPlay';
   private readonly app: AppContext;
   private menu!: MenuList;
   private readonly keys: (action: Action) => string;
-  private page: 'solo' | 'duel' = 'solo';
+  private page: Page = 'solo';
 
   constructor(app: AppContext) {
     this.app = app;
@@ -87,11 +111,11 @@ export class HowToPlayScene implements Scene {
   }
 
   private buildMenu(): void {
-    const other = this.page === 'solo' ? 'duel' : 'solo';
+    const other = PAGES[(PAGES.indexOf(this.page) + 1) % PAGES.length];
     this.menu = new MenuList([
       {
         kind: 'action',
-        label: other === 'duel' ? 'DUEL RULES' : 'SOLO RULES',
+        label: `${PAGE_LABELS[other].button} ▸`,
         onSelect: () => {
           this.page = other;
           this.buildMenu();
@@ -119,14 +143,14 @@ export class HowToPlayScene implements Scene {
     const k = this.keys;
     let y = Math.max(56, height * 0.09);
 
-    drawTitle(ctx, this.page === 'solo' ? 'HOW TO PLAY' : 'DUEL IN THE DARK', cx, y);
+    drawTitle(ctx, PAGE_LABELS[this.page].title, cx, y);
     y += 40;
     const line = (text: string, color: string = white, alpha = 0.85, size = 13) => {
       drawText(ctx, text, left, y, { size, color, alpha });
       y += size + 9;
     };
-    if (this.page === 'duel') {
-      for (const [heading, lines] of DUEL_RULES) {
+    if (this.page !== 'solo') {
+      for (const [heading, lines] of this.page === 'duel' ? DUEL_RULES : VARIANT_RULES) {
         line(heading, THEME.colors.cyan, 1, 14);
         for (const text of lines) line(text);
         y += 8;

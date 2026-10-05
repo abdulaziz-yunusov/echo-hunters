@@ -26,6 +26,7 @@ describe('save data', () => {
       display: DISPLAY.defaults,
       duelBot: 'normal',
       duelBestOf: 3,
+      duelVariant: 'classic',
     });
   });
 

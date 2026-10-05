@@ -1,3 +1,4 @@
+import { DUEL_VARIANTS, type VariantChoice } from '@/config/duel';
 import { DUEL_BOTS, type DuelBotId } from '@/config/duelBots';
 import { THEME } from '@/config/theme';
 import type { InputFrame } from '@/input/inputFrame';
@@ -32,6 +33,8 @@ export interface DuelEndParams {
   viewerId?: number;
   /** The bot's level, if this was a practice duel (Phase 26). */
   practice?: DuelBotId;
+  /** Practice: the variant picked (or RANDOM), for PLAY AGAIN (Phase 30). */
+  practiceVariant?: VariantChoice;
   /** The online series this round belongs to (Phase 27). */
   series?: DuelSeries;
 }
@@ -185,7 +188,7 @@ export class DuelEndScene implements Scene {
     }
     return {
       title: won ? 'ROUND WON' : 'ROUND LOST',
-      line: `Round ${this.round} of best of ${series.bestOf} · ${score} · first to ${series.winsNeeded}`,
+      line: `Round ${this.round} of best of ${series.bestOf} · ${DUEL_VARIANTS[series.variant].label} · ${score} · first to ${series.winsNeeded}`,
       color,
     };
   }
@@ -195,7 +198,9 @@ export class DuelEndScene implements Scene {
     if (!series || this.params.outcome === 'disconnected') return null;
     if (series.rivalLeft) return 'Rival left.';
     if (this.countdown !== null) {
-      return `ROUND ${series.upcoming?.round ?? this.round + 1} STARTS IN ${Math.ceil(this.countdown)}`;
+      const next = series.upcoming;
+      const variant = next ? ` · ${DUEL_VARIANTS[next.variant].label}` : '';
+      return `ROUND ${next?.round ?? this.round + 1}${variant} STARTS IN ${Math.ceil(this.countdown)}`;
     }
     if (series.rivalIsReady && !series.ready) {
       return series.over ? 'Your rival wants a rematch.' : 'Your rival is ready.';
@@ -348,7 +353,12 @@ export class DuelEndScene implements Scene {
         {
           kind: 'action',
           label: 'PLAY AGAIN',
-          onSelect: () => app.goTo('duel', { practice, seed: randomSeed() }),
+          onSelect: () =>
+            app.goTo('duel', {
+              practice,
+              seed: randomSeed(),
+              variant: this.params.practiceVariant,
+            }),
         },
         { kind: 'action', label: 'DUEL MENU', onSelect: () => app.goTo('duelLobby') },
       );

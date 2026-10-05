@@ -2,6 +2,7 @@ import { GAME } from '@/config/game';
 import { HUNTER_COMMON } from '@/config/hunters';
 import { isTool, PICKUP_TYPES, type ToolId } from '@/config/pickups';
 import { setHunterState } from '../ai/hunterBrain';
+import { createHunter } from '../entities/hunter';
 import type { EntityId } from '../entities/entity';
 import type { Core } from '../entities/objectives';
 import type { Pickup } from '../entities/pickup';
@@ -148,6 +149,29 @@ function find(state: GameState, kind: TakeKind, id: number) {
   return kind === 'core'
     ? state.cores.find((c) => c.id === id)
     : state.pickups.find((p) => p.id === id);
+}
+
+// ─── Overtime (Phase 30) ────────────────────────────────────────────────────
+
+/**
+ * Nobody has extracted by `overtime.at`: sudden death. Both sides start
+ * it on their own clock (they run within a few ticks of each other) and
+ * make the same changes, so the extra hunter has the same id on both and
+ * the host's snapshots move it on the client.
+ */
+export function updateOvertime(ctx: SimContext): void {
+  const { state } = ctx;
+  const duel = state.duel;
+  const cfg = GAME.duel.overtime;
+  if (!duel || duel.overtimeAt !== null || state.time < cfg.at) return;
+  duel.overtimeAt = state.time;
+  duel.coresToWin = Math.min(duel.coresToWin, cfg.coresToWin);
+  state.rules.coreHumInterval /= cfg.humSpeedup;
+  const id = Math.max(99, ...state.hunters.map((h) => h.id)) + 1;
+  const hunter = createHunter(id, cfg.hunter, state.beacon.x, state.beacon.y);
+  state.hunters.push(hunter);
+  setHunterState(ctx, hunter, 'idle');
+  ctx.events.emit('overtimeStarted', { time: state.time });
 }
 
 // ─── Carried cores (Phase 28) ───────────────────────────────────────────────

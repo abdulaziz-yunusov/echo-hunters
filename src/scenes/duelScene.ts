@@ -1,6 +1,7 @@
 import { AudioDirector } from '@/audio/audioDirector';
 import { PracticeRival } from '@/bot/practiceRival';
 import { DIFFICULTIES } from '@/config/difficulty';
+import { DUEL_VARIANTS, type DuelVariantId, type VariantChoice } from '@/config/duel';
 import { DUEL_BOTS, type DuelBotId } from '@/config/duelBots';
 import { THEME } from '@/config/theme';
 import type { InputFrame } from '@/input/inputFrame';
@@ -14,6 +15,7 @@ import { drawText } from '@/render/text';
 import { WorldRenderer } from '@/render/worldRenderer';
 import { ReplayRecorder } from '@/replay/recorder';
 import type { Replay } from '@/replay/replay';
+import { pickVariant } from '@/sim/rules';
 import { createDuelSimulation, type Simulation } from '@/sim/simulation';
 import { MenuList } from '@/ui/menuList';
 import { drawMenu, drawTitle } from '@/ui/menuRenderer';
@@ -27,10 +29,16 @@ const END_DELAY = 2;
 const BANNER_TIME = 4;
 /** Seconds a cue such as "STEAL!" stays up. */
 const CUE_TIME = 1.6;
+/** Seconds the OVERTIME banner stays up (Phase 30). */
+const OVERTIME_BANNER = 4;
 
-/** A round of an online series (Phase 27), or practice against a bot (Phase 26). */
+/**
+ * A round of an online series (Phase 27; its variant comes from the series),
+ * or practice against a bot (Phase 26) with an arena variant or RANDOM.
+ */
 export type DuelParams =
-  { series: DuelSeries; seed: number } | { practice: DuelBotId; seed: number };
+  | { series: DuelSeries; seed: number }
+  | { practice: DuelBotId; seed: number; variant?: VariantChoice };
 
 /**
  * One duel (GDD §8). Like a solo level, but the other player is out there,
@@ -54,6 +62,9 @@ export class DuelScene implements Scene {
   /** The bot's side of a practice duel; null online. */
   private readonly rival: PracticeRival | null;
   private readonly practice: DuelBotId | null;
+  /** Practice: what was picked (one variant or RANDOM), for PLAY AGAIN. */
+  private readonly practiceChoice: VariantChoice;
+  private readonly variant: DuelVariantId;
   /** The online series this round belongs to; null in practice. */
   private readonly series: DuelSeries | null;
   /** The host records the round for both players' debrief (Phase 25). */
@@ -71,7 +82,9 @@ export class DuelScene implements Scene {
     this.app = app;
     this.practice = 'practice' in params ? params.practice : null;
     this.series = 'series' in params ? params.series : null;
-    this.rival = this.practice ? new PracticeRival(params.seed, this.practice) : null;
+    this.practiceChoice = ('variant' in params ? params.variant : undefined) ?? 'classic';
+    this.variant = this.series?.variant ?? pickVariant(this.practiceChoice, params.seed);
+    this.rival = this.practice ? new PracticeRival(params.seed, this.practice, this.variant) : null;
     const transport = this.series?.transport ?? this.rival!.transport;
     this.role = this.series?.role ?? 'host';
     this.camera = new Camera(app.viewport);
@@ -79,8 +92,11 @@ export class DuelScene implements Scene {
       seed: params.seed,
       role: this.role,
       swapSpawns: this.series?.swapSpawns ?? false,
+      variant: this.variant,
     });
-    this.world = new WorldRenderer(this.sim, DIFFICULTIES.easy.ghostAlpha);
+    // Blackout (Phase 30) sets its own; otherwise duels keep Easy's faint explored walls.
+    const ghost = this.sim.state.rules.ghostAlpha ?? DIFFICULTIES.easy.ghostAlpha;
+    this.world = new WorldRenderer(this.sim, ghost);
     this.display = new RoundDisplay(this.camera, this.world);
     this.audio = new AudioDirector(this.sim, this.display.output(app.sound));
     this.net = new NetSession(this.sim, transport, this.series?.round ?? 1);
@@ -122,7 +138,7 @@ export class DuelScene implements Scene {
     ]);
     const who = this.practice ? `practice vs ${this.practice} bot` : this.role;
     const round = this.series ? `, round ${this.series.round}/${this.series.bestOf}` : '';
-    app.debug.watch('duel', `${who}, seed ${params.seed}${round}`);
+    app.debug.watch('duel', `${who}, seed ${params.seed}${round}, ${this.variant}`);
   }
 
   /** Practice only: a hidden tab opens the menu, which pauses. */
@@ -163,6 +179,7 @@ export class DuelScene implements Scene {
         replay: this.replay ?? undefined,
         viewerId: state.player.id,
         practice: this.practice ?? undefined,
+        practiceVariant: this.practiceChoice,
         series: this.series ?? undefined,
       });
       return;
@@ -199,10 +216,38 @@ export class DuelScene implements Scene {
   }
 
   private bannerTitle(): string {
-    if (this.practice) return `PRACTICE · ${DUEL_BOTS[this.practice].label} BOT`;
+    const variant = this.variant === 'classic' ? '' : ` · ${DUEL_VARIANTS[this.variant].label}`;
+    if (this.practice) return `PRACTICE · ${DUEL_BOTS[this.practice].label} BOT${variant}`;
     const series = this.series;
-    if (!series || series.bestOf === 1) return 'DUEL';
-    return `ROUND ${series.round} · BEST OF ${series.bestOf}`;
+    if (!series || series.bestOf === 1) return `DUEL${variant}`;
+    return `ROUND ${series.round} · BEST OF ${series.bestOf}${variant}`;
+  }
+
+  /** Overtime (Phase 30): a banner when sudden death begins. */
+  private drawOvertime(ctx: CanvasRenderingContext2D, width: number, height: number): void {
+    const { duel, time } = this.sim.state;
+    const since = duel?.overtimeAt === null || !duel ? null : time - duel.overtimeAt;
+    if (since === null || since > OVERTIME_BANNER || this.menuOpen) return;
+    const a = Math.min(1, since / 0.2, (OVERTIME_BANNER - since) / 0.6);
+    drawText(ctx, 'OVERTIME', width / 2, height * 0.3, {
+      size: 40,
+      color: THEME.colors.red,
+      align: 'center',
+      glow: THEME.glowBlur * 2,
+      alpha: a,
+    });
+    drawText(
+      ctx,
+      'SUDDEN DEATH: carry 1 core to the beacon. Another Stalker is loose.',
+      width / 2,
+      height * 0.3 + 30,
+      {
+        size: 13,
+        color: THEME.colors.white,
+        align: 'center',
+        alpha: a * 0.85,
+      },
+    );
   }
 
   private cornerLabel(): string {
@@ -232,6 +277,7 @@ export class DuelScene implements Scene {
     this.display.draw(ctx, width, height, focus);
     drawHud(ctx, state);
     this.drawCue(ctx, width, state.time);
+    this.drawOvertime(ctx, width, height);
     if (state.time < BANNER_TIME && !this.menuOpen) {
       const a = Math.min(1, (BANNER_TIME - state.time) / 0.6);
       const title = this.bannerTitle();
@@ -242,18 +288,12 @@ export class DuelScene implements Scene {
         glow: THEME.glowBlur,
         alpha: a,
       });
-      drawText(
-        ctx,
-        'Carry 2 cores to the beacon first. Two hits and you drop them.',
-        width / 2,
-        height * 0.3 + 28,
-        {
-          size: 13,
-          color: THEME.colors.white,
-          align: 'center',
-          alpha: a * 0.8,
-        },
-      );
+      drawText(ctx, DUEL_VARIANTS[this.variant].blurb, width / 2, height * 0.3 + 28, {
+        size: 13,
+        color: THEME.colors.white,
+        align: 'center',
+        alpha: a * 0.8,
+      });
     }
     const corner = this.cornerLabel();
     drawText(ctx, corner, width - 12, height - 12, {

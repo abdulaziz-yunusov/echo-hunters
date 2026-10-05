@@ -1,3 +1,4 @@
+import type { DuelVariantId } from '@/config/duel';
 import { EMITTER_TYPES, type EmitterTypeId } from '@/config/emitters';
 import type { HunterTypeId } from '@/config/hunters';
 import type { PickupTypeId } from '@/config/pickups';
@@ -34,7 +35,16 @@ export interface ReplayHunter {
   track: ReplayTrack;
 }
 
-export type ReplayMarkKind = 'core' | 'pickup' | 'beacon' | 'hit' | 'stun' | 'close' | 'end';
+export type ReplayMarkKind =
+  | 'core'
+  | 'pickup'
+  | 'beacon'
+  | 'hit'
+  | 'stun'
+  | 'close'
+  | 'end'
+  /** Duel overtime began (Phase 30). */
+  | 'overtime';
 
 /** Something worth pointing out on the timeline. */
 export interface ReplayMark {
@@ -80,6 +90,10 @@ export interface ReplayDuel {
   rival: ReplayTrack;
   winner: number | null;
   events: DuelEvent[];
+  /** The round's arena variant (Phase 30): the debrief shows it, and its sound rules rebuild the rings. */
+  variant: DuelVariantId;
+  /** When overtime began; null if it never did. */
+  overtimeAt: number | null;
 }
 
 /**

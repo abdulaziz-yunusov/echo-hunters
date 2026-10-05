@@ -1,4 +1,6 @@
+import type { DuelVariantId, VariantChoice } from '@/config/duel';
 import { GAME } from '@/config/game';
+import { pickVariant } from '@/sim/rules';
 import type { DuelStatsTable } from '@/replay/duelStats';
 import { GUEST_ID, PLAYER_ID, type EntityId } from '@/sim/entities/entity';
 import type { NetMessage } from './protocol';
@@ -18,6 +20,8 @@ export interface UpcomingRound {
   round: number;
   /** Seconds to wait before it starts (0 for a rematch). */
   countdown: number;
+  /** Its arena variant (Phase 30). */
+  variant: DuelVariantId;
 }
 
 /**
@@ -36,6 +40,10 @@ export class DuelSeries {
   readonly bestOf: number;
   /** The current (or just finished) round, from 1. */
   round = 1;
+  /** The current (or just finished) round's arena variant (Phase 30). */
+  variant: DuelVariantId;
+  /** Host: what the lobby picked, one variant or 'random' (a new one each round). */
+  private readonly choice: VariantChoice;
   private results: RoundResult[] = [];
   private meReady = false;
   private rivalReady = false;
@@ -48,9 +56,15 @@ export class DuelSeries {
     role: 'host' | 'client',
     bestOf: number,
     newSeed: () => number,
+    variants: { choice: VariantChoice; first: DuelVariantId } = {
+      choice: 'classic',
+      first: 'classic',
+    },
   ) {
     this.transport = transport;
     this.role = role;
+    this.choice = variants.choice;
+    this.variant = variants.first;
     this.bestOf = bestOf;
     this.newSeed = newSeed;
     transport.onMessage((m) => this.receive(m));
@@ -139,6 +153,7 @@ export class DuelSeries {
     if (!next) return null;
     this.announced = null;
     this.round = next.round;
+    this.variant = next.variant;
     return next;
   }
 
@@ -154,7 +169,7 @@ export class DuelSeries {
       this.rivalReady = true;
       this.startIfBothReady();
     } else if (m.t === 'next' && this.role === 'client') {
-      this.announce({ seed: m.seed, round: m.round, countdown: m.countdown });
+      this.announce({ seed: m.seed, round: m.round, countdown: m.countdown, variant: m.variant });
     } else if (m.t === 'bye') {
       this.left = true;
     }
@@ -164,10 +179,13 @@ export class DuelSeries {
   private startIfBothReady(): void {
     if (this.role !== 'host' || !this.meReady || !this.rivalReady) return;
     const rematch = this.over;
+    const seed = this.newSeed();
     const next: UpcomingRound = {
-      seed: this.newSeed(),
+      seed,
       round: rematch ? 1 : this.round + 1,
       countdown: rematch ? 0 : GAME.duel.series.countdown,
+      // RANDOM: a different variant from the last round's (Phase 30).
+      variant: pickVariant(this.choice, seed, rematch ? null : this.variant),
     };
     this.transport.send({ t: 'next', ...next });
     this.announce(next);

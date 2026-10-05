@@ -1,9 +1,16 @@
+import {
+  DUEL_VARIANTS,
+  VARIANT_CHOICES,
+  type DuelVariantId,
+  type VariantChoice,
+} from '@/config/duel';
 import { DUEL_BOT_ORDER, DUEL_BOTS, type DuelBotId } from '@/config/duelBots';
 import { GAME } from '@/config/game';
 import { THEME } from '@/config/theme';
 import type { InputFrame } from '@/input/inputFrame';
 import { PROTOCOL_VERSION } from '@/net/protocol';
 import { DuelSeries } from '@/net/series';
+import { pickVariant } from '@/sim/rules';
 import type { Transport } from '@/net/transport';
 import { randomSeed } from '@/platform/seed';
 import { loadSave, updateSave } from '@/platform/storage';
@@ -41,12 +48,15 @@ export class DuelLobbyScene implements Scene {
   private left = false;
   private bot: DuelBotId;
   private bestOf: number;
+  /** Arena variant for hosted duels and practice (Phase 30): one, or RANDOM. */
+  private variant: VariantChoice;
 
   constructor(app: AppContext) {
     this.app = app;
     const save = loadSave();
     this.bot = save.duelBot;
     this.bestOf = save.duelBestOf;
+    this.variant = save.duelVariant;
     this.setPhase({ kind: 'choose' });
   }
 
@@ -88,7 +98,7 @@ export class DuelLobbyScene implements Scene {
       if (p.code) {
         say('ROOM CODE', white, 13);
         say(p.code, THEME.colors.cyan, 44);
-        say(seriesLabel(this.bestOf), white, 13);
+        say(`${seriesLabel(this.bestOf)} · ${variantLabel(this.variant)}`, white, 13);
         say('Send this code to your opponent. Waiting for them to join…', white, 13);
       } else {
         say('Opening a room…', white, 14);
@@ -115,7 +125,8 @@ export class DuelLobbyScene implements Scene {
     const practice = {
       kind: 'action' as const,
       label: 'PRACTICE VS BOT',
-      onSelect: () => this.app.goTo('duel', { practice: this.bot, seed: randomSeed() }),
+      onSelect: () =>
+        this.app.goTo('duel', { practice: this.bot, seed: randomSeed(), variant: this.variant }),
     };
     switch (phase.kind) {
       case 'choose':
@@ -126,6 +137,12 @@ export class DuelLobbyScene implements Scene {
             label: 'SERIES',
             value: () => seriesLabel(this.bestOf),
             onChange: (step) => this.cycleBestOf(step),
+          },
+          {
+            kind: 'adjust',
+            label: 'VARIANT',
+            value: () => variantLabel(this.variant),
+            onChange: (step) => this.cycleVariant(step),
           },
           {
             kind: 'action',
@@ -191,6 +208,12 @@ export class DuelLobbyScene implements Scene {
     updateSave({ duelBestOf: this.bestOf });
   }
 
+  private cycleVariant(step: number): void {
+    const n = VARIANT_CHOICES.length;
+    this.variant = VARIANT_CHOICES[(VARIANT_CHOICES.indexOf(this.variant) + step + n) % n];
+    updateSave({ duelVariant: this.variant });
+  }
+
   private cycleBot(step: number): void {
     const n = DUEL_BOT_ORDER.length;
     this.bot = DUEL_BOT_ORDER[(DUEL_BOT_ORDER.indexOf(this.bot) + step + n) % n];
@@ -217,8 +240,12 @@ export class DuelLobbyScene implements Scene {
         return;
       }
       const seed = randomSeed();
-      transport.send({ t: 'hello', v: PROTOCOL_VERSION, seed, bestOf: this.bestOf });
-      const series = new DuelSeries(transport, 'host', this.bestOf, randomSeed);
+      const variant = pickVariant(this.variant, seed);
+      transport.send({ t: 'hello', v: PROTOCOL_VERSION, seed, bestOf: this.bestOf, variant });
+      const series = new DuelSeries(transport, 'host', this.bestOf, randomSeed, {
+        choice: this.variant,
+        first: variant,
+      });
       this.app.goTo('duel', { series, seed });
     } catch (error) {
       if (!this.left && this.phase.kind === 'hosting') this.fail(error);
@@ -236,12 +263,15 @@ export class DuelLobbyScene implements Scene {
         transport.close();
         return;
       }
-      const { seed, bestOf } = await waitForHello(transport);
+      const { seed, bestOf, variant } = await waitForHello(transport);
       if (this.left) {
         transport.close();
         return;
       }
-      const series = new DuelSeries(transport, 'client', bestOf, randomSeed);
+      const series = new DuelSeries(transport, 'client', bestOf, randomSeed, {
+        choice: variant,
+        first: variant,
+      });
       this.app.goTo('duel', { series, seed });
     } catch (error) {
       if (!this.left && this.phase.kind === 'connecting') this.fail(error);
@@ -259,7 +289,13 @@ function seriesLabel(bestOf: number): string {
 }
 
 /** The host speaks first: its protocol version, the first map seed and the series length. */
-function waitForHello(transport: Transport): Promise<{ seed: number; bestOf: number }> {
+function variantLabel(choice: VariantChoice): string {
+  return choice === 'random' ? 'RANDOM' : DUEL_VARIANTS[choice].label;
+}
+
+function waitForHello(
+  transport: Transport,
+): Promise<{ seed: number; bestOf: number; variant: DuelVariantId }> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       transport.close();
@@ -275,7 +311,7 @@ function waitForHello(transport: Transport): Promise<{ seed: number; bestOf: num
         );
         return;
       }
-      resolve({ seed: m.seed, bestOf: m.bestOf });
+      resolve({ seed: m.seed, bestOf: m.bestOf, variant: m.variant });
     });
   });
 }

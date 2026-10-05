@@ -3,6 +3,8 @@ import type { HunterTypeId } from '@/config/hunters';
 import { createLoopbackPair } from '@/net/loopback';
 import { NetSession } from '@/net/netSession';
 import { DuelSeries } from '@/net/series';
+import type { DuelVariantId, VariantChoice } from '@/config/duel';
+import { pickVariant } from '@/sim/rules';
 import { ReplayRecorder } from '@/replay/recorder';
 import type { Player } from '@/sim/entities/player';
 import { IDLE_INPUT, type PlayerInput } from '@/sim/playerInput';
@@ -15,10 +17,15 @@ export const DUEL_SEED = 20260929;
 export const EXTRACT_TICKS = Math.ceil(GAME.duel.extractTime / DUEL_DT) + 20;
 
 /** Host and client simulations joined by an in-memory link with `latency` ticks each way. */
-export function duel(latency = 3, hunters: HunterTypeId[] = [], seed = DUEL_SEED) {
+export function duel(
+  latency = 3,
+  hunters: HunterTypeId[] = [],
+  seed = DUEL_SEED,
+  variant: DuelVariantId = 'classic',
+) {
   const link = createLoopbackPair(latency);
-  const host = createDuelSimulation({ seed, role: 'host', hunters });
-  const client = createDuelSimulation({ seed, role: 'client', hunters });
+  const host = createDuelSimulation({ seed, role: 'host', hunters, variant });
+  const client = createDuelSimulation({ seed, role: 'client', hunters, variant });
   const hostNet = new NetSession(host, link.a);
   const clientNet = new NetSession(client, link.b);
   /** Called after every host step (e.g. a recorder). */
@@ -45,11 +52,13 @@ export function duel(latency = 3, hunters: HunterTypeId[] = [], seed = DUEL_SEED
  * The two sides of an online series on one in-memory link. Map seeds come
  * from a counter, so a test always sees the same maps.
  */
-export function seriesPair(bestOf = 3, latency = 2) {
+export function seriesPair(bestOf = 3, latency = 2, choice: VariantChoice = 'classic') {
   const link = createLoopbackPair(latency);
   let seed = 100;
-  const host = new DuelSeries(link.a, 'host', bestOf, () => ++seed);
-  const client = new DuelSeries(link.b, 'client', bestOf, () => ++seed);
+  // As the lobby does: the host picks round 1's variant and says so in hello.
+  const first = pickVariant(choice, DUEL_SEED);
+  const host = new DuelSeries(link.a, 'host', bestOf, () => ++seed, { choice, first });
+  const client = new DuelSeries(link.b, 'client', bestOf, () => ++seed, { choice: first, first });
   return { link, host, client, firstSeed: DUEL_SEED };
 }
 

@@ -1,8 +1,10 @@
+import { isVariant, type DuelVariantId } from '@/config/duel';
 import { EMITTER_TYPES } from '@/config/emitters';
 import { HUNTER_TYPES, type HunterTypeId } from '@/config/hunters';
 import { PICKUP_TYPES } from '@/config/pickups';
 import { REPLAY } from '@/config/replay';
 import { SOUND_KINDS, type SoundKindId } from '@/config/sounds';
+import { buildRules } from '@/sim/rules';
 import { createWave } from '@/sim/sound/soundWave';
 import type { WallGeometry } from '@/sim/world/edges';
 import type { MapLayout } from '@/sim/world/mapGen';
@@ -23,7 +25,7 @@ import type {
  * sample times to 1 ms, stored as differences (small numbers), then gzipped.
  */
 
-const WIRE_VERSION = 2;
+const WIRE_VERSION = 3;
 /** Tenths of a pixel; milliseconds. */
 const POS = 10;
 const MS = 1000;
@@ -59,6 +61,8 @@ export interface WireReplay {
     rival: WireTrack;
     winner: number | null;
     events: DuelEvent[];
+    variant: DuelVariantId;
+    overtimeAt: number | null;
   } | null;
 }
 
@@ -93,16 +97,22 @@ export function toWire(r: Replay): WireReplay {
       rival: packTrack(r.duel.rival),
       winner: r.duel.winner,
       events: r.duel.events.map((e) => ({ ...e, time: round(e.time, MS) })),
+      variant: r.duel.variant,
+      overtimeAt: r.duel.overtimeAt === null ? null : round(r.duel.overtimeAt, MS),
     },
   };
 }
 
 /** Rebuild a recording on the receiver's own copy of the map. */
 export function fromWire(w: WireReplay, layout: MapLayout, walls: WallGeometry): Replay {
+  // A duel variant's sound rules (Phase 30) shape its rings.
+  const rules = buildRules({ variant: w.duel?.variant });
+  const scale = { rings: rules.soundRings, speed: rules.soundSpeed };
   const sounds = w.sounds.map(([id, kind, x, y, owner, start, dir, fx, fy]) =>
     createWave(walls, id, kind, x, y, owner < 0 ? null : owner, start, {
       focus: { x: fx, y: fy },
       dir,
+      scale,
     }),
   );
   return {
@@ -127,6 +137,8 @@ export function fromWire(w: WireReplay, layout: MapLayout, walls: WallGeometry):
       rival: unpackTrack(w.duel.rival),
       winner: w.duel.winner,
       events: w.duel.events,
+      variant: w.duel.variant,
+      overtimeAt: w.duel.overtimeAt,
     },
   };
 }
@@ -234,6 +246,7 @@ const MARK_KINDS: Record<ReplayMarkKind, true> = {
   stun: true,
   close: true,
   end: true,
+  overtime: true,
 };
 const OUTCOMES = [null, 'extracted', 'dead', 'lost'];
 
@@ -315,6 +328,8 @@ function isWireReplay(w: unknown): w is WireReplay {
         int(duel.rivalId) &&
         track(duel.rival, n) &&
         (duel.winner === null || int(duel.winner)) &&
-        list(duel.events, duelEvent)))
+        list(duel.events, duelEvent) &&
+        isVariant(duel.variant) &&
+        time(duel.overtimeAt)))
   );
 }

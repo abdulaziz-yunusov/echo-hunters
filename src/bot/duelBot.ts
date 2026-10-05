@@ -239,7 +239,8 @@ export class DuelBot extends Bot {
   private hear(s: SoundEmitted): void {
     const { player, rival } = this.sim.state;
     if (!rival || s.owner !== rival.id || DECOY_SOUNDS.includes(s.kind)) return;
-    const range = AUDIO_SOUNDS[s.kind].range * this.level.hearing;
+    const range =
+      AUDIO_SOUNDS[s.kind].range * this.level.hearing * this.sim.state.rules.soundHearing;
     if (Math.hypot(s.x - player.x, s.y - player.y) > range) return;
     this.notice(s.x, s.y);
   }

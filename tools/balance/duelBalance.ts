@@ -1,4 +1,6 @@
+import type { DuelVariantId, VariantChoice } from '@/config/duel';
 import { DUEL_BOTS, type DuelBotId } from '@/config/duelBots';
+import { pickVariant } from '@/sim/rules';
 import { GAME } from '@/config/game';
 import { DUEL_TOOLS, isTool, TOOLS, type ToolId } from '@/config/pickups';
 import { deriveSeed, Rng } from '@/core/rng';
@@ -36,6 +38,10 @@ export interface DuelRound {
   tools: Partial<Record<ToolId, EntityId>>;
   /** Tools used, by either player. */
   toolUses: number;
+  /** The arena variant (Phase 30). */
+  variant: DuelVariantId;
+  /** Overtime began before the round was decided. */
+  overtime: boolean;
 }
 
 export interface DuelStats {
@@ -56,6 +62,8 @@ export interface DuelStats {
   /** Per tool: decided rounds in which someone picked it up, and the share of them its picker won. */
   toolWins: Record<ToolId, { rounds: number; pickerWins: number }>;
   meanToolUses: number;
+  /** Share of rounds that went to overtime, 0..1. */
+  overtime: number;
   /** Rounds nobody won within DUEL_ROUND_LIMIT. */
   timeouts: number;
 }
@@ -74,10 +82,11 @@ export function playDuel(
   seed: number,
   lag = lagFor(seed),
   bots: BotPair = ['hard', 'hard'],
+  variant: DuelVariantId = 'classic',
 ): DuelRound {
   const link = createLoopbackPair(lag);
-  const host = createDuelSimulation({ seed, role: 'host' });
-  const client = createDuelSimulation({ seed, role: 'client' });
+  const host = createDuelSimulation({ seed, role: 'host', variant });
+  const client = createDuelSimulation({ seed, role: 'client', variant });
   const hostNet = new NetSession(host, link.a);
   const clientNet = new NetSession(client, link.b);
   const hostBot = new DuelBot(host, { level: bots[0], seed: deriveSeed(seed, 'host-bot') });
@@ -130,6 +139,8 @@ export function playDuel(
     drops,
     tools,
     toolUses,
+    variant,
+    overtime: duel.overtimeAt !== null,
   };
 }
 
@@ -137,11 +148,15 @@ export function playDuel(
  * Play seeds 1..maps and sum them up. Two different levels take turns
  * hosting (the first hosts the odd seeds), so neither gets the host's side.
  */
-export function measureDuels(maps: number, bots: BotPair = ['hard', 'hard']): DuelStats {
+export function measureDuels(
+  maps: number,
+  bots: BotPair = ['hard', 'hard'],
+  variant: VariantChoice = 'classic',
+): DuelStats {
   const rounds: DuelRound[] = [];
   for (let seed = 1; seed <= maps; seed++) {
     const pair: BotPair = seed % 2 === 1 ? bots : [bots[1], bots[0]];
-    rounds.push(playDuel(seed, lagFor(seed), pair));
+    rounds.push(playDuel(seed, lagFor(seed), pair, pickVariant(variant, seed)));
   }
   return summarize(rounds, bots);
 }
@@ -177,6 +192,7 @@ export function summarize(
       }),
     ) as DuelStats['toolWins'],
     meanToolUses: mean((r) => r.toolUses),
+    overtime: rounds.length ? rounds.filter((r) => r.overtime).length / rounds.length : NaN,
     timeouts: rounds.length - decided.length,
   };
 }
@@ -202,6 +218,7 @@ export function formatDuelTable(s: DuelStats): string {
     ['First core wins', pct(s.firstCoreWins)],
     ['Drops per round', s.meanDrops.toFixed(2)],
     ['Tools used per round', s.meanToolUses.toFixed(2)],
+    ['Overtime', pct(s.overtime)],
     ...DUEL_TOOLS.map((tool): [string, string] => {
       const t = s.toolWins[tool];
       return [`${TOOLS[tool].label} picker wins`, `${pct(t.pickerWins)} of ${t.rounds}`];

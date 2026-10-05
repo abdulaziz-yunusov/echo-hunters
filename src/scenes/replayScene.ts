@@ -1,3 +1,4 @@
+import { DUEL_VARIANTS } from '@/config/duel';
 import { REPLAY } from '@/config/replay';
 import { THEME } from '@/config/theme';
 import type { InputFrame } from '@/input/inputFrame';
@@ -18,7 +19,7 @@ const BUTTON = { w: 80, h: 30 };
 /** Timeline marks explained above the bar, and the width of one 11 px monospace character. */
 const LEGEND: readonly ReplayMarkKind[] = ['hit', 'close', 'core', 'stun', 'pickup', 'beacon'];
 /** Duels have no close calls. */
-const DUEL_LEGEND = LEGEND.filter((k) => k !== 'close');
+const DUEL_LEGEND: readonly ReplayMarkKind[] = [...LEGEND.filter((k) => k !== 'close'), 'overtime'];
 const LEGEND_CHAR = 6.6;
 
 interface Rect {
@@ -136,7 +137,9 @@ export class ReplayScene implements Scene {
 
   private drawHeader(ctx: CanvasRenderingContext2D, width: number): void {
     const r = this.replay;
-    const title = r.duel ? 'DUEL DEBRIEF' : `REPLAY · LEVEL ${r.level}`;
+    const title = r.duel
+      ? `DUEL DEBRIEF · ${DUEL_VARIANTS[r.duel.variant].label}${r.duel.overtimeAt !== null ? ' · OVERTIME' : ''}`
+      : `REPLAY · LEVEL ${r.level}`;
     drawText(ctx, title, width / 2, 34, {
       size: 20,
       color: THEME.colors.cyan,

@@ -2,6 +2,7 @@ import { GAME } from '@/config/game';
 import { HUNTER_TYPES, type HunterTypeId } from '@/config/hunters';
 import { createSimulation } from '@/sim/simulation';
 import { Bot, BOT_PROFILES, type BotProfile } from '@/bot/bot';
+import { DUEL_VARIANTS, VARIANT_CHOICES, type VariantChoice } from '@/config/duel';
 import { DUEL_BOTS, type DuelBotId } from '@/config/duelBots';
 import { formatDuelTable, MAX_LAG, measureDuels, type BotPair } from './duelBalance';
 
@@ -127,7 +128,7 @@ export function parseLevels(text: string): number[] {
 }
 
 const USAGE = `npm run balance -- [--levels 1-8] [--maps 40] [--profile basic|careful|all] [--hunters stalker,listener]
-       npm run balance -- --duel [--maps 40] [--bots hard,easy]`;
+       npm run balance -- --duel [--maps 40] [--bots hard,easy] [--variant classic|…|random|all]`;
 
 export interface CliOptions {
   levels: number[];
@@ -138,6 +139,8 @@ export interface CliOptions {
   duel: boolean;
   /** Duel bot levels to compare (the same one twice by default). */
   bots: BotPair;
+  /** Duel arena variants to measure, one table each (Phase 30). */
+  variants: VariantChoice[];
 }
 
 export function parseArgs(argv: readonly string[]): CliOptions {
@@ -147,6 +150,7 @@ export function parseArgs(argv: readonly string[]): CliOptions {
     profiles: ['basic'],
     duel: false,
     bots: ['hard', 'hard'],
+    variants: ['classic'],
   };
   for (let i = 0; i < argv.length; i++) {
     const flag = argv[i];
@@ -170,6 +174,11 @@ export function parseArgs(argv: readonly string[]): CliOptions {
         if (!(t in HUNTER_TYPES)) throw new Error(`Unknown hunter type ${t}.`);
       }
       options.hunters = types as HunterTypeId[];
+    } else if (flag === '--variant') {
+      if (value === 'all') options.variants = [...VARIANT_CHOICES];
+      else if ((VARIANT_CHOICES as readonly string[]).includes(value)) {
+        options.variants = [value as VariantChoice];
+      } else throw new Error(`Unknown variant ${value}.\n${USAGE}`);
     } else if (flag === '--bots') {
       const levels = value.split(',');
       if (levels.length !== 2 || !levels.every((l) => l in DUEL_BOTS)) {
@@ -187,12 +196,15 @@ export function parseArgs(argv: readonly string[]): CliOptions {
 export function main(argv: readonly string[], log: (line: string) => void = console.log): void {
   const cli = parseArgs(argv);
   if (cli.duel) {
-    const started = Date.now();
-    const stats = measureDuels(cli.maps, cli.bots);
     const [a, b] = cli.bots.map((id: DuelBotId) => DUEL_BOTS[id].label.toLowerCase());
-    log(`\n${a} duel bot vs ${b} · ${cli.maps} maps · lag 0–${MAX_LAG} ticks\n`);
-    log(formatDuelTable(stats));
-    log(`\n(${((Date.now() - started) / 1000).toFixed(1)} s)`);
+    for (const variant of cli.variants) {
+      const started = Date.now();
+      const stats = measureDuels(cli.maps, cli.bots, variant);
+      const name = variant === 'random' ? 'RANDOM' : DUEL_VARIANTS[variant].label;
+      log(`\n${a} duel bot vs ${b} · ${name} · ${cli.maps} maps · lag 0–${MAX_LAG} ticks\n`);
+      log(formatDuelTable(stats));
+      log(`\n(${((Date.now() - started) / 1000).toFixed(1)} s)`);
+    }
     return;
   }
   const note = cli.hunters ? ` · hunters ${cli.hunters.join(',')}` : '';
