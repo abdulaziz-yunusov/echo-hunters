@@ -50,6 +50,7 @@ export function startApp(canvas: HTMLCanvasElement): void {
   // Leaving the tab pauses the game (the loop also stops while hidden).
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) scenes.current?.onHidden?.();
+    else scenes.current?.onShown?.();
   });
 
   const loop = new FixedLoop({

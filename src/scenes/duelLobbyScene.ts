@@ -9,6 +9,8 @@ import { GAME } from '@/config/game';
 import { THEME } from '@/config/theme';
 import type { InputFrame } from '@/input/inputFrame';
 import { PROTOCOL_VERSION } from '@/net/protocol';
+import { DuelLink } from '@/net/duelLink';
+import { VERSION_MESSAGE } from '@/net/protocol';
 import { DuelSeries } from '@/net/series';
 import { pickVariant } from '@/sim/rules';
 import type { Transport } from '@/net/transport';
@@ -237,12 +239,25 @@ export class DuelLobbyScene implements Scene {
       this.cancelHosting = null;
       if (this.left) {
         transport.close();
+        room.cancel();
         return;
       }
       const seed = randomSeed();
       const variant = pickVariant(this.variant, seed);
-      transport.send({ t: 'hello', v: PROTOCOL_VERSION, seed, bestOf: this.bestOf, variant });
-      const series = new DuelSeries(transport, 'host', this.bestOf, randomSeed, {
+      // A secret for this duel: a rival who drops can prove it's them when rejoining (Phase 31).
+      const token = randomSeed().toString(36);
+      transport.send({
+        t: 'hello',
+        v: PROTOCOL_VERSION,
+        seed,
+        bestOf: this.bestOf,
+        variant,
+        token,
+      });
+      // The room stays open for a rejoin; it closes with the link.
+      const link = new DuelLink(transport, { role: 'host', token, onClosed: () => room.cancel() });
+      room.onLaterOpponent((t) => link.offer(t));
+      const series = new DuelSeries(link, 'host', this.bestOf, randomSeed, {
         choice: this.variant,
         first: variant,
       });
@@ -263,12 +278,18 @@ export class DuelLobbyScene implements Scene {
         transport.close();
         return;
       }
-      const { seed, bestOf, variant } = await waitForHello(transport);
+      const { seed, bestOf, variant, token } = await waitForHello(transport);
       if (this.left) {
         transport.close();
         return;
       }
-      const series = new DuelSeries(transport, 'client', bestOf, randomSeed, {
+      // After a drop, keep joining the same room until the host takes us back (Phase 31).
+      const link = new DuelLink(transport, {
+        role: 'client',
+        token,
+        reconnect: () => joinRoom(code),
+      });
+      const series = new DuelSeries(link, 'client', bestOf, randomSeed, {
         choice: variant,
         first: variant,
       });
@@ -295,7 +316,7 @@ function variantLabel(choice: VariantChoice): string {
 
 function waitForHello(
   transport: Transport,
-): Promise<{ seed: number; bestOf: number; variant: DuelVariantId }> {
+): Promise<{ seed: number; bestOf: number; variant: DuelVariantId; token: string }> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       transport.close();
@@ -305,13 +326,13 @@ function waitForHello(
       if (m.t !== 'hello') return;
       clearTimeout(timer);
       if (m.v !== PROTOCOL_VERSION) {
+        // Tell the host why we're leaving, so it can say so too.
+        transport.send({ t: 'bye', reason: 'version' });
         transport.close();
-        reject(
-          new Error('You are on different game versions: both players should reload the page.'),
-        );
+        reject(new Error(VERSION_MESSAGE));
         return;
       }
-      resolve({ seed: m.seed, bestOf: m.bestOf, variant: m.variant });
+      resolve({ seed: m.seed, bestOf: m.bestOf, variant: m.variant, token: m.token });
     });
   });
 }

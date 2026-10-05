@@ -35,9 +35,16 @@ export function createLoopbackPair(latencyTicks = 0) {
     },
   });
 
+  const ends = { a: end(0), b: end(1) };
+
   return {
-    a: end(0),
-    b: end(1),
+    ...ends,
+    /** The connection dies under both players (tests of Phase 31's reconnect): both notice. */
+    drop() {
+      if (!open) return;
+      open = false;
+      for (const h of [...closeHandlers[0], ...closeHandlers[1]]) h();
+    },
     /** Advance one tick and deliver due messages, in order. */
     pump() {
       now++;

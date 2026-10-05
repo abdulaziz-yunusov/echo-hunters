@@ -467,6 +467,111 @@ describe('screen flow', () => {
     expect((end(host) as unknown as { statusLine(): string }).statusLine()).toBe('Rival left.');
   });
 
+  describe('connection quality (Phase 31)', () => {
+    /** A round under way, both sides in their duel scenes. */
+    function playing() {
+      const s = seriesApps(3);
+      s.tick(60);
+      return s;
+    }
+    const duelOf = (t: ReturnType<typeof testApp>) =>
+      t.scenes.current as unknown as {
+        sim: Simulation;
+        canClaim: boolean;
+        menu: MenuList;
+        onHidden(): void;
+        onShown(): void;
+      };
+
+    it('a drop freezes the round; the rejoin carries on', async () => {
+      const { pair, host, client, tick } = playing();
+      const before = duelOf(host).sim.state.time;
+      pair.link.drop();
+      tick(60);
+      expect(duelOf(host).sim.state.time).toBe(before); // frozen while waiting
+      expect(host.current()).toBe('Duel');
+      host.render();
+      client.render();
+      await flushLink(pair.link);
+      tick(30);
+      expect(duelOf(host).sim.state.time).toBeGreaterThan(before);
+      expect(pair.host.transport.state).toBe('open');
+    });
+
+    it('a rival who never comes back: the host wins by forfeit, the client has lost the connection', () => {
+      const { pair, host, client, tick, end } = playing();
+      pair.link.setReachable(false);
+      pair.link.drop();
+      tick((GAME.duel.link.reconnectGrace + 0.5) / DT);
+      expect(client.current()).toBe('DuelEnd');
+      expect((end(client) as unknown as { params: { outcome: string } }).params.outcome).toBe(
+        'disconnected',
+      );
+      tick(150); // the host's round ends as a win, and lingers
+      expect(host.current()).toBe('DuelEnd');
+      const params = (end(host) as unknown as { params: { outcome: string; forfeit: boolean } })
+        .params;
+      expect(params).toMatchObject({ outcome: 'won', forfeit: true });
+      host.render();
+    });
+
+    it('a rival away too long can be claimed against, from the menu', () => {
+      const { pair, host, client, tick, end } = playing();
+      duelOf(client).onHidden();
+      // The client's tab is hidden: only the host's game runs now.
+      const hostOnly = (n: number) => {
+        for (let i = 0; i < n; i++) {
+          host.press({});
+          pair.link.pump();
+        }
+      };
+      hostOnly(10);
+      expect(duelOf(host).canClaim).toBe(false);
+      host.render();
+      hostOnly((GAME.duel.link.awayForfeit + 0.2) / DT);
+      expect(duelOf(host).canClaim).toBe(true);
+      host.press({ pause: true });
+      const labels = duelOf(host).menu.items.map((i) => i.label);
+      expect(labels).toContain('CLAIM THE WIN');
+      host.choose(1); // RESUME, CLAIM THE WIN
+      duelOf(client).onShown();
+      tick(150);
+      expect(host.current()).toBe('DuelEnd');
+      expect(client.current()).toBe('DuelEnd');
+      expect(
+        (end(client) as unknown as { params: { outcome: string; forfeit: boolean } }).params,
+      ).toMatchObject({ outcome: 'lost', forfeit: true });
+    });
+
+    it('the client can claim against an away host; the host agrees only if it really is away', () => {
+      const { pair, host, client, tick } = playing();
+      const clientNet = (client.scenes.current as unknown as { net: { claimWin(): void } }).net;
+      clientNet.claimWin(); // the host is here: refused
+      tick(10);
+      expect(duelOf(host).sim.state.duel!.winner).toBeNull();
+      duelOf(host).onHidden();
+      pair.link.pump();
+      clientNet.claimWin();
+      for (let i = 0; i < 10; i++) pair.link.pump(); // a hidden host still handles messages
+      expect(duelOf(host).sim.state.duel!.winner).toBe(2);
+      expect(duelOf(host).sim.state.duel!.forfeit).toBe(true);
+    });
+
+    it('a rival on another version: the host is told why they left', () => {
+      const { pair, host, tick } = playing();
+      pair.client.transport.send({ t: 'bye', reason: 'version' });
+      pair.link.pump();
+      pair.link.pump();
+      pair.link.drop();
+      tick(5);
+      expect(host.current()).toBe('DuelEnd');
+      expect(
+        (host.scenes.current as unknown as { params: { outcome: string } }).params.outcome,
+      ).toBe('version');
+      host.render();
+    });
+  });
+
   it('a rival who leaves during the countdown stops it', async () => {
     const { host, client, tick, win, pair } = seriesApps(3);
     await win('client');

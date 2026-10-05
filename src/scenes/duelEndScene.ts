@@ -3,6 +3,7 @@ import { DUEL_BOTS, type DuelBotId } from '@/config/duelBots';
 import { THEME } from '@/config/theme';
 import type { InputFrame } from '@/input/inputFrame';
 import type { NetSession } from '@/net/netSession';
+import { VERSION_MESSAGE } from '@/net/protocol';
 import type { DuelSeries } from '@/net/series';
 import { randomSeed } from '@/platform/seed';
 import { drawText } from '@/render/text';
@@ -18,7 +19,8 @@ import { MenuList, type MenuItem } from '@/ui/menuList';
 import { drawMenu } from '@/ui/menuRenderer';
 import type { AppContext, Scene } from './scene';
 
-export type DuelOutcome = 'won' | 'lost' | 'disconnected';
+/** 'version': the rival left because the game versions differ (Phase 31). */
+export type DuelOutcome = 'won' | 'lost' | 'disconnected' | 'version';
 
 export interface DuelEndParams {
   outcome: DuelOutcome;
@@ -37,6 +39,8 @@ export interface DuelEndParams {
   practiceVariant?: VariantChoice;
   /** The online series this round belongs to (Phase 27). */
   series?: DuelSeries;
+  /** Won (or lost) by forfeit: the rival left, or someone was away too long (Phase 31). */
+  forfeit?: boolean;
 }
 
 /** Keys are ignored this long, so a key still held from the duel doesn't skip the screen (s). */
@@ -92,6 +96,8 @@ export class DuelEndScene implements Scene {
 
   update(dt: number, input: InputFrame): void {
     this.time += dt;
+    // Phase 31: the series' connection keeps its heartbeat (and may be reconnecting) here too.
+    this.series?.transport.tick(dt);
     if (this.tickCountdown(dt)) return;
     const key = this.currentMenuKey();
     if (key !== this.menuKey) {
@@ -101,6 +107,15 @@ export class DuelEndScene implements Scene {
     if (this.time < INPUT_GRACE) return;
     if (input.back) this.app.goTo('menu');
     else this.menu.update(input);
+  }
+
+  /** Between rounds too, a hidden tab is announced, so it isn't taken for a lost connection. */
+  onHidden(): void {
+    this.series?.transport.setAway(true);
+  }
+
+  onShown(): void {
+    this.series?.transport.setAway(false);
   }
 
   exit(): void {
@@ -154,8 +169,21 @@ export class DuelEndScene implements Scene {
   }
 
   private heading(): { title: string; line: string; color: string } {
+    const head = this.baseHeading();
+    if (this.params.forfeit && this.params.outcome === 'won') {
+      head.line = 'Your rival left, or was away too long: you win by forfeit.';
+    } else if (this.params.forfeit && this.params.outcome === 'lost') {
+      head.line = 'You were away too long: your rival claimed the win.';
+    }
+    return head;
+  }
+
+  private baseHeading(): { title: string; line: string; color: string } {
     const { outcome, practice } = this.params;
     const { green, red, orange } = THEME.colors;
+    if (outcome === 'version') {
+      return { title: "CAN'T PLAY", line: VERSION_MESSAGE, color: orange };
+    }
     if (outcome === 'disconnected') {
       return {
         title: 'CONNECTION LOST',
@@ -197,6 +225,9 @@ export class DuelEndScene implements Scene {
     const series = this.series;
     if (!series || this.params.outcome === 'disconnected') return null;
     if (series.rivalLeft) return 'Rival left.';
+    if (series.transport.state === 'reconnecting') {
+      return `Rival disconnected: waiting ${Math.ceil(series.transport.secondsLeft)} s for them.`;
+    }
     if (this.countdown !== null) {
       const next = series.upcoming;
       const variant = next ? ` · ${DUEL_VARIANTS[next.variant].label}` : '';
@@ -273,6 +304,8 @@ export class DuelEndScene implements Scene {
   /** Run the countdown to the next round. Returns true once the scene has moved on. */
   private tickCountdown(dt: number): boolean {
     const series = this.series;
+    // Waiting for a dropped connection: the countdown holds.
+    if (series?.transport.state === 'reconnecting') return false;
     if (!series || series.rivalLeft) {
       this.countdown = null;
       return false;
@@ -309,7 +342,11 @@ export class DuelEndScene implements Scene {
     const app = this.app;
     const items: MenuItem[] = [];
     const series = this.series;
-    const live = series && !series.rivalLeft && this.params.outcome !== 'disconnected';
+    const live =
+      series &&
+      !series.rivalLeft &&
+      this.params.outcome !== 'disconnected' &&
+      this.params.outcome !== 'version';
 
     if (live) {
       const label = series.over ? 'REMATCH' : 'READY';

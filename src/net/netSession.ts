@@ -59,6 +59,8 @@ export class NetSession {
   private detached = false;
   private closeListeners: (() => void)[] = [];
   private recording: Replay | null = null;
+  /** Why the rival said goodbye, if they gave a reason (Phase 31: a version mismatch). */
+  private goodbye: 'version' | null = null;
   private recordingListeners: ((replay: Replay) => void)[] = [];
 
   constructor(sim: Simulation, transport: Transport, round = 1) {
@@ -71,6 +73,10 @@ export class NetSession {
     });
     transport.onClose(() => {
       if (!this.detached) this.markClosed();
+    });
+    // Phase 31: a dropped connection came back.
+    transport.onResume?.(() => {
+      if (!this.detached) this.resumed();
     });
 
     const on = sim.events.on.bind(sim.events);
@@ -97,7 +103,13 @@ export class NetSession {
             cores: e.cores.map((c) => ({ ...c, collected: false })),
           }),
         ),
-        on('duelEnded', (e) => this.send({ t: 'end', winner: e.winner })),
+        on('duelEnded', (e) =>
+          this.send({
+            t: 'end',
+            winner: e.winner,
+            ...(sim.state.duel?.forfeit ? { forfeit: true as const } : {}),
+          }),
+        ),
         on('extractStarted', (e) => this.send({ t: 'extract_start', by: e.by })),
         on('trapFired', (e) => this.send({ t: 'trap_fire', ...e })),
         on('toolDropped', (e) => this.send({ t: 'tool_drop', by: e.by, ...e.pickup })),
@@ -115,6 +127,23 @@ export class NetSession {
   /** The connection dropped (or the rival left). */
   get disconnected(): boolean {
     return this.closed;
+  }
+
+  /** The rival left because the game versions differ. */
+  get versionMismatch(): boolean {
+    return this.goodbye === 'version';
+  }
+
+  /**
+   * The rival was away too long (Phase 31): win by forfeit. The host decides
+   * at once; the client asks the host, which agrees only if its own tab
+   * really is hidden.
+   */
+  claimWin(): void {
+    const { state } = this.sim;
+    if (state.status !== 'playing') return;
+    if (this.isHost) declareWinner(this.sim, state.player.id, true);
+    else this.send({ t: 'claim' });
   }
 
   onDisconnect(listener: () => void): void {
@@ -309,7 +338,10 @@ export class NetSession {
         if (!this.isHost) this.applySnapshot(m);
         break;
       case 'end':
-        if (!this.isHost) declareWinner(sim, m.winner);
+        if (!this.isHost) declareWinner(sim, m.winner, m.forfeit === true);
+        break;
+      case 'claim':
+        if (this.isHost && this.transport.away && rivalId >= 0) declareWinner(sim, rivalId, true);
         break;
       case 'rec':
         if (!this.isHost && !this.recording && m.round === this.round) {
@@ -317,12 +349,26 @@ export class NetSession {
         }
         break;
       case 'bye':
+        this.goodbye = m.reason ?? null;
         this.markClosed();
         break;
       case 'hello':
       case 'ready':
       case 'next':
         break; // the lobby and the series (net/series.ts) handle these
+    }
+  }
+
+  /**
+   * Back after a drop (Phase 31). Host: send the whole picture at once.
+   * Client: anything asked before the drop may have been lost, so ask again.
+   */
+  private resumed(): void {
+    const duel = this.sim.state.duel;
+    if (this.isHost) this.sendSnapshot();
+    else if (duel) {
+      duel.pending = [];
+      duel.atBeacon = false;
     }
   }
 

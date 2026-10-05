@@ -2,6 +2,7 @@ import { GAME } from '@/config/game';
 import type { HunterTypeId } from '@/config/hunters';
 import { createLoopbackPair } from '@/net/loopback';
 import { NetSession } from '@/net/netSession';
+import { DuelLink } from '@/net/duelLink';
 import { DuelSeries } from '@/net/series';
 import type { DuelVariantId, VariantChoice } from '@/config/duel';
 import { pickVariant } from '@/sim/rules';
@@ -53,13 +54,61 @@ export function duel(
  * from a counter, so a test always sees the same maps.
  */
 export function seriesPair(bestOf = 3, latency = 2, choice: VariantChoice = 'classic') {
-  const link = createLoopbackPair(latency);
+  const links = linkedPair(latency);
   let seed = 100;
   // As the lobby does: the host picks round 1's variant and says so in hello.
   const first = pickVariant(choice, DUEL_SEED);
-  const host = new DuelSeries(link.a, 'host', bestOf, () => ++seed, { choice, first });
-  const client = new DuelSeries(link.b, 'client', bestOf, () => ++seed, { choice: first, first });
-  return { link, host, client, firstSeed: DUEL_SEED };
+  const host = new DuelSeries(links.host, 'host', bestOf, () => ++seed, { choice, first });
+  const client = new DuelSeries(links.client, 'client', bestOf, () => ++seed, {
+    choice: first,
+    first,
+  });
+  return { link: links, host, client, firstSeed: DUEL_SEED };
+}
+
+/**
+ * Two DuelLinks over an in-memory connection that can be dropped (Phase 31).
+ * The client's rejoin opens a fresh in-memory connection and offers its
+ * other end to the host's link, as the PeerJS room would.
+ */
+export function linkedPair(latency = 2, grace?: number) {
+  let wire = createLoopbackPair(latency);
+  const token = 'test-token';
+  const host = new DuelLink(wire.a, { role: 'host', token, grace });
+  let rejoins = 0;
+  /** While false, rejoining fails (the rival can't get back in). */
+  let reachable = true;
+  const client = new DuelLink(wire.b, {
+    role: 'client',
+    token,
+    grace,
+    reconnect: async () => {
+      if (!reachable) throw new Error('unreachable');
+      rejoins++;
+      wire = createLoopbackPair(latency);
+      host.offer(wire.a);
+      return wire.b;
+    },
+  });
+  return {
+    host,
+    client,
+    /** Deliver what is due on the current connection. */
+    pump: () => wire.pump(),
+    /** Kill the current connection under both sides. */
+    drop: () => wire.drop(),
+    /** Both links' clocks (heartbeat, silence, reconnect countdown). */
+    tick: (dt: number) => {
+      host.tick(dt);
+      client.tick(dt);
+    },
+    get rejoins() {
+      return rejoins;
+    },
+    setReachable(value: boolean) {
+      reachable = value;
+    },
+  };
 }
 
 /** Center of the floor tile under (x, y): a safe place to put someone. */

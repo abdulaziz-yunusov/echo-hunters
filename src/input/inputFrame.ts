@@ -36,6 +36,7 @@ export interface InputFrame {
   debugNewMap: boolean;
   debugOverview: boolean;
   debugWarp: boolean;
+  debugDrop: boolean;
   debugHearing: boolean;
 
   /** Pointer position in screen CSS pixels, or null until the pointer has been seen. */
@@ -62,6 +63,7 @@ export const EMPTY_INPUT: Readonly<InputFrame> = {
   debugNewMap: false,
   debugOverview: false,
   debugWarp: false,
+  debugDrop: false,
   debugHearing: false,
   aim: null,
 };

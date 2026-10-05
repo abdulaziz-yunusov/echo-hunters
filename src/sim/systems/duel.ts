@@ -287,10 +287,12 @@ function canExtract(state: GameState, holder: Player): boolean {
   return state.beacon.active && holder.cores >= coresNeeded(state);
 }
 
-export function declareWinner(ctx: SimContext, winner: EntityId): void {
+/** `forfeit`: won because the other player left or was away too long (Phase 31). */
+export function declareWinner(ctx: SimContext, winner: EntityId, forfeit = false): void {
   const { state } = ctx;
   if (!state.duel || state.duel.winner !== null) return;
   state.duel.winner = winner;
+  state.duel.forfeit = forfeit;
   ctx.events.emit('duelEnded', { winner });
   endRound(ctx, winner === state.player.id ? 'extracted' : 'lost');
 }

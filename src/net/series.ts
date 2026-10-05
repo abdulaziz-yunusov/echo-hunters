@@ -4,7 +4,7 @@ import { pickVariant } from '@/sim/rules';
 import type { DuelStatsTable } from '@/replay/duelStats';
 import { GUEST_ID, PLAYER_ID, type EntityId } from '@/sim/entities/entity';
 import type { NetMessage } from './protocol';
-import type { Transport } from './transport';
+import type { DuelLink } from './duelLink';
 
 /** How one round of a series went. */
 export interface RoundResult {
@@ -35,7 +35,8 @@ export interface UpcomingRound {
  * "ready" means a rematch: a new series of the same length, at once.
  */
 export class DuelSeries {
-  readonly transport: Transport;
+  /** The connection for the whole series; it survives drops (Phase 31). */
+  readonly transport: DuelLink;
   readonly role: 'host' | 'client';
   readonly bestOf: number;
   /** The current (or just finished) round, from 1. */
@@ -52,7 +53,7 @@ export class DuelSeries {
   private readonly newSeed: () => number;
 
   constructor(
-    transport: Transport,
+    transport: DuelLink,
     role: 'host' | 'client',
     bestOf: number,
     newSeed: () => number,

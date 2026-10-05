@@ -172,6 +172,26 @@ export const GAME = {
     interpolationDelay: 0.12,
     /** Give up connecting after this long (s). */
     connectTimeout: 8,
+    /**
+     * Connection quality (Phase 31). reconnectGrace: a dropped connection
+     * may come back within this long (the round waits, frozen); then the
+     * host wins by forfeit. silence: nothing heard for this long counts as a
+     * drop. awayForfeit: a rival whose tab is hidden this long may be
+     * claimed against. highPing: the HUD's ping turns orange above it (ms).
+     */
+    link: { reconnectGrace: 15, pingEvery: 1, silence: 4, awayForfeit: 20, highPing: 150 },
+    /**
+     * WebRTC servers (Phase 31). STUN finds a direct route; when strict
+     * networks block that, a TURN server relays the traffic. Free TURN
+     * services come and go: to add one, append an entry like
+     * `{ urls: 'turn:relay.example.com:443', username: 'user', credential: 'secret' }`
+     * (a free personal account at a TURN provider gives these). An empty
+     * list means PeerJS's own defaults.
+     */
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' },
+    ] as { urls: string; username?: string; credential?: string }[],
     /** PeerJS ids are global: prefix room codes so they don't collide with other apps. */
     peerPrefix: 'pulse-echo-hunters-',
     /** Room code length and alphabet (no look-alike characters). */

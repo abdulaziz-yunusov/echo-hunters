@@ -4,7 +4,15 @@ import { decode, encode, PROTOCOL_VERSION, type NetMessage } from '@/net/protoco
 
 describe('protocol', () => {
   const samples: NetMessage[] = [
-    { t: 'hello', v: PROTOCOL_VERSION, seed: 42, bestOf: 3, variant: 'heavyAir' },
+    { t: 'hello', v: PROTOCOL_VERSION, seed: 42, bestOf: 3, variant: 'heavyAir', token: 'k3y' },
+    { t: 'end', winner: 2, forfeit: true },
+    { t: 'bye', reason: 'version' },
+    { t: 'ping', n: 1.5 },
+    { t: 'pong', n: 1.5 },
+    { t: 'rejoin', token: 'k3y' },
+    { t: 'away' },
+    { t: 'back' },
+    { t: 'claim' },
     { t: 'p', x: 1.5, y: 2 },
     { t: 'snd', kind: 'ping', x: 3, y: 4, owner: 2, fx: 3, fy: 4 },
     { t: 'snd', kind: 'pingBeam', x: 3, y: 4, owner: 2, fx: 3, fy: 4, dir: -1.25 },
@@ -59,6 +67,10 @@ describe('protocol', () => {
       '{"t":"rec","data":"x"}',
       '{"t":"next","seed":1,"round":0,"countdown":5}',
       '{"t":"next","seed":1,"round":2}',
+      '{"t":"bye","reason":"bored"}',
+      '{"t":"end","winner":1,"forfeit":false}',
+      '{"t":"rejoin"}',
+      '{"t":"ping","n":"now"}',
       '{"t":"next","seed":1,"round":2,"countdown":5,"variant":"lava"}',
       '{"t":"hello","v":7,"seed":1,"bestOf":3}',
       '{"t":"extract_start"}',

@@ -5,7 +5,10 @@ import { SOUND_KINDS, type SoundKindId } from '@/config/sounds';
 import type { TakeKind } from '@/sim/gameState';
 
 /** Bump when messages change shape; mismatched players are told to reload. */
-export const PROTOCOL_VERSION = 7;
+export const PROTOCOL_VERSION = 8;
+
+/** Shown on both sides when the players' game versions differ. */
+export const VERSION_MESSAGE = 'Your rival is on a different version: both reload the page.';
 
 export type { TakeKind };
 
@@ -29,7 +32,7 @@ export interface CoreSnap {
  */
 export type NetMessage =
   /** Host → client, once connected: the first round's map seed and variant, and the series length. */
-  | { t: 'hello'; v: number; seed: number; bestOf: number; variant: DuelVariantId }
+  | { t: 'hello'; v: number; seed: number; bestOf: number; variant: DuelVariantId; token: string }
   /** Own position (15 Hz). */
   | { t: 'p'; x: number; y: number }
   /** A sound made by the sender (or, from the host, by a hunter); `dir` aims a beam. */
@@ -85,8 +88,8 @@ export type NetMessage =
       /** Who is extracting, if anyone. */
       ex: number | null;
     }
-  /** Host → client: the duel is over. */
-  | { t: 'end'; winner: number }
+  /** Host → client: the duel is over (`forfeit`: the loser left, or was away too long). */
+  | { t: 'end'; winner: number; forfeit?: true }
   /** Host → client, after the end: round `round`'s recording for the debrief (replay/wire.ts). */
   | { t: 'rec'; data: string; round: number }
   /** After a round: "I'm ready for the next round" (or, once the series is over, a rematch). */
@@ -96,8 +99,18 @@ export type NetMessage =
    * this map, starting in `countdown` s. Round 1 is a rematch: a new series.
    */
   | { t: 'next'; seed: number; round: number; countdown: number; variant: DuelVariantId }
-  /** Leaving on purpose. */
-  | { t: 'bye' };
+  /** Leaving on purpose (`version`: we can't play, the game versions differ). */
+  | { t: 'bye'; reason?: 'version' }
+  /** Connection quality (Phase 31), handled by DuelLink: heartbeat and latency. */
+  | { t: 'ping'; n: number }
+  | { t: 'pong'; n: number }
+  /** Client → host, first on a new connection: I'm the rival who dropped (token from hello). */
+  | { t: 'rejoin'; token: string }
+  /** My tab was hidden / is back. */
+  | { t: 'away' }
+  | { t: 'back' }
+  /** You were away too long: I claim the win. */
+  | { t: 'claim' };
 
 export type MessageType = NetMessage['t'];
 
@@ -132,7 +145,12 @@ const cores = (v: unknown) =>
 
 const VALIDATORS: Record<MessageType, (m: Rec) => boolean> = {
   hello: (m) =>
-    int(m.v) && num(m.seed) && int(m.bestOf) && (m.bestOf as number) >= 1 && isVariant(m.variant),
+    int(m.v) &&
+    num(m.seed) &&
+    int(m.bestOf) &&
+    (m.bestOf as number) >= 1 &&
+    isVariant(m.variant) &&
+    typeof m.token === 'string',
   p: (m) => num(m.x) && num(m.y),
   snd: (m) =>
     typeof m.kind === 'string' &&
@@ -174,7 +192,7 @@ const VALIDATORS: Record<MessageType, (m: Rec) => boolean> = {
     typeof m.beacon === 'boolean' &&
     (m.winner === null || int(m.winner)) &&
     (m.ex === null || int(m.ex)),
-  end: (m) => int(m.winner),
+  end: (m) => int(m.winner) && (m.forfeit === undefined || m.forfeit === true),
   rec: (m) => typeof m.data === 'string' && m.data.length <= REPLAY.maxPackedChars && int(m.round),
   ready: () => true,
   next: (m) =>
@@ -183,5 +201,11 @@ const VALIDATORS: Record<MessageType, (m: Rec) => boolean> = {
     (m.round as number) >= 1 &&
     num(m.countdown) &&
     isVariant(m.variant),
-  bye: () => true,
+  bye: (m) => m.reason === undefined || m.reason === 'version',
+  ping: (m) => num(m.n),
+  pong: (m) => num(m.n),
+  rejoin: (m) => typeof m.token === 'string' && m.token.length <= 64,
+  away: () => true,
+  back: () => true,
+  claim: () => true,
 };

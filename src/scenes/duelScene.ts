@@ -1,11 +1,13 @@
 import { AudioDirector } from '@/audio/audioDirector';
 import { PracticeRival } from '@/bot/practiceRival';
 import { DIFFICULTIES } from '@/config/difficulty';
+import { GAME } from '@/config/game';
 import { DUEL_VARIANTS, type DuelVariantId, type VariantChoice } from '@/config/duel';
 import { DUEL_BOTS, type DuelBotId } from '@/config/duelBots';
 import { THEME } from '@/config/theme';
 import type { InputFrame } from '@/input/inputFrame';
 import { toPlayerInput } from '@/input/toPlayerInput';
+import type { DuelLink } from '@/net/duelLink';
 import { NetSession } from '@/net/netSession';
 import type { DuelSeries } from '@/net/series';
 import { Camera } from '@/render/camera';
@@ -17,7 +19,8 @@ import { ReplayRecorder } from '@/replay/recorder';
 import type { Replay } from '@/replay/replay';
 import { pickVariant } from '@/sim/rules';
 import { createDuelSimulation, type Simulation } from '@/sim/simulation';
-import { MenuList } from '@/ui/menuList';
+import { declareWinner } from '@/sim/systems/duel';
+import { MenuList, type MenuItem } from '@/ui/menuList';
 import { drawMenu, drawTitle } from '@/ui/menuRenderer';
 import { warpToObjective } from './debugWarp';
 import { RoundDisplay } from './roundDisplay';
@@ -57,7 +60,7 @@ export class DuelScene implements Scene {
   private readonly audio: AudioDirector;
   private readonly camera: Camera;
   private readonly display: RoundDisplay;
-  private readonly menu: MenuList;
+  private menu: MenuList;
   private readonly role: 'host' | 'client';
   /** The bot's side of a practice duel; null online. */
   private readonly rival: PracticeRival | null;
@@ -67,6 +70,9 @@ export class DuelScene implements Scene {
   private readonly variant: DuelVariantId;
   /** The online series this round belongs to; null in practice. */
   private readonly series: DuelSeries | null;
+  /** The series' connection (Phase 31: it survives drops); null in practice. */
+  private readonly link: DuelLink | null;
+  private menuCanClaim = false;
   /** The host records the round for both players' debrief (Phase 25). */
   private readonly recorder: ReplayRecorder | null;
   private replay: Replay | null = null;
@@ -82,6 +88,7 @@ export class DuelScene implements Scene {
     this.app = app;
     this.practice = 'practice' in params ? params.practice : null;
     this.series = 'series' in params ? params.series : null;
+    this.link = this.series?.transport ?? null;
     this.practiceChoice = ('variant' in params ? params.variant : undefined) ?? 'classic';
     this.variant = this.series?.variant ?? pickVariant(this.practiceChoice, params.seed);
     this.rival = this.practice ? new PracticeRival(params.seed, this.practice, this.variant) : null;
@@ -101,8 +108,14 @@ export class DuelScene implements Scene {
     this.audio = new AudioDirector(this.sim, this.display.output(app.sound));
     this.net = new NetSession(this.sim, transport, this.series?.round ?? 1);
     this.recorder = this.role === 'host' ? new ReplayRecorder(this.sim, params.seed) : null;
+    // The rival is gone for good (Phase 31): left, timed out, or can't play our version.
     this.net.onDisconnect(() => {
-      if (this.sim.state.status === 'playing') app.goTo('duelEnd', { outcome: 'disconnected' });
+      const { state } = this.sim;
+      if (state.status !== 'playing') return;
+      if (this.net.versionMismatch) app.goTo('duelEnd', { outcome: 'version' });
+      // The host is the referee: it wins by forfeit, and the round ends as usual.
+      else if (this.role === 'host') declareWinner(this.sim, state.player.id, true);
+      else app.goTo('duelEnd', { outcome: 'disconnected' });
     });
     this.sim.events.on('roundEnded', (e) => (this.endedAt = e.time));
     this.sim.events.on('duelEnded', (e) => this.series?.finishRound(e.winner));
@@ -128,32 +141,68 @@ export class DuelScene implements Scene {
       const { strength, duration } = THEME.shake.hit;
       this.camera.shake(strength, duration);
     });
-    this.menu = new MenuList([
-      { kind: 'action', label: 'RESUME', onSelect: () => (this.menuOpen = false) },
-      {
-        kind: 'action',
-        label: this.practice ? 'LEAVE PRACTICE' : 'LEAVE DUEL',
-        onSelect: () => app.goTo('menu'),
-      },
-    ]);
+    this.menu = this.buildMenu();
     const who = this.practice ? `practice vs ${this.practice} bot` : this.role;
     const round = this.series ? `, round ${this.series.round}/${this.series.bestOf}` : '';
     app.debug.watch('duel', `${who}, seed ${params.seed}${round}, ${this.variant}`);
   }
 
-  /** Practice only: a hidden tab opens the menu, which pauses. */
+  /** Practice: a hidden tab opens the menu, which pauses. Online: the rival is told (Phase 31). */
   onHidden(): void {
     if (this.rival) this.menuOpen = true;
+    this.link?.setAway(true);
+  }
+
+  onShown(): void {
+    this.link?.setAway(false);
+  }
+
+  /** The rival's tab has been hidden long enough to claim the win (Phase 31). */
+  get canClaim(): boolean {
+    const away = this.link?.rivalAway ?? null;
+    return (
+      away !== null && away >= GAME.duel.link.awayForfeit && this.sim.state.status === 'playing'
+    );
+  }
+
+  private buildMenu(): MenuList {
+    const items: MenuItem[] = [
+      { kind: 'action', label: 'RESUME', onSelect: () => (this.menuOpen = false) },
+    ];
+    if (this.canClaim) {
+      items.push({
+        kind: 'action',
+        label: 'CLAIM THE WIN',
+        onSelect: () => {
+          this.net.claimWin();
+          this.menuOpen = false;
+        },
+      });
+    }
+    items.push({
+      kind: 'action',
+      label: this.practice ? 'LEAVE PRACTICE' : 'LEAVE DUEL',
+      onSelect: () => this.app.goTo('menu'),
+    });
+    return new MenuList(items);
   }
 
   update(dt: number, input: InputFrame): void {
     if (input.back || input.pause) this.menuOpen = !this.menuOpen;
     else if (this.menuOpen) this.menu.update(input);
     if (this.app.debug.enabled && input.debugWarp) warpToObjective(this.sim.state);
+    if (this.app.debug.enabled && input.debugDrop) this.link?.forceDrop();
 
     this.aimScreen = input.aim;
+    if (this.canClaim !== this.menuCanClaim) {
+      this.menuCanClaim = this.canClaim;
+      this.menu = this.buildMenu();
+    }
     // Online the world never pauses; with the menu open the player just stands still.
     if (this.rival && this.menuOpen) return;
+    // Phase 31: while the connection is down, both sides wait, frozen, for it to come back.
+    this.link?.tick(dt);
+    if (this.link?.state === 'reconnecting') return;
     this.net.tick(dt);
     this.sim.step(
       toPlayerInput(input, (x, y) => this.camera.screenToWorld(x, y), this.menuOpen),
@@ -180,6 +229,7 @@ export class DuelScene implements Scene {
         viewerId: state.player.id,
         practice: this.practice ?? undefined,
         practiceVariant: this.practiceChoice,
+        forfeit: state.duel?.forfeit,
         series: this.series ?? undefined,
       });
       return;
@@ -253,9 +303,59 @@ export class DuelScene implements Scene {
   private cornerLabel(): string {
     if (this.practice) return 'PRACTICE';
     const side = this.role === 'host' ? 'HOSTING' : 'JOINED';
+    const relay = this.link?.viaRelay ? ' · VIA RELAY' : '';
     const series = this.series;
-    if (!series || series.bestOf === 1) return side;
-    return `${side} · YOU ${series.wins(series.myId)} – ${series.wins(series.rivalId)} RIVAL`;
+    if (!series || series.bestOf === 1) return side + relay;
+    return `${side}${relay} · YOU ${series.wins(series.myId)} – ${series.wins(series.rivalId)} RIVAL`;
+  }
+
+  /** Phase 31: the round trip to the rival, orange when slow. */
+  private drawPing(ctx: CanvasRenderingContext2D, width: number, height: number): void {
+    const latency = this.link?.latency;
+    if (latency === null || latency === undefined || this.link?.state !== 'open') return;
+    const ms = Math.round(latency * 1000);
+    const slow = ms > GAME.duel.link.highPing;
+    drawText(ctx, `PING ${ms} ms`, width - 12, height - 28, {
+      size: 11,
+      color: slow ? THEME.colors.orange : THEME.colors.white,
+      align: 'right',
+      alpha: slow ? 0.9 : 0.35,
+    });
+  }
+
+  /** Phase 31: the connection is down (with the time left), or the rival's tab is hidden. */
+  private drawConnection(ctx: CanvasRenderingContext2D, width: number, height: number): void {
+    const link = this.link;
+    if (!link) return;
+    let title: string | null = null;
+    let line = '';
+    if (link.state === 'reconnecting') {
+      title = this.role === 'host' ? 'RIVAL DISCONNECTED' : 'CONNECTION LOST';
+      const left = Math.ceil(link.secondsLeft);
+      line =
+        this.role === 'host'
+          ? `Waiting for them to come back: ${left} s. The round is paused.`
+          : `Reconnecting: ${left} s. The round is paused.`;
+    } else if (link.rivalAway !== null && this.sim.state.status === 'playing') {
+      title = 'RIVAL IS AWAY';
+      const wait = Math.ceil(GAME.duel.link.awayForfeit - link.rivalAway);
+      line = this.canClaim
+        ? 'Their tab is hidden. You can claim the win from the menu (ESC).'
+        : `Their tab is hidden. You can claim the win in ${wait} s.`;
+    }
+    if (!title) return;
+    drawText(ctx, title, width / 2, height * 0.42, {
+      size: 30,
+      color: THEME.colors.orange,
+      align: 'center',
+      glow: THEME.glowBlur * 2,
+    });
+    drawText(ctx, line, width / 2, height * 0.42 + 26, {
+      size: 13,
+      color: THEME.colors.white,
+      align: 'center',
+      alpha: 0.85,
+    });
   }
 
   render(ctx: CanvasRenderingContext2D, alpha: number): void {
@@ -295,6 +395,8 @@ export class DuelScene implements Scene {
         alpha: a * 0.8,
       });
     }
+    if (!this.menuOpen) this.drawConnection(ctx, width, height);
+    this.drawPing(ctx, width, height);
     const corner = this.cornerLabel();
     drawText(ctx, corner, width - 12, height - 12, {
       size: 11,

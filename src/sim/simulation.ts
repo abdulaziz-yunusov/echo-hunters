@@ -109,6 +109,7 @@ export class Simulation implements SimContext {
             seenUntil: 0,
             variant: options.variant ?? 'classic',
             overtimeAt: null,
+            forfeit: false,
           }
         : null,
       hunters: hunterTypes.slice(0, layout.hunterSpawns.length).map((type, i) => {

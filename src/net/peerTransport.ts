@@ -1,4 +1,4 @@
-import Peer, { type DataConnection } from 'peerjs';
+import Peer, { type DataConnection, type PeerOptions } from 'peerjs';
 import { GAME } from '@/config/game';
 import { decode, encode, type NetMessage } from './protocol';
 import type { Transport } from './transport';
@@ -7,20 +7,46 @@ import type { Transport } from './transport';
 export const BLOCKED_MESSAGE =
   'Connection blocked: try disabling your ad blocker, or use a different network.';
 
+/** PeerJS options: the STUN / TURN servers from config (an empty list keeps PeerJS's own). */
+export function peerOptions(): PeerOptions {
+  const { iceServers } = GAME.duel;
+  return iceServers.length > 0 ? { config: { iceServers } } : {};
+}
+
+/**
+ * Does a WebRTC stats report show the chosen route going through a TURN
+ * relay? (The selected candidate pair's local candidate is of type 'relay'.)
+ */
+export function usesRelay(stats: Iterable<Record<string, unknown>>): boolean {
+  const all = [...stats];
+  const pair = all.find(
+    (s) => s.type === 'candidate-pair' && s.state === 'succeeded' && s.nominated === true,
+  );
+  if (!pair) return false;
+  const local = all.find((s) => s.id === pair.localCandidateId);
+  return local?.candidateType === 'relay';
+}
+
 /** Wraps an open PeerJS data connection as a Transport. */
 class PeerTransport implements Transport {
   private readonly conn: DataConnection;
-  private readonly peer: Peer;
+  /** Frees whatever this connection alone holds (a joiner's own Peer). */
+  private readonly release: () => void;
   private closed = false;
   private readonly closeHandlers: (() => void)[] = [];
+  private relay = false;
 
-  constructor(peer: Peer, conn: DataConnection) {
-    this.peer = peer;
+  constructor(conn: DataConnection, release: () => void = () => {}) {
     this.conn = conn;
+    this.release = release;
     const lost = () => this.markClosed();
     conn.on('close', lost);
     conn.on('error', lost);
-    peer.on('disconnected', lost);
+    void this.checkRelay();
+  }
+
+  get viaRelay(): boolean {
+    return this.relay;
   }
 
   send(message: NetMessage): void {
@@ -41,13 +67,22 @@ class PeerTransport implements Transport {
   close(): void {
     this.markClosed();
     this.conn.close();
-    this.peer.destroy();
+    this.release();
   }
 
   private markClosed(): void {
     if (this.closed) return;
     this.closed = true;
     for (const h of this.closeHandlers) h();
+  }
+
+  private async checkRelay(): Promise<void> {
+    try {
+      const report = await this.conn.peerConnection?.getStats();
+      if (report) this.relay = usesRelay(report.values() as Iterable<Record<string, unknown>>);
+    } catch {
+      // No stats: assume a direct connection.
+    }
   }
 }
 
@@ -56,6 +91,11 @@ export interface HostedRoom {
   code: string;
   /** Resolves when someone joins. */
   opponent: Promise<Transport>;
+  /**
+   * Every later connection to the room (Phase 31): a rival rejoining after
+   * a drop. The room stays open until `cancel()`.
+   */
+  onLaterOpponent(listener: (transport: Transport) => void): void;
   /** Stop waiting and free the room. */
   cancel(): void;
 }
@@ -64,7 +104,7 @@ export interface HostedRoom {
 export async function hostRoom(): Promise<HostedRoom> {
   for (let attempt = 0; attempt < 3; attempt++) {
     const code = randomCode();
-    const peer = new Peer(GAME.duel.peerPrefix + code);
+    const peer = new Peer(GAME.duel.peerPrefix + code, peerOptions());
     try {
       await opened(peer);
     } catch (error) {
@@ -72,6 +112,12 @@ export async function hostRoom(): Promise<HostedRoom> {
       if ((error as { type?: string }).type === 'unavailable-id') continue; // code taken: try another
       throw new Error(BLOCKED_MESSAGE, { cause: error });
     }
+    // Lost the PeerJS server (not the rival): get the same id back, so a rejoin can find us.
+    peer.on('disconnected', () => {
+      if (!peer.destroyed) peer.reconnect();
+    });
+    let first = true;
+    const later: ((t: Transport) => void)[] = [];
     let cancel = () => peer.destroy();
     const opponent = new Promise<Transport>((resolve, reject) => {
       cancel = () => {
@@ -79,18 +125,31 @@ export async function hostRoom(): Promise<HostedRoom> {
         reject(new Error('cancelled'));
       };
       peer.on('connection', (conn) => {
-        conn.on('open', () => resolve(new PeerTransport(peer, conn)));
+        conn.on('open', () => {
+          const transport = new PeerTransport(conn);
+          if (first) {
+            first = false;
+            resolve(transport);
+          } else for (const l of later) l(transport);
+        });
       });
-      peer.on('error', () => reject(new Error(BLOCKED_MESSAGE)));
+      peer.on('error', (e) => {
+        if (first) reject(new Error(BLOCKED_MESSAGE, { cause: e }));
+      });
     });
-    return { code, opponent, cancel: () => cancel() };
+    return {
+      code,
+      opponent,
+      onLaterOpponent: (listener) => later.push(listener),
+      cancel: () => cancel(),
+    };
   }
   throw new Error('Could not get a free room code. Please try again.');
 }
 
 /** Join a room by code. Fails after the connect timeout. */
 export async function joinRoom(code: string): Promise<Transport> {
-  const peer = new Peer();
+  const peer = new Peer(peerOptions());
   try {
     await opened(peer);
     const conn = peer.connect(GAME.duel.peerPrefix + code.toUpperCase(), { reliable: true });
@@ -101,7 +160,7 @@ export async function joinRoom(code: string): Promise<Transport> {
         peer.on('error', (e) => reject(e));
       }),
     );
-    return new PeerTransport(peer, conn);
+    return new PeerTransport(conn, () => peer.destroy());
   } catch (error) {
     peer.destroy();
     const type = (error as { type?: string }).type;

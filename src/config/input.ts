@@ -18,6 +18,7 @@ export const ACTIONS = [
   'debugNewMap',
   'debugOverview',
   'debugWarp',
+  'debugDrop',
   'debugHearing',
 ] as const;
 
@@ -77,5 +78,7 @@ export const DEFAULT_BINDINGS: Readonly<Record<Action, readonly string[]>> = {
   debugNewMap: ['KeyN'],
   debugOverview: ['KeyO'],
   debugWarp: ['KeyT'],
+  /** Debug, online duel (Phase 31): cut the connection, to try a reconnect. */
+  debugDrop: ['KeyK'],
   debugHearing: ['KeyH'],
 };

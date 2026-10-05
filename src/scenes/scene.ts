@@ -24,6 +24,8 @@ export interface Scene {
   resume?(): void;
   /** The browser tab was hidden (e.g. to pause the game). */
   onHidden?(): void;
+  /** The tab is visible again (a duel tells the rival it is back, Phase 31). */
+  onShown?(): void;
   /** Fixed-step update; only the top scene receives it. */
   update(dt: number, input: InputFrame): void;
   /** @param alpha 0..1 between the last tick and the next, for smooth drawing. */

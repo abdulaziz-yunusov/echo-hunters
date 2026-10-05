@@ -30,8 +30,8 @@ function playRound(s: Pair, seed: number, winner: 'host' | 'client') {
     }),
   };
   const nets = {
-    host: new NetSession(sims.host, s.link.a, s.host.round),
-    client: new NetSession(sims.client, s.link.b, s.client.round),
+    host: new NetSession(sims.host, s.host.transport, s.host.round),
+    client: new NetSession(sims.client, s.client.transport, s.client.round),
   };
   sims.host.events.on('duelEnded', (e) => s.host.finishRound(e.winner));
   sims.client.events.on('duelEnded', (e) => s.client.finishRound(e.winner));
@@ -181,9 +181,10 @@ describe('duel series', () => {
         let lostRound = false;
         if (index === 0) {
           const sim = createDuelSimulation({ seed: DUEL_SEED, role: stayer.role, hunters: [] });
-          new NetSession(sim, stayer === s.host ? s.link.a : s.link.b).onDisconnect(
-            () => (lostRound = true),
-          );
+          new NetSession(
+            sim,
+            stayer === s.host ? s.host.transport : s.client.transport,
+          ).onDisconnect(() => (lostRound = true));
         } else {
           playRound(s, DUEL_SEED, 'host');
           if (index >= 2) s[leaver].markReady();
@@ -207,13 +208,13 @@ describe('duel series', () => {
     const s = seriesPair(3);
     const data = await packReplay(recordedDuel().replay);
     const sim = createDuelSimulation({ seed: DUEL_SEED, role: 'client', hunters: [] });
-    const net = new NetSession(sim, s.link.b, 2);
+    const net = new NetSession(sim, s.client.transport, 2);
     let received = 0;
     net.onRecording(() => received++);
-    s.link.a.send({ t: 'rec', data, round: 1 });
+    s.host.transport.send({ t: 'rec', data, round: 1 });
     await flushLink(s.link);
     expect(received).toBe(0);
-    s.link.a.send({ t: 'rec', data, round: 2 });
+    s.host.transport.send({ t: 'rec', data, round: 2 });
     await flushLink(s.link);
     expect(received).toBe(1);
   });
@@ -222,7 +223,7 @@ describe('duel series', () => {
     const s = seriesPair(3);
     const { nets, sims } = playRound(s, DUEL_SEED, 'host');
     nets.client.detach();
-    s.link.a.send({ t: 'bye' });
+    s.host.transport.send({ t: 'bye' });
     s.link.pump();
     s.link.pump();
     expect(nets.client.disconnected).toBe(false);

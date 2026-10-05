@@ -54,6 +54,8 @@ export interface DuelState {
   variant: DuelVariantId;
   /** When overtime began (sim time); null before. */
   overtimeAt: number | null;
+  /** The round was won by forfeit: the loser left, or was away too long (Phase 31). */
+  forfeit: boolean;
 }
 
 /** A duel trap on the floor (Phase 29). Each side knows its own; the host knows all. */
