@@ -28,6 +28,7 @@ export class RoundDisplay {
     this.camera.shakeScale = d.shake;
     this.world.flashIntensity = d.flash;
     this.showCues = d.soundCues;
+    this.world.ghostVisible = d.ghost;
     if (!this.showCues) this.cues.clear();
   }
 

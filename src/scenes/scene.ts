@@ -43,7 +43,14 @@ export interface Scene {
 export interface SceneParams {
   menu: undefined;
   play: { run: RunState };
-  levelEnd: { run: RunState; score: ScoreBreakdown; seconds: number; replay?: Replay };
+  /** `best`: this map's best time before this round, and whether this round beat it (Phase 23). */
+  levelEnd: {
+    run: RunState;
+    score: ScoreBreakdown;
+    seconds: number;
+    replay?: Replay;
+    best?: { previous: number | null; isNew: boolean };
+  };
   gameOver: { run: RunState; score: ScoreBreakdown; replay?: Replay };
   /** `viewerId`: whose path is "you" in a duel debrief (default: the recorded player). */
   replay: { replay: Replay; viewerId?: number };

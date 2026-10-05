@@ -147,6 +147,7 @@ function validDisplay(value: unknown): DisplaySettings {
   if (level(d.shake)) result.shake = d.shake as number;
   if (level(d.flash)) result.flash = d.flash as number;
   if (typeof d.soundCues === 'boolean') result.soundCues = d.soundCues;
+  if (typeof d.ghost === 'boolean') result.ghost = d.ghost;
   if ((GLOW_SETTINGS as readonly unknown[]).includes(d.glow)) {
     result.glow = d.glow as DisplaySettings['glow'];
   }

@@ -11,6 +11,8 @@ export interface DisplaySettings {
   palette: PaletteId;
   /** Glow on everything (Phase 12): AUTO turns it off on slow devices. */
   glow: GlowSetting;
+  /** The echo of your best run on a map (Phase 23). */
+  ghost: boolean;
 }
 
 export type GlowSetting = 'auto' | 'on' | 'off';
@@ -24,6 +26,7 @@ export const DISPLAY = {
     soundCues: false,
     palette: 'standard',
     glow: 'auto',
+    ghost: true,
   } as DisplaySettings,
   /**
    * Glow governor (Phase 12, render/quality.ts): frames averaging slower than

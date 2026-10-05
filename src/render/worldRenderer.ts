@@ -19,7 +19,16 @@ import {
   pickupKey,
   revealAlpha,
 } from './objectRenderer';
-import { drawPlayer, drawRivalOutline, drawStones, drawTraps, RIVAL_KEY } from './playerRenderer';
+import {
+  drawGhost,
+  drawPlayer,
+  drawRivalOutline,
+  drawStones,
+  drawTraps,
+  GHOST_KEY,
+  RIVAL_KEY,
+} from './playerRenderer';
+import type { GhostTrack } from '@/replay/ghostPath';
 import { RevealMap, type RevealableObject } from './revealMap';
 import { drawSurfaces, listSurfaceTiles, type SurfaceTile } from './surfaceRenderer';
 import { WallLayer } from './wallLayer';
@@ -69,6 +78,11 @@ export class WorldRenderer {
     });
   }
 
+  /** The echo of the best run on this map (Phase 23), if any. Purely visual: the sim never sees it. */
+  ghost: GhostTrack | null = null;
+  /** Player setting: show the ghost. */
+  ghostVisible = true;
+
   /** Player setting: brightness of hit / pickup / stun flashes (0..1). */
   set flashIntensity(value: number) {
     this.fx.intensity = value;
@@ -84,6 +98,9 @@ export class WorldRenderer {
     const { state } = this.sim;
     this.reveal.update(state.time);
     this.reveal.revealObjects(state.waves, revealables(state), state.time, dt);
+    const ghost = this.ghostVisible ? this.ghost?.positionAt(state.time) : null;
+    if (ghost)
+      this.reveal.revealObjects(state.waves, [{ key: GHOST_KEY, ...ghost }], state.time, dt);
     this.reveal.revealObjects(state.waves, this.surfaces, state.time, dt);
     this.fx.update(dt);
   }
@@ -114,6 +131,9 @@ export class WorldRenderer {
     );
     this.drawObjects(ctx, pixel);
     drawHunterSilhouettes(ctx, state.hunters, this.reveal, time, this.silhouetteSeconds);
+    if (this.ghostVisible && this.ghost) {
+      drawGhost(ctx, this.reveal.objectReveal(GHOST_KEY), time, this.silhouetteSeconds, pixel);
+    }
     drawRivalOutline(ctx, this.reveal.objectReveal(RIVAL_KEY), time, this.silhouetteSeconds, pixel);
     // Duel tools (Phase 29): your own traps, and the rival through walls after a flare or a trap.
     drawTraps(ctx, state.traps, state.player.id, pixel);

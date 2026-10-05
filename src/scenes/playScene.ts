@@ -10,6 +10,8 @@ import { drawHud } from '@/render/hud';
 import { drawAimGuide, playerDrawPosition } from '@/render/playerRenderer';
 import { drawText, wrapLines } from '@/render/text';
 import { ReplayRecorder } from '@/replay/recorder';
+import { GhostTrack, pathFromReplay } from '@/replay/ghostPath';
+import { ghostKey, loadGhost, submitGhost } from '@/platform/ghostStore';
 import { WorldRenderer } from '@/render/worldRenderer';
 import { roundResult, scoreRound } from '@/sim/scoring';
 import { levelDef, newHunterTypes } from '@/sim/level';
@@ -216,6 +218,8 @@ export class PlayScene implements Scene {
     // A modifier (Blackout, Phase 21) may override the difficulty's ghost level.
     const ghost = this.sim.state.rules.ghostAlpha ?? DIFFICULTIES[this.run.difficulty].ghostAlpha;
     this.world = new WorldRenderer(this.sim, ghost);
+    const stored = loadGhost(ghostKey(this.sim.state.layout.seed));
+    this.world.ghost = stored ? new GhostTrack(stored.points) : null;
     this.display = new RoundDisplay(this.camera, this.world);
     this.audio = new AudioDirector(this.sim, this.display.output(this.app.sound));
     this.popup = null;
@@ -392,7 +396,9 @@ export class PlayScene implements Scene {
     const replay = this.recorder.finish();
     if (state.status === 'extracted') {
       const seconds = this.endedAt ?? state.time;
-      this.app.goTo('levelEnd', { run: this.run, score, seconds, replay });
+      // The echo of the best run (Phase 23): its path, if this was the fastest on this map.
+      const best = submitGhost(ghostKey(state.layout.seed), seconds, pathFromReplay(replay));
+      this.app.goTo('levelEnd', { run: this.run, score, seconds, replay, best });
     } else {
       this.app.goTo('gameOver', { run: this.run, score, replay });
     }

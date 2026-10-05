@@ -30,17 +30,26 @@ export class LevelEndScene implements Scene {
   private readonly isNewHigh: boolean;
   private readonly menu: MenuList;
   private time = 0;
+  /** "vs best: −12 s" against this map's best run (Phase 23); '' when unknown. */
+  readonly versusBest: string;
   /** The level's modifier (Phase 21): it is in the score, and named. */
   private readonly modifier: ModifierId | null;
 
   constructor(
     app: AppContext,
-    params: { run: RunState; score: ScoreBreakdown; seconds: number; replay?: Replay },
+    params: {
+      run: RunState;
+      score: ScoreBreakdown;
+      seconds: number;
+      replay?: Replay;
+      best?: { previous: number | null; isNew: boolean };
+    },
   ) {
     this.app = app;
     this.run = params.run;
     this.score = params.score;
     this.seconds = params.seconds;
+    this.versusBest = versusBest(params.seconds, params.best);
     this.modifier = this.run.custom ? null : levelModifier(this.run.seed, this.run.level);
     this.next = nextLevel(this.run, this.score.total);
     // A hand-made map can be made easy, so it never counts for the high score (Phase 13).
@@ -98,6 +107,14 @@ export class LevelEndScene implements Scene {
       align: 'center',
       alpha: 0.6,
     });
+    if (this.versusBest) {
+      drawText(ctx, this.versusBest, cx, y + 20, {
+        size: 13,
+        color: this.versusBest.startsWith('NEW') ? THEME.colors.green : white,
+        align: 'center',
+        alpha: 0.8,
+      });
+    }
 
     y += 44;
     const s = this.score;
@@ -155,4 +172,19 @@ export class LevelEndScene implements Scene {
     drawText(ctx, label, cx - 170, y, { size: 15, color, alpha });
     drawText(ctx, value, cx + 170, y, { size: 15, color, alpha, align: 'right' });
   }
+}
+
+/**
+ * How this round compares with the map's best before it: "NEW BEST · −12 s",
+ * "vs best: +4 s", or "FIRST RUN ON THIS MAP".
+ */
+export function versusBest(
+  seconds: number,
+  best: { previous: number | null; isNew: boolean } | undefined,
+): string {
+  if (!best) return '';
+  if (best.previous === null) return best.isNew ? 'FIRST RUN ON THIS MAP: GHOST SAVED' : '';
+  const diff = Math.round(seconds - best.previous);
+  const signed = diff < 0 ? `−${-diff} s` : `+${diff} s`;
+  return best.isNew ? `NEW BEST · ${signed} · GHOST SAVED` : `vs best: ${signed}`;
 }

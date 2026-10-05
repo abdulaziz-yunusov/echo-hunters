@@ -34,6 +34,12 @@ import { UPGRADE_IDS, UPGRADE_OFFER_SIZE, UPGRADES, type UpgradeId } from '@/con
 import { buildRules } from '@/sim/rules';
 import { offerUpgrades } from '@/sim/upgrades';
 import { levelModifier } from '@/sim/modifiers';
+import { Bot } from '@/bot/bot';
+import { ghostKey, submitGhost } from '@/platform/ghostStore';
+import { pathFromReplay, type GhostTrack } from '@/replay/ghostPath';
+import { samplePointAt, trackPosition } from '@/replay/replay';
+import type { RevealMap } from '@/render/revealMap';
+import { GHOST_KEY } from '@/render/playerRenderer';
 import { roundResult, scoreRound } from '@/sim/scoring';
 
 const DT = 1 / 60;
@@ -139,7 +145,7 @@ describe('screen flow', () => {
     t.app.goTo('menu');
     t.choose(6); // PLAY, DAILY, DUEL, DIFFICULTY, MAP EDITOR, HOW TO PLAY, SETTINGS
     expect(t.current()).toBe('Settings');
-    t.choose(9); // … SOUND, SOUND CUES, SCREEN SHAKE, FLASHES, COLORS, GLOW, CONTROLS
+    t.choose(10); // … SOUND, SOUND CUES, SCREEN SHAKE, FLASHES, COLORS, GLOW, GHOST, CONTROLS
     expect(t.current()).toBe('Controls');
     t.press({ back: true });
     expect(t.current()).toBe('Settings');
@@ -894,6 +900,75 @@ describe('screen flow', () => {
       t.idle(1);
       t.choose(0);
       expect(t.current()).toBe('Play');
+    });
+  });
+
+  describe('the echo of your best run (Phase 23)', () => {
+    const storage = () => {
+      const data = new Map<string, string>();
+      vi.stubGlobal('localStorage', {
+        getItem: (k: string) => data.get(k) ?? null,
+        setItem: (k: string, v: string) => void data.set(k, v),
+      });
+    };
+    type Playing = {
+      sim: Simulation;
+      world: { ghost: GhostTrack | null; reveal: RevealMap };
+      endedAt: number | null;
+      finishLevel(): void;
+    };
+    const playing = (t: ReturnType<typeof testApp>) => t.scenes.current as unknown as Playing;
+
+    it('playing a map again brings back the earlier path, seen only where rings pass', () => {
+      storage();
+      // A bot's extraction on run seed 4, level 1, saved as that map's best.
+      const sim = createSimulation({ seed: 4, level: 1 });
+      const bot = new Bot(sim, 'careful');
+      const recorder = new ReplayRecorder(sim, 4);
+      for (let i = 0; i < 300 * 60 && sim.state.status === 'playing'; i++) {
+        sim.step(bot.input(), DT);
+        recorder.afterStep();
+      }
+      const replay = recorder.finish();
+      submitGhost(ghostKey(sim.state.layout.seed), sim.state.time, pathFromReplay(replay));
+
+      const t = testApp();
+      t.app.goTo('play', { run: newRun(4, 'easy') });
+      const { world } = playing(t);
+      expect(world.ghost).not.toBeNull();
+      for (const time of [0.5, 3, 7, 12]) {
+        const was = trackPosition(replay.player, samplePointAt(replay, time));
+        const ghost = world.ghost!.positionAt(time)!;
+        expect(Math.hypot(ghost.x - was.x, ghost.y - was.y)).toBeLessThan(4);
+      }
+      // Silent darkness until a ring passes over it: then it is seen.
+      t.idle(0.3);
+      expect(world.reveal.objectReveal(GHOST_KEY)).toBeUndefined();
+      t.press({ ping: true, pingHeld: true });
+      t.press({});
+      t.idle(0.2);
+      expect(world.reveal.objectReveal(GHOST_KEY)).toBeDefined();
+      vi.unstubAllGlobals();
+    });
+
+    it('Level End: the first extraction saves the ghost; a slower one is compared', () => {
+      storage();
+      const finish = (seconds: number) => {
+        const t = testApp();
+        t.app.goTo('play', { run: newRun(12, 'easy') });
+        t.idle(0.5);
+        const p = playing(t);
+        p.sim.state.status = 'extracted';
+        p.endedAt = seconds;
+        p.finishLevel();
+        expect(t.current()).toBe('LevelEnd');
+        t.render();
+        return (t.scenes.current as unknown as { versusBest: string }).versusBest;
+      };
+      expect(finish(40)).toBe('FIRST RUN ON THIS MAP: GHOST SAVED');
+      expect(finish(45)).toBe('vs best: +5 s');
+      expect(finish(33)).toBe('NEW BEST · −7 s · GHOST SAVED');
+      vi.unstubAllGlobals();
     });
   });
 

@@ -87,6 +87,12 @@ export class SettingsScene implements Scene {
           this.changeDisplay({ glow: next });
         },
       },
+      {
+        kind: 'adjust',
+        label: 'BEST-RUN GHOST',
+        value: () => (this.display().ghost ? 'ON' : 'OFF'),
+        onChange: () => this.changeDisplay({ ghost: !this.display().ghost }),
+      },
       { kind: 'action', label: 'CONTROLS', onSelect: () => app.open('controls') },
       { kind: 'action', label: 'BACK', onSelect: () => app.close() },
     ]);

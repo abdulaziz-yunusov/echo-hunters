@@ -134,6 +134,7 @@ describe('save data', () => {
       soundCues: true,
       palette: 'colorblind' as const,
       glow: 'off' as const,
+      ghost: false,
     };
     updateSave({ display });
     expect(loadSave().display).toEqual(display);
@@ -143,7 +144,14 @@ describe('save data', () => {
       fakeStorage({
         'pulse-echo-hunters': JSON.stringify({
           version: 3,
-          display: { shake: 3, flash: 0, soundCues: 'yes', palette: 'sepia', glow: 'max' },
+          display: {
+            shake: 3,
+            flash: 0,
+            soundCues: 'yes',
+            palette: 'sepia',
+            glow: 'max',
+            ghost: 1,
+          },
         }),
       }),
     );

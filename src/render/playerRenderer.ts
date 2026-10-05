@@ -163,3 +163,36 @@ export function drawRivalOutline(
   ctx.stroke();
   ctx.restore();
 }
+
+export const GHOST_KEY = 'ghost';
+
+/**
+ * The echo of your best run (Phase 23): a pale, dashed ring where a sound
+ * ring last passed over it, fading like a hunter's silhouette. It never
+ * shows where nothing was heard, so the darkness stays dark.
+ */
+export function drawGhost(
+  ctx: CanvasRenderingContext2D,
+  seen: { time: number; x: number; y: number } | undefined,
+  now: number,
+  fadeSeconds: number,
+  pixel: number,
+): void {
+  if (!seen) return;
+  const a = 1 - (now - seen.time) / fadeSeconds;
+  if (a <= 0) return;
+  ctx.save();
+  ctx.globalAlpha = a * 0.55;
+  ctx.strokeStyle = THEME.colors.white;
+  ctx.fillStyle = THEME.colors.white;
+  ctx.lineWidth = 1.5 * pixel;
+  ctx.setLineDash([3 * pixel, 3 * pixel]);
+  ctx.beginPath();
+  ctx.arc(seen.x, seen.y, GAME.player.radius, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.globalAlpha = a * 0.35;
+  ctx.beginPath();
+  ctx.arc(seen.x, seen.y, GAME.player.radius * 0.4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
