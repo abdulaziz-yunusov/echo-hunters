@@ -36,6 +36,9 @@ export class AudioDirector {
       on('closeCall', centered('closeCall')),
       on('pickupCollected', (e) => this.ifMine(e.by, 'pickupCollected')),
       on('stoneThrown', centered('stoneThrown')),
+      // Duel tools (Phase 29): your flare going up, or the rival's finding you.
+      on('toolUsed', (e) => (e.tool === 'flare' ? this.ifMine(e.by, 'flare') : undefined)),
+      on('flareSeen', centered('flare')),
       // Duel (Phase 28): both players hear a steal and an extraction starting.
       on('coreStolen', centered('coreStolen')),
       on('extractStarted', centered('extractStarted')),

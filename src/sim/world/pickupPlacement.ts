@@ -1,6 +1,6 @@
 import { GAME } from '@/config/game';
 import type { LevelDef } from '@/config/levels';
-import type { PickupTypeId } from '@/config/pickups';
+import { DUEL_TOOLS, type PickupTypeId } from '@/config/pickups';
 import { deriveSeed, Rng } from '@/core/rng';
 import type { Pickup } from '../entities/pickup';
 import type { MapLayout } from './mapGen';
@@ -12,6 +12,18 @@ import { distanceField } from './pathfinding';
  * Pickups go on free floor tiles away from the spawns, never on a core,
  * the beacon or another pickup.
  */
+/**
+ * A duel map's pickups (Phase 29): GAME.duel.pickups, plus
+ * GAME.duel.toolsPerMap tools picked by the seed (its own stream), so both
+ * players get the same ones.
+ */
+export function duelPickupCounts(seed: number): LevelDef['pickups'] {
+  const tools = new Rng(deriveSeed(seed, 'tools')).shuffle([...DUEL_TOOLS]);
+  const counts: LevelDef['pickups'] = { ...GAME.duel.pickups };
+  for (const tool of tools.slice(0, GAME.duel.toolsPerMap)) counts[tool] = 1;
+  return counts;
+}
+
 export function placePickups(layout: MapLayout, counts: LevelDef['pickups']): Pickup[] {
   const { tiles } = layout;
   const rng = new Rng(deriveSeed(layout.seed, 'pickups'));

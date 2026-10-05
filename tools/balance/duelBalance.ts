@@ -1,5 +1,6 @@
 import { DUEL_BOTS, type DuelBotId } from '@/config/duelBots';
 import { GAME } from '@/config/game';
+import { DUEL_TOOLS, isTool, TOOLS, type ToolId } from '@/config/pickups';
 import { deriveSeed, Rng } from '@/core/rng';
 import { createLoopbackPair } from '@/net/loopback';
 import { NetSession } from '@/net/netSession';
@@ -31,6 +32,10 @@ export interface DuelRound {
   firstCore: EntityId | null;
   /** Times someone was hit hard enough to drop their cores. */
   drops: number;
+  /** Who first picked up each duel tool that was picked up (Phase 29). */
+  tools: Partial<Record<ToolId, EntityId>>;
+  /** Tools used, by either player. */
+  toolUses: number;
 }
 
 export interface DuelStats {
@@ -48,6 +53,9 @@ export interface DuelStats {
   /** Share of decided rounds won by whoever took the first core, 0..1. */
   firstCoreWins: number;
   meanDrops: number;
+  /** Per tool: decided rounds in which someone picked it up, and the share of them its picker won. */
+  toolWins: Record<ToolId, { rounds: number; pickerWins: number }>;
+  meanToolUses: number;
   /** Rounds nobody won within DUEL_ROUND_LIMIT. */
   timeouts: number;
 }
@@ -79,6 +87,12 @@ export function playDuel(
   let drops = 0;
   host.events.on('coreCollected', (e) => (firstCore ??= e.by));
   host.events.on('coresDropped', () => drops++);
+  const tools: DuelRound['tools'] = {};
+  host.events.on('pickupCollected', (e) => {
+    if (isTool(e.type)) tools[e.type] ??= e.by;
+  });
+  let toolUses = 0;
+  for (const sim of [host, client]) sim.events.on('toolUsed', () => toolUses++);
 
   const { state } = host;
   const duel = state.duel!;
@@ -114,6 +128,8 @@ export function playDuel(
     leadChanges,
     firstCore,
     drops,
+    tools,
+    toolUses,
   };
 }
 
@@ -150,6 +166,17 @@ export function summarize(
     meanLeadChanges: mean((r) => r.leadChanges),
     firstCoreWins: share(decided.filter((r) => r.winner === r.firstCore).length),
     meanDrops: mean((r) => r.drops),
+    toolWins: Object.fromEntries(
+      DUEL_TOOLS.map((tool) => {
+        const picked = decided.filter((r) => r.tools[tool] !== undefined);
+        const won = picked.filter((r) => r.tools[tool] === r.winner).length;
+        return [
+          tool,
+          { rounds: picked.length, pickerWins: picked.length ? won / picked.length : NaN },
+        ];
+      }),
+    ) as DuelStats['toolWins'],
+    meanToolUses: mean((r) => r.toolUses),
     timeouts: rounds.length - decided.length,
   };
 }
@@ -174,6 +201,11 @@ export function formatDuelTable(s: DuelStats): string {
     ['Lead changes per round', s.meanLeadChanges.toFixed(2)],
     ['First core wins', pct(s.firstCoreWins)],
     ['Drops per round', s.meanDrops.toFixed(2)],
+    ['Tools used per round', s.meanToolUses.toFixed(2)],
+    ...DUEL_TOOLS.map((tool): [string, string] => {
+      const t = s.toolWins[tool];
+      return [`${TOOLS[tool].label} picker wins`, `${pct(t.pickerWins)} of ${t.rounds}`];
+    }),
     [`Past ${DUEL_ROUND_LIMIT / 60} min`, pct(s.rounds ? s.timeouts / s.rounds : NaN)],
   ];
   return ['| Duel | |', '|---|---|', ...rows.map(([k, v]) => `| ${k} | ${v} |`)].join('\n');

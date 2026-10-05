@@ -1,6 +1,6 @@
 import { GAME } from '@/config/game';
 import { HUNTER_COMMON } from '@/config/hunters';
-import { PICKUP_TYPES } from '@/config/pickups';
+import { isTool, PICKUP_TYPES, type ToolId } from '@/config/pickups';
 import { setHunterState } from '../ai/hunterBrain';
 import type { EntityId } from '../entities/entity';
 import type { Core } from '../entities/objectives';
@@ -41,6 +41,8 @@ export function take(ctx: SimContext, kind: TakeKind, id: number): void {
   if (!duel || duel.pending.includes(key)) return;
   const core = kind === 'core' ? state.cores.find((c) => c.id === id) : undefined;
   if (core && isLockedFor(state, core, state.player.id)) return; // no point asking yet
+  const pickup = kind === 'pickup' ? state.pickups.find((p) => p.id === id) : undefined;
+  if (pickup?.lockedFor === state.player.id) return;
   duel.pending.push(key);
   ctx.events.emit('takeRequested', { kind, id });
 }
@@ -73,7 +75,9 @@ export function grant(ctx: SimContext, kind: TakeKind, id: number, by: EntityId)
     }
   } else {
     const pickup = item as Pickup;
-    if (holder === state.player) applyPickup(holder, pickup);
+    if (isTool(pickup.type)) {
+      if (holder) takeTool(ctx, holder, pickup.type, item.x, item.y);
+    } else if (holder === state.player) applyPickup(holder, pickup);
     ctx.events.emit('pickupCollected', {
       pickupId: id,
       type: pickup.type,
@@ -112,6 +116,32 @@ function applyPickup(player: Player, p: Pickup): void {
       player.silentTime = PICKUP_TYPES.silentBoots.duration;
       break;
   }
+}
+
+/**
+ * One tool slot (Phase 29): a new tool replaces the one in hand, which the
+ * referee puts on the floor right there, locked for this player until they
+ * step away (so standing on it doesn't swap back and forth).
+ */
+function takeTool(ctx: SimContext, holder: Player, tool: ToolId, x: number, y: number): void {
+  const old = holder.tool;
+  holder.tool = tool;
+  if (old && ctx.state.mode !== 'client') {
+    const id = Math.max(0, ...ctx.state.pickups.map((p) => p.id)) + 1;
+    placeDroppedTool(ctx, holder.id, { id, type: old, x, y });
+  }
+}
+
+/** A swapped-out tool lands on the floor (referee; or the client, told by the host). */
+export function placeDroppedTool(
+  ctx: SimContext,
+  by: EntityId,
+  pickup: { id: number; type: ToolId; x: number; y: number },
+): void {
+  const { state } = ctx;
+  if (state.pickups.some((p) => p.id === pickup.id)) return;
+  state.pickups.push({ ...pickup, collected: false, lockedFor: by });
+  ctx.events.emit('toolDropped', { by, pickup });
 }
 
 function find(state: GameState, kind: TakeKind, id: number) {

@@ -1,4 +1,5 @@
 import { GAME } from '@/config/game';
+import type { ToolId } from '@/config/pickups';
 import type { EntityId } from './entity';
 
 /** The Echo. Plain data: systems update it, renderers read it. */
@@ -48,6 +49,22 @@ export interface Player {
   silentTime: number;
   /** Duel: seconds until the cores this player carries hum again (Phase 28). */
   carryHumTimer: number;
+  /** Duel: the tool in the one tool slot (Phase 29). */
+  tool: ToolId | null;
+  /** Duel: Decoy Steps walking away from where they were set off; null when none. */
+  decoy: Decoy | null;
+}
+
+/** Fake footsteps on the move (Phase 29). */
+export interface Decoy {
+  x: number;
+  y: number;
+  /** Where it walks, along the corridors, toward the aim (next waypoint first). */
+  route: { x: number; y: number }[];
+  /** Seconds left. */
+  left: number;
+  /** Distance walked since its last step (px). */
+  stride: number;
 }
 
 export function createPlayer(id: EntityId, x: number, y: number): Player {
@@ -80,6 +97,8 @@ export function createPlayer(id: EntityId, x: number, y: number): Player {
     shockCooldown: 0,
     silentTime: 0,
     carryHumTimer: GAME.duel.carryHumInterval,
+    tool: null,
+    decoy: null,
   };
 }
 

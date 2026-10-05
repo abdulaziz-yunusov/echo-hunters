@@ -8,7 +8,10 @@ import type { SoundEmitted } from '@/sim/events';
 import type { PlayerInput } from '@/sim/playerInput';
 import type { Simulation } from '@/sim/simulation';
 import { frontPassedOver } from '@/sim/sound/soundWave';
+import { isTool } from '@/config/pickups';
+import type { Pickup } from '@/sim/entities/pickup';
 import { coresNeeded, isLockedFor } from '@/sim/systems/duel';
+import { rivalRevealed } from '@/sim/systems/tools';
 import { hasLineOfSight } from '@/sim/world/visibility';
 import { Bot } from './bot';
 
@@ -24,6 +27,18 @@ const GIVE_UP = 24;
 const EARLY_REACH = 1.8;
 /** Hunt a rival who carries more cores when last known within this distance (px), Phase 28. */
 const HUNT_RANGE = 300;
+/** A core with an awake hunter this close (px) is left alone for now. */
+const GUARD_RADIUS = 56;
+/** Duel tools (Phase 29): fetch a tool lying this close (px) when the slot is empty. */
+const TOOL_DETOUR = 160;
+/** A rival position at most this old (s) counts as "on my heels". */
+const TOOL_FRESH = 2;
+/** Fire a flare when the rival leads and hasn't been located for this long (s). */
+const FLARE_AFTER = 3;
+/** Set a trap at the beacon from this close (px). */
+const TRAP_AT_BEACON = 40;
+/** Use decoys or a trap behind when the rival is this close (px). */
+const PURSUED = 280;
 
 /** Where the rival was heard or seen, and when the bot knew it (sim time). */
 export interface Sighting extends Vec2 {
@@ -47,7 +62,12 @@ export interface DuelBotOptions {
  * rival (the pale outline a player would see). Never from the state directly.
  *
  * Its level (`DUEL_BOTS`) slows its reactions, shortens its hearing,
- * shakes its shockwave and takes its stones away.
+ * shakes its shockwave and takes its stones and tools away.
+ *
+ * Tools (Phase 29): it fetches one lying close by, then uses it when a
+ * player would: a trap at the beacon the rival must reach, or behind it
+ * when pursued while carrying; a flare when the rival leads and it has
+ * lost them; decoy steps away from its route when pursued while carrying.
  */
 export class DuelBot extends Bot {
   private readonly level: DuelBotLevel;
@@ -60,6 +80,8 @@ export class DuelBot extends Bot {
   private thinkUntil = -Infinity;
   /** The sighting it last decided whether to fire early at. */
   private judged: Sighting | null = null;
+  /** The tool it is fetching: kept until it is gone, so the bot doesn't dither at the edge of range. */
+  private fetching: Pickup | null = null;
   private readonly off: () => void;
 
   constructor(sim: Simulation, options: DuelBotOptions = {}) {
@@ -89,6 +111,7 @@ export class DuelBot extends Bot {
     input.moveX *= pace;
     input.moveY *= pace;
     this.shock(input);
+    if (this.level.tools) this.useTool(input);
     return input;
   }
 
@@ -99,14 +122,77 @@ export class DuelBot extends Bot {
     const chase = this.chaseTarget();
     // The beacon is awake and not for us: the rival carries the cores. Stop them.
     if (beacon.active) return chase ?? beacon;
+    const tool = this.level.tools ? this.toolNearby() : null;
+    if (tool) return tool;
     // The rival leads and we know where they are: knock the cores loose (2 hits) and steal them.
     const rival = state.rival;
     if (chase && rival && rival.cores > player.cores && dist(player, chase) <= HUNT_RANGE) {
       return chase;
     }
-    const free = state.cores.filter((c) => !c.collected && !isLockedFor(state, c, player.id));
+    const free = state.cores.filter(
+      (c) => !c.collected && !isLockedFor(state, c, player.id) && !this.guarded(c),
+    );
     if (free.length > 0) return this.nearest(free);
     return chase ?? beacon;
+  }
+
+  /**
+   * A core with an awake hunter right on it (one it can hear): not worth
+   * walking into until the hunter moves off. Without this, two bots could
+   * keep diving for a core dropped next to an attacking Stalker, each hit
+   * twice and dropping it again, for the whole round.
+   */
+  private guarded(core: Vec2): boolean {
+    const { player, hunters } = this.sim.state;
+    return hunters.some(
+      (h) =>
+        h.state !== 'stunned' &&
+        dist(h, core) <= GUARD_RADIUS &&
+        dist(player, h) <= this.hearingRange,
+    );
+  }
+
+  /** A tool on the floor close by, if the slot is empty (once chosen, until it is gone). */
+  private toolNearby(): Vec2 | null {
+    const { player, pickups } = this.sim.state;
+    const available = (p: Pickup) => isTool(p.type) && !p.collected && p.lockedFor !== player.id;
+    if (player.tool || (this.fetching && !available(this.fetching))) this.fetching = null;
+    if (player.tool) return null;
+    if (!this.fetching) {
+      const near = pickups.filter((p) => available(p) && dist(player, p) <= TOOL_DETOUR);
+      this.fetching = near.length > 0 ? (this.nearest(near) as Pickup) : null;
+    }
+    return this.fetching;
+  }
+
+  /** Use the tool in hand when it helps (see the class comment). */
+  private useTool(input: PlayerInput): void {
+    const { state } = this.sim;
+    const { player, beacon, rival, time } = state;
+    if (!player.tool || input.useTool) return;
+    const r = this.rivalAt;
+    const pursued = r !== null && time - r.time <= TOOL_FRESH && dist(player, r) <= PURSUED;
+    const carrying = player.cores > 0;
+    const rivalLeads = (rival?.cores ?? 0) > player.cores;
+    let use = false;
+    switch (player.tool) {
+      case 'trapKit':
+        use =
+          (beacon.active && rivalLeads && dist(player, beacon) <= TRAP_AT_BEACON) ||
+          (carrying && pursued);
+        break;
+      case 'flare':
+        use = rivalLeads && (r === null || time - r.time > FLARE_AFTER);
+        break;
+      case 'decoySteps':
+        if (carrying && pursued && r) {
+          use = true;
+          // Send the fake steps the other way from the rival.
+          input.aim = { x: player.x + (player.x - r.x), y: player.y + (player.y - r.y) };
+        }
+        break;
+    }
+    input.useTool = use;
   }
 
   /** A new goal waits for the reaction delay; meanwhile the bot stands still. */
@@ -158,10 +244,14 @@ export class DuelBot extends Bot {
     this.notice(s.x, s.y);
   }
 
-  /** A ring (not the rival's own) passing over the rival shows their outline. */
+  /** A ring (not the rival's own) passing over the rival shows their outline; so does a flare or a trap. */
   private look(): void {
     const { rival, waves } = this.sim.state;
     if (!rival) return;
+    if (rivalRevealed(this.sim.state)) {
+      this.notice(rival.x, rival.y);
+      return;
+    }
     const dt = 1 / GAME.loop.tickRate;
     for (const w of waves) {
       if (w.owner === rival.id || !frontPassedOver(w, rival.x, rival.y, dt)) continue;

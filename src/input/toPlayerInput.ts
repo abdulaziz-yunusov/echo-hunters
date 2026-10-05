@@ -20,6 +20,7 @@ export function toPlayerInput(
     pingHeld: input.pingHeld,
     throwStone: input.throwStone,
     shockwave: input.shockwave,
+    useTool: input.useTool,
     aim: input.aim ? screenToWorld(input.aim.x, input.aim.y) : null,
   };
 }

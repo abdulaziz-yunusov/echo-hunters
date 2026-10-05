@@ -9,12 +9,14 @@ import {
   extractionCancelled,
   extractionStarted,
   grant,
+  placeDroppedTool,
   playerById,
   receiveHit,
   resolveShockwave,
   startExtraction,
   tryGrant,
 } from '@/sim/systems/duel';
+import { flareSeen, placeTrap, springTrap } from '@/sim/systems/tools';
 import type { Replay } from '@/replay/replay';
 import { packReplay, unpackReplay } from '@/replay/wire';
 import { Interpolator } from './interpolation';
@@ -72,7 +74,10 @@ export class NetSession {
     });
 
     const on = sim.events.on.bind(sim.events);
-    this.unsubscribe.push(on('soundEmitted', (s) => this.shareSound(s)));
+    this.unsubscribe.push(
+      on('soundEmitted', (s) => this.shareSound(s)),
+      on('toolUsed', (e) => this.shareTool(e)),
+    );
     if (this.isHost) {
       this.unsubscribe.push(
         on('coreCollected', (e) => this.send({ t: 'taken', kind: 'core', id: e.coreId, by: e.by })),
@@ -94,6 +99,8 @@ export class NetSession {
         ),
         on('duelEnded', (e) => this.send({ t: 'end', winner: e.winner })),
         on('extractStarted', (e) => this.send({ t: 'extract_start', by: e.by })),
+        on('trapFired', (e) => this.send({ t: 'trap_fire', ...e })),
+        on('toolDropped', (e) => this.send({ t: 'tool_drop', by: e.by, ...e.pickup })),
         on('extractCancelled', (e) => this.send({ t: 'extract_cancel', by: e.by })),
       );
     } else {
@@ -199,7 +206,20 @@ export class NetSession {
       fx: s.wave.focusX,
       fy: s.wave.focusY,
       dir: s.wave.arc?.dir,
+      ...(s.wave.decoy ? { dc: true as const } : {}),
     });
+  }
+
+  /**
+   * Using a tool (Phase 29). The client tells the host everything (it judges
+   * traps and needs to know the slot is empty). The host tells the client
+   * only about a flare: its traps are secret, its decoy steps speak for themselves.
+   */
+  private shareTool(e: { tool: string; x: number; y: number; trapId?: number }): void {
+    if (e.tool === 'flare') this.send({ t: 'flare' });
+    else if (this.isHost) return;
+    else if (e.tool === 'trapKit') this.send({ t: 'trap_place', id: e.trapId!, x: e.x, y: e.y });
+    else if (e.tool === 'decoySteps') this.send({ t: 'decoy' });
   }
 
   private sendSnapshot(): void {
@@ -227,7 +247,11 @@ export class NetSession {
         this.rivalTrack.push(this.time, m.x, m.y);
         break;
       case 'snd':
-        sim.emitSound(m.kind, m.x, m.y, m.owner, { focus: { x: m.fx, y: m.fy }, dir: m.dir });
+        sim.emitSound(m.kind, m.x, m.y, m.owner, {
+          focus: { x: m.fx, y: m.fy },
+          dir: m.dir,
+          decoy: m.dc === true,
+        });
         // The host decides what the client's shockwave hits.
         if (this.isHost && m.kind === 'shockwave' && m.owner === rivalId) {
           resolveShockwave(sim, m.x, m.y, rivalId);
@@ -255,6 +279,25 @@ export class NetSession {
         break;
       case 'extract_cancel':
         if (!this.isHost) extractionCancelled(sim, m.by);
+        break;
+      case 'trap_place':
+        if (this.isHost && state.rival) {
+          state.rival.tool = null;
+          placeTrap(state, rivalId, m.id, m.x, m.y);
+        }
+        break;
+      case 'trap_fire':
+        if (!this.isHost) springTrap(sim, m);
+        break;
+      case 'flare':
+        if (state.rival) state.rival.tool = null;
+        flareSeen(sim);
+        break;
+      case 'decoy':
+        if (this.isHost && state.rival) state.rival.tool = null;
+        break;
+      case 'tool_drop':
+        if (!this.isHost) placeDroppedTool(sim, m.by, { id: m.id, type: m.type, x: m.x, y: m.y });
         break;
       case 'hit':
         if (!this.isHost) receiveHit(sim, m.hits, m.fromX, m.fromY);

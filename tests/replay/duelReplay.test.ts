@@ -9,9 +9,27 @@ import {
   type Replay,
 } from '@/replay/replay';
 import { toWire } from '@/replay/wire';
-import { flushLink, recordedDuel } from '../helpers/duel';
+import { isTool } from '@/config/pickups';
+import { ReplayRecorder } from '@/replay/recorder';
+import { duel, DUEL_SEED, flushLink, recordedDuel, teleport } from '../helpers/duel';
 
 describe('duel recording (Phase 25)', () => {
+  it('a tool swapped out mid-round shows up in the debrief from that moment (Phase 29)', () => {
+    const { host, client, settle, afterHostStep } = duel(2);
+    const recorder = new ReplayRecorder(host, DUEL_SEED);
+    afterHostStep.push(() => recorder.afterStep());
+    const [a, b] = host.state.pickups.filter((p) => isTool(p.type));
+    for (const t of [a, b]) {
+      teleport(client.state.player, t.x, t.y);
+      settle();
+    }
+    const replay = recorder.finish();
+    const dropped = replay.pickups.find((p) => p.appearedAt !== undefined)!;
+    expect(dropped).toMatchObject({ type: a.type, x: b.x, y: b.y, takenAt: null });
+    expect(presentAt(dropped, dropped.appearedAt! - 0.1)).toBe(false);
+    expect(presentAt(dropped, dropped.appearedAt! + 0.1)).toBe(true);
+  });
+
   it("the host records both players' paths, hits, drops and the winner", () => {
     const { host, client, replay } = recordedDuel();
     const duel = replay.duel!;

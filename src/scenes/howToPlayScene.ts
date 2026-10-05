@@ -1,4 +1,5 @@
 import { GAME } from '@/config/game';
+import { TOOLS } from '@/config/pickups';
 import type { HunterTypeId } from '@/config/hunters';
 import type { Action } from '@/config/input';
 import { THEME } from '@/config/theme';
@@ -54,7 +55,14 @@ const DUEL_RULES: readonly [string, readonly string[]][] = [
     [
       `The host picks one round or best of ${duel.series.bestOf.filter((n) => n > 1).join(' / ')}. Spawn corners swap every round.`,
       `Both press READY between rounds (${duel.series.countdown} s countdown). REMATCH starts a new series, same room.`,
-      'Duel End shows both players side by side: cores, steals, hits, pings, stones, distance, time in the lead.',
+    ],
+  ],
+  [
+    'TOOLS (ONE AT A TIME; USE: R, SEE CONTROLS)',
+    [
+      `TRAP KIT: set it at your feet, unseen. Your rival stepping on it snaps loudly and shows them to you.`,
+      `FLARE: see your rival through walls for ${TOOLS.flare.revealSeconds} s. They hear it, and know they are seen.`,
+      `DECOY STEPS: fake footsteps walk off toward your aim for ${TOOLS.decoySteps.seconds} s; yours go silent.`,
     ],
   ],
   [

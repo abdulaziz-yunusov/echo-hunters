@@ -52,7 +52,8 @@ export class Bot {
   protected readonly sim: Simulation;
   private readonly tune: (typeof PROFILE)[BotProfile];
   private readonly careful: boolean;
-  private readonly hearing: number;
+  /** How far hunters are noticed (px). */
+  protected readonly hearingRange: number;
   private readonly stones: boolean;
   private route: Vec2[] = [];
   /** Where the bot is heading now (kept while still valid, so it doesn't dither). */
@@ -65,7 +66,7 @@ export class Bot {
     this.sim = sim;
     this.tune = PROFILE[profile];
     this.careful = profile === 'careful';
-    this.hearing = HEARING * (limits.hearing ?? 1);
+    this.hearingRange = HEARING * (limits.hearing ?? 1);
     this.stones = limits.stones ?? true;
   }
 
@@ -177,7 +178,7 @@ export class Bot {
   private nearestHeardHunter(): Hunter | null {
     const { player, hunters } = this.sim.state;
     let best: Hunter | null = null;
-    let bestDistance = this.hearing;
+    let bestDistance = this.hearingRange;
     for (const h of hunters) {
       if (h.state === 'stunned') continue;
       const d = dist(player, h);

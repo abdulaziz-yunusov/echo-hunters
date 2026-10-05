@@ -46,6 +46,19 @@ export interface DuelState {
   atBeacon: boolean;
   /** Someone is extracting: who, and since when (this machine's sim time). Host decides. */
   extracting: { by: EntityId; since: number } | null;
+  /** This machine's player sees the rival's outline through walls until then (flare, trap; sim time). */
+  revealRivalUntil: number;
+  /** The rival's flare shows this machine's player until then: YOU ARE SEEN (sim time). */
+  seenUntil: number;
+}
+
+/** A duel trap on the floor (Phase 29). Each side knows its own; the host knows all. */
+export interface Trap {
+  /** Numbered by its owner. */
+  id: number;
+  owner: EntityId;
+  x: number;
+  y: number;
 }
 
 /** Everything that describes one round. Plain data, the single source of truth. */
@@ -73,6 +86,9 @@ export interface GameState {
   /** Decoy stones in flight. */
   stones: Stone[];
   nextStoneId: number;
+  /** Duel traps (Phase 29): your own, and (host) the rival's too. Oldest first. */
+  traps: Trap[];
+  nextTrapId: number;
   /** Sound rings currently expanding. */
   waves: SoundWave[];
   nextWaveId: number;

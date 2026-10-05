@@ -17,6 +17,8 @@ export const SYNTHS = [
   'wallBump',
   'coreHum',
   'carryHum',
+  'trapSnap',
+  'hiss',
   'vent',
   'drip',
   'scream',
@@ -61,6 +63,7 @@ export const AUDIO_SOUNDS = {
   // The rival hears a carrier as far as hunters do (Phase 28).
   carriedHum: { synth: 'carryHum', range: 220, volume: 0.5 },
   carriedHumHeavy: { synth: 'carryHum', range: 308, volume: 0.65 },
+  trapSnap: { synth: 'trapSnap', range: 900, volume: 0.9 },
   ventHum: { synth: 'vent', range: 420, volume: 0.45 },
   drip: { synth: 'drip', range: 300, volume: 0.35 },
 } as const satisfies Record<SoundKindId, SpatialSoundDef>;
@@ -77,6 +80,8 @@ export const AUDIO_EVENTS = {
   extracted: { synth: 'extract', volume: 0.7 },
   /** Duel (Phase 28): a core taken from the rival's drop, heard by both. */
   coreStolen: { synth: 'steal', volume: 0.7 },
+  /** Duel (Phase 29): you fired a flare, or the rival's flare found you. */
+  flare: { synth: 'hiss', volume: 0.6 },
   /** Duel: someone started extracting, heard by both. */
   extractStarted: { synth: 'extracting', volume: 0.6 },
   died: { synth: 'death', volume: 0.9 },

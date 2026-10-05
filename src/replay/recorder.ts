@@ -127,6 +127,10 @@ export class ReplayRecorder {
       if (pickup) pickup.takenAt = state.time;
       mark('pickup', e.x, e.y);
     });
+    // Duel tools (Phase 29): a swapped-out tool is a new pickup on the floor from now on.
+    on('toolDropped', ({ pickup }) => {
+      r.pickups.push({ ...pickup, takenAt: null, appearedAt: state.time });
+    });
     on('beaconActivated', (e) => {
       r.beacon.activeAt = state.time;
       mark('beacon', e.x, e.y);

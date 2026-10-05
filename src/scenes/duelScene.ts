@@ -90,6 +90,13 @@ export class DuelScene implements Scene {
     });
     this.sim.events.on('roundEnded', (e) => (this.endedAt = e.time));
     this.sim.events.on('duelEnded', (e) => this.series?.finishRound(e.winner));
+    this.sim.events.on('trapFired', (e) => {
+      const me = this.sim.state.player.id;
+      if (e.victim === me) this.cue = { text: 'TRAPPED!', color: 'red', at: this.sim.state.time };
+      else if (e.owner === me) {
+        this.cue = { text: 'TRAP SPRUNG', color: 'green', at: this.sim.state.time };
+      }
+    });
     this.sim.events.on('coreStolen', (e) => {
       const mine = e.by === this.sim.state.player.id;
       const victim = e.from === this.sim.state.player.id;

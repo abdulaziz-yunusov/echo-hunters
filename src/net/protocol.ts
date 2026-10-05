@@ -1,9 +1,10 @@
+import { DUEL_TOOLS, type ToolId } from '@/config/pickups';
 import { REPLAY } from '@/config/replay';
 import { SOUND_KINDS, type SoundKindId } from '@/config/sounds';
 import type { TakeKind } from '@/sim/gameState';
 
 /** Bump when messages change shape; mismatched players are told to reload. */
-export const PROTOCOL_VERSION = 5;
+export const PROTOCOL_VERSION = 6;
 
 export type { TakeKind };
 
@@ -40,6 +41,8 @@ export type NetMessage =
       fx: number;
       fy: number;
       dir?: number;
+      /** A fake step from Decoy Steps (Phase 29): it leaves no trail. */
+      dc?: true;
     }
   /** Client → host: "I am touching this, may I take it?" */
   | { t: 'take'; kind: TakeKind; id: number }
@@ -55,6 +58,16 @@ export type NetMessage =
   | { t: 'extract_start'; by: number }
   /** Host → client: `by`'s extraction stopped short. */
   | { t: 'extract_cancel'; by: number }
+  /** Client → host: I set a trap here (Phase 29). The host never tells the client about its own. */
+  | { t: 'trap_place'; id: number; x: number; y: number }
+  /** Host → client: `owner`'s trap `id` caught `victim` at (x, y). */
+  | { t: 'trap_fire'; owner: number; id: number; victim: number; x: number; y: number }
+  /** Either way: I fired a flare; you are seen. */
+  | { t: 'flare' }
+  /** Client → host: I set off Decoy Steps (my tool slot is empty now). */
+  | { t: 'decoy' }
+  /** Host → client: `by` swapped tools; the old one is on the floor. */
+  | { t: 'tool_drop'; by: number; id: number; type: ToolId; x: number; y: number }
   /** Host → client: you were hit (now `hits` hits). */
   | { t: 'hit'; hits: number; fromX: number; fromY: number }
   /** Host → client: a player dropped their cores here. */
@@ -127,7 +140,8 @@ const VALIDATORS: Record<MessageType, (m: Rec) => boolean> = {
     int(m.owner) &&
     num(m.fx) &&
     num(m.fy) &&
-    (m.dir === undefined || num(m.dir)),
+    (m.dir === undefined || num(m.dir)) &&
+    (m.dc === undefined || m.dc === true),
   take: (m) => takeKind(m.kind) && int(m.id),
   taken: (m) => takeKind(m.kind) && int(m.id) && int(m.by),
   denied: (m) => takeKind(m.kind) && int(m.id),
@@ -135,6 +149,16 @@ const VALIDATORS: Record<MessageType, (m: Rec) => boolean> = {
   extract_leave: () => true,
   extract_start: (m) => int(m.by),
   extract_cancel: (m) => int(m.by),
+  trap_place: (m) => int(m.id) && num(m.x) && num(m.y),
+  trap_fire: (m) => int(m.owner) && int(m.id) && int(m.victim) && num(m.x) && num(m.y),
+  flare: () => true,
+  decoy: () => true,
+  tool_drop: (m) =>
+    int(m.by) &&
+    int(m.id) &&
+    (DUEL_TOOLS as readonly unknown[]).includes(m.type) &&
+    num(m.x) &&
+    num(m.y),
   hit: (m) => int(m.hits) && num(m.fromX) && num(m.fromY),
   drop: (m) => int(m.by) && cores(m.cores),
   snap: (m) =>

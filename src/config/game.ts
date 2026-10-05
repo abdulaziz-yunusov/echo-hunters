@@ -154,6 +154,8 @@ export const GAME = {
     hunters: ['stalker'] as HunterTypeId[],
     /** No hearts: duels have no HP. */
     pickups: { stoneBag: 2, silentBoots: 1 },
+    /** Tools on each duel map, picked from DUEL_TOOLS by the seed (Phase 29). */
+    toolsPerMap: 2,
     /** Sound cover in the arena (Phase 17). */
     emitters: { vent: 2, drip: 2 },
     /** Own position sent this often (Hz). */

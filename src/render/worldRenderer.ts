@@ -1,6 +1,7 @@
 import { GAME } from '@/config/game';
 import type { GameState } from '@/sim/gameState';
 import { extractionProgress } from '@/sim/systems/duel';
+import { rivalRevealed } from '@/sim/systems/tools';
 import { playerMasked } from '@/sim/systems/emitters';
 import type { Simulation } from '@/sim/simulation';
 import type { Camera } from './camera';
@@ -18,7 +19,7 @@ import {
   pickupKey,
   revealAlpha,
 } from './objectRenderer';
-import { drawPlayer, drawRivalOutline, drawStones, RIVAL_KEY } from './playerRenderer';
+import { drawPlayer, drawRivalOutline, drawStones, drawTraps, RIVAL_KEY } from './playerRenderer';
 import { RevealMap, type RevealableObject } from './revealMap';
 import { drawSurfaces, listSurfaceTiles, type SurfaceTile } from './surfaceRenderer';
 import { WallLayer } from './wallLayer';
@@ -114,6 +115,17 @@ export class WorldRenderer {
     this.drawObjects(ctx, pixel);
     drawHunterSilhouettes(ctx, state.hunters, this.reveal, time, this.silhouetteSeconds);
     drawRivalOutline(ctx, this.reveal.objectReveal(RIVAL_KEY), time, this.silhouetteSeconds, pixel);
+    // Duel tools (Phase 29): your own traps, and the rival through walls after a flare or a trap.
+    drawTraps(ctx, state.traps, state.player.id, pixel);
+    if (state.rival && rivalRevealed(state)) {
+      const left = state.duel!.revealRivalUntil - state.time;
+      const seen = {
+        time: time - (1 - Math.min(1, left)) * this.silhouetteSeconds,
+        x: state.rival.x,
+        y: state.rival.y,
+      };
+      drawRivalOutline(ctx, seen, time, this.silhouetteSeconds, pixel);
+    }
     drawWaves(ctx, state.waves, alpha / GAME.loop.tickRate, pixel);
     if (debug) {
       drawWavePolygons(ctx, state.waves, pixel);

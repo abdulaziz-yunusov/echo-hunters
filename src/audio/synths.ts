@@ -206,6 +206,18 @@ export const SYNTHS: Record<SynthName, Synth> = {
     for (const f of [440, 554, 660]) tone(ctx, out, 'triangle', f, f, 0, 0.15, 0.4, 1, 0.4);
   },
 
+  // Duel (Phase 29): a trap springing shut. A sharp metal clack and a ring.
+  trapSnap: (ctx, out, n, p) => {
+    noiseBurst(ctx, out, n, 'bandpass', 3200 * p, 1.2, 0.8, 0.001, 0.12);
+    tone(ctx, out, 'square', 900 * p, 180 * p, 0.08, 0.5, 0.001, 0.18);
+    tone(ctx, out, 'triangle', 1320 * p, 1300 * p, 0, 0.18, 0.01, 0.7, 0.05);
+  },
+
+  // A flare burning: a long hiss.
+  hiss: (ctx, out, n) => {
+    noiseBurst(ctx, out, n, 'highpass', 4500, 0.5, 0.35, 0.05, 1.1);
+  },
+
   // Duel (Phase 28): a core snatched from the rival's drop. A quick upward grab.
   steal: (ctx, out, n) => {
     noiseBurst(ctx, out, n, 'highpass', 2500, 0.7, 0.25, 0.002, 0.08);

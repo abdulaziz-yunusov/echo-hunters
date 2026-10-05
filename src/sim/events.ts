@@ -1,5 +1,5 @@
 import type { SoundKindId } from '@/config/sounds';
-import type { PickupTypeId } from '@/config/pickups';
+import type { PickupTypeId, ToolId } from '@/config/pickups';
 import type { EntityId } from './entities/entity';
 import type { RoundStatus, TakeKind } from './gameState';
 import type { SoundWave } from './sound/soundWave';
@@ -42,6 +42,14 @@ export interface GameEvents {
   extractStarted: { by: EntityId };
   /** Duel: `by`'s extraction was cut short (hit, stepped away, lost the cores). */
   extractCancelled: { by: EntityId };
+  /** Duel (Phase 29): this machine's player used the tool in hand. */
+  toolUsed: { by: EntityId; tool: ToolId; x: number; y: number; trapId?: number };
+  /** Duel: picking up a tool swapped out the old one, now on the floor. */
+  toolDropped: { by: EntityId; pickup: { id: number; type: ToolId; x: number; y: number } };
+  /** Duel: `victim` walked into `owner`'s trap. */
+  trapFired: { owner: EntityId; victim: EntityId; id: number; x: number; y: number };
+  /** Duel: the rival's flare shows where this machine's player is. */
+  flareSeen: undefined;
   /** Duel: `by` took a core that `from` had dropped. */
   coreStolen: { by: EntityId; from: EntityId; x: number; y: number };
   /** Duel: a player's carried cores fell to the floor as new cores. */

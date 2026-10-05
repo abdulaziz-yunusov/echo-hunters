@@ -20,13 +20,14 @@ import { updateCloseCalls } from './systems/closeCalls';
 import { updateCombat } from './systems/combat';
 import { updateEmitters } from './systems/emitters';
 import { updateExtracting, updateObjectives } from './systems/objectives';
+import { updateTools } from './systems/tools';
 import { updatePickups } from './systems/pickups';
 import { updatePlayerMovement } from './systems/playerMovement';
 import { updateStones } from './systems/stones';
 import { buildWallGeometry, type WallGeometry } from './world/edges';
 import { generateMap, mapOptionsFromConfig, type MapLayout } from './world/mapGen';
 import { placeEmitters } from './world/emitterPlacement';
-import { placePickups } from './world/pickupPlacement';
+import { duelPickupCounts, placePickups } from './world/pickupPlacement';
 
 /** Hunter ids start here (the player is 1). */
 const FIRST_HUNTER_ID = 100;
@@ -97,6 +98,8 @@ export class Simulation implements SimContext {
             pending: [],
             atBeacon: false,
             extracting: null,
+            revealRivalUntil: 0,
+            seenUntil: 0,
           }
         : null,
       hunters: hunterTypes.slice(0, layout.hunterSpawns.length).map((type, i) => {
@@ -109,6 +112,8 @@ export class Simulation implements SimContext {
       emitters: placeEmitters(layout, options.emitters ?? def.emitters ?? {}, pickupTiles),
       stones: [],
       nextStoneId: 1,
+      traps: [],
+      nextTrapId: 1,
       waves: [],
       nextWaveId: 1,
       rng: new Rng(deriveSeed(layout.seed, 'ai')),
@@ -144,6 +149,7 @@ export class Simulation implements SimContext {
     if (playing) {
       updatePlayerMovement(this, s.player, input, dt);
       updateAbilities(this, s.player, input, dt);
+      updateTools(this, s.player, input, dt);
       updateStones(this, dt);
       updatePickups(this, s.player, dt);
       updateObjectives(this, s.player, dt);
@@ -221,7 +227,7 @@ export function createDuelSimulation({
     mode: role,
     swapSpawns,
     hunters,
-    pickups: GAME.duel.pickups,
+    pickups: duelPickupCounts(layout.seed),
     emitters: GAME.duel.emitters,
   });
 }

@@ -24,6 +24,8 @@ export interface InputFrame {
   ping: boolean;
   throwStone: boolean;
   shockwave: boolean;
+  /** Duel tool (Phase 29), pressed this tick. */
+  useTool: boolean;
   confirm: boolean;
   /** Mouse button pressed this tick (also sets confirm); menus use it with `aim`. */
   click: boolean;
@@ -50,6 +52,7 @@ export const EMPTY_INPUT: Readonly<InputFrame> = {
   ping: false,
   throwStone: false,
   shockwave: false,
+  useTool: false,
   confirm: false,
   click: false,
   back: false,

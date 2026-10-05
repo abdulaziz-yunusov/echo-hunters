@@ -29,6 +29,11 @@ export interface SoundWave {
   readonly focusY: number;
   /** A directional sound's wedge (Phase 18 beam); null = all around. */
   readonly arc: Sector | null;
+  /**
+   * Made by Decoy Steps (Phase 29): it sounds like its owner's footstep to
+   * everyone, but nobody walked there, so it leaves no trail.
+   */
+  readonly decoy: boolean;
 }
 
 /** Optional details of a new sound. */
@@ -37,6 +42,8 @@ export interface SoundOptions {
   focus?: Vec2;
   /** Aim of a directional sound kind (radians); ignored by the others. */
   dir?: number;
+  /** A fake footstep from Decoy Steps. */
+  decoy?: boolean;
 }
 
 export function createWave(
@@ -47,7 +54,7 @@ export function createWave(
   y: number,
   owner: EntityId | null,
   time: number,
-  { focus = { x, y }, dir = 0 }: SoundOptions = {},
+  { focus = { x, y }, dir = 0, decoy = false }: SoundOptions = {},
 ): SoundWave {
   const def = SOUND_KINDS[kind];
   const halfAngle = arcHalfAngle(kind);
@@ -66,6 +73,7 @@ export function createWave(
     focusX: focus.x,
     focusY: focus.y,
     arc,
+    decoy,
   };
 }
 

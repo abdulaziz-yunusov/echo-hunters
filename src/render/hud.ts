@@ -1,4 +1,5 @@
 import { GAME } from '@/config/game';
+import { TOOLS } from '@/config/pickups';
 import { THEME } from '@/config/theme';
 import { beamCharged, beamReady } from '@/sim/entities/player';
 import type { GameState } from '@/sim/gameState';
@@ -50,6 +51,11 @@ export function drawHud(ctx: CanvasRenderingContext2D, state: GameState): void {
     part(`CORES ${collected}/${cores.length}`, THEME.colors.cyan, collected > 0 ? 1 : 0.6);
   }
   part(`STONES ${player.stones}`, white, player.stones > 0 ? 0.8 : 0.4);
+  // Duel tool slot (Phase 29).
+  if (duel) {
+    if (player.tool) part(`TOOL ${TOOLS[player.tool].label}`, THEME.colors.orange, 1, 6);
+    else part('TOOL –', white, 0.35);
+  }
   cooldown('PING', player.pingCooldown, state.rules.pingCooldown, THEME.colors.cyan);
   // While the ping key is held with the beam ready, the beam meter shows the charge.
   const { chargeTime, cooldown: beamTotal } = GAME.abilities.beam;
@@ -66,6 +72,24 @@ export function drawHud(ctx: CanvasRenderingContext2D, state: GameState): void {
       size: 12,
       color: THEME.colors.white,
       alpha: 0.8,
+    });
+    line += 18;
+  }
+  if (duel && state.time < duel.seenUntil) {
+    // The rival's flare (Phase 29): they can see you right now.
+    drawText(ctx, 'YOU ARE SEEN', 12, line, {
+      size: 13,
+      color: THEME.colors.red,
+      glow: 8,
+      alpha: Math.floor(state.time * 6) % 2 === 0 ? 1 : 0.5,
+    });
+    line += 18;
+  }
+  if (player.decoy) {
+    drawText(ctx, `DECOY STEPS ${Math.ceil(player.decoy.left)}s: YOUR STEPS ARE SILENT`, 12, line, {
+      size: 12,
+      color: THEME.colors.cyan,
+      glow: 6,
     });
     line += 18;
   }

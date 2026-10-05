@@ -8,6 +8,7 @@ export const ACTIONS = [
   'ping',
   'throwStone',
   'shockwave',
+  'useTool',
   'confirm',
   'click',
   'back',
@@ -32,6 +33,7 @@ export const REMAPPABLE = [
   'ping',
   'throwStone',
   'shockwave',
+  'useTool',
 ] as const satisfies readonly Action[];
 
 export type RemappableAction = (typeof REMAPPABLE)[number];
@@ -46,6 +48,7 @@ export const ACTION_LABELS: Record<RemappableAction, string> = {
   ping: 'Sonar ping',
   throwStone: 'Throw stone',
   shockwave: 'Shockwave',
+  useTool: 'Use duel tool',
 };
 
 /**
@@ -63,6 +66,7 @@ export const DEFAULT_BINDINGS: Readonly<Record<Action, readonly string[]>> = {
   ping: ['Space'],
   throwStone: ['KeyQ'],
   shockwave: ['Mouse0', 'KeyE'],
+  useTool: ['KeyR'],
   confirm: ['Enter', 'NumpadEnter', 'Space', 'Mouse0'],
   /** The mouse button only, so menus can tell a click (at the pointer) from Enter. */
   click: ['Mouse0'],

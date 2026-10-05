@@ -28,6 +28,7 @@ function scriptedInputs(seed: number, ticks: number): PlayerInput[] {
       ping,
       pingHeld: hold > 0,
       throwStone: rng.chance(0.005),
+      useTool: false,
       shockwave: rng.chance(0.005),
       aim: { x: rng.range(0, 1300), y: rng.range(0, 800) },
     });

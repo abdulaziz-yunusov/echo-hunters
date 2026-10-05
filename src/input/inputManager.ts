@@ -75,6 +75,7 @@ export class InputManager {
       ping: s.wasPressed('ping'),
       throwStone: s.wasPressed('throwStone'),
       shockwave: s.wasPressed('shockwave'),
+      useTool: s.wasPressed('useTool'),
       confirm: s.wasPressed('confirm'),
       click: s.wasPressed('click'),
       back: s.wasPressed('back'),

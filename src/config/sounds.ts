@@ -89,6 +89,8 @@ export const SOUND_KINDS = {
   coreHum: { maxRadius: 40, hearRadius: 40, speed: 120, color: 'cyan', tags: ['ambient'] },
   // Phase 28 carrier pressure: cores you carry hum; with enough to win, 1.4x louder.
   carriedHum: { maxRadius: 60, hearRadius: 220, speed: 160, color: 'cyan', tags: ['carry'] },
+  // Phase 29: a trap springing shut. Loud: it lights the area and hunters come.
+  trapSnap: { maxRadius: 260, hearRadius: 600, speed: 420, color: 'red', tags: ['impact'] },
   carriedHumHeavy: { maxRadius: 84, hearRadius: 308, speed: 160, color: 'cyan', tags: ['carry'] },
   // Phase 17 sound cover: machine noise no hunter reacts to, lighting the walls nearby.
   ventHum: { maxRadius: 150, hearRadius: 150, speed: 110, color: 'dim', tags: ['ambient'] },

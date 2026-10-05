@@ -148,7 +148,7 @@ export function drawPickupIcons(
     ctx.shadowColor = color;
     ctx.beginPath();
     PICKUP_SHAPES[p.type](ctx, p.x, p.y);
-    if (p.type === 'silentBoots') ctx.stroke();
+    if (OUTLINED.includes(p.type)) ctx.stroke();
     else ctx.fill();
   }
   ctx.restore();
@@ -158,7 +158,13 @@ const PICKUP_COLORS: Record<PickupTypeId, ColorKey> = {
   stoneBag: 'white',
   heart: 'red',
   silentBoots: 'cyan',
+  trapKit: 'red',
+  flare: 'orange',
+  decoySteps: 'white',
 };
+
+/** Drawn as outlines; the rest are filled. */
+const OUTLINED: readonly PickupTypeId[] = ['silentBoots', 'trapKit', 'decoySteps'];
 
 type Shape = (ctx: CanvasRenderingContext2D, x: number, y: number) => void;
 
@@ -185,6 +191,34 @@ const PICKUP_SHAPES: Record<PickupTypeId, Shape> = {
       ctx.moveTo(x + dx - 3, y - 5);
       ctx.lineTo(x + dx + 2, y);
       ctx.lineTo(x + dx - 3, y + 5);
+    }
+  },
+  // Duel tools (Phase 29). A trap: open jaws.
+  trapKit: (ctx, x, y) => {
+    ctx.moveTo(x - 7, y - 2);
+    for (let i = 0; i < 4; i++) ctx.lineTo(x - 5 + i * 4, i % 2 ? y - 2 : y + 3);
+    ctx.lineTo(x + 7, y - 2);
+    ctx.moveTo(x - 7, y + 5);
+    ctx.lineTo(x + 7, y + 5);
+  },
+  // A flare: a four-pointed spark.
+  flare: (ctx, x, y) => {
+    for (let i = 0; i < 8; i++) {
+      const r = i % 2 === 0 ? 7 : 2.5;
+      const a = (i * Math.PI) / 4 - Math.PI / 2;
+      if (i === 0) ctx.moveTo(x + Math.cos(a) * r, y + Math.sin(a) * r);
+      else ctx.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r);
+    }
+    ctx.closePath();
+  },
+  // Decoy steps: two footprints, walking.
+  decoySteps: (ctx, x, y) => {
+    for (const [dx, dy] of [
+      [-3, 3],
+      [3, -3],
+    ]) {
+      ctx.moveTo(x + dx + 2, y + dy);
+      ctx.ellipse(x + dx, y + dy, 2, 3.5, 0, 0, Math.PI * 2);
     }
   },
 };

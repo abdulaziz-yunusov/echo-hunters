@@ -72,6 +72,59 @@ describe('duel bot', () => {
     expect(near.bot.lastKnownRival).toMatchObject({ x: near.rival.x, y: near.rival.y });
   });
 
+  it('fetches a tool lying close by, and only with an empty slot (Phase 29)', () => {
+    const { sim, bot, player } = setup([
+      '##################',
+      '#....P.........C.#',
+      '#...............P#',
+      '##################',
+    ]);
+    sim.state.pickups.push({
+      id: 1,
+      type: 'flare',
+      x: player.x - 96,
+      y: player.y,
+      collected: false,
+    });
+    expect(bot.input().moveX).toBeLessThan(0); // the flare, not the core
+    player.tool = 'trapKit';
+    expect(bot.input().moveX).toBeGreaterThan(0);
+  });
+
+  it('fires a flare when the rival leads and it has lost them; Easy never uses tools', () => {
+    for (const level of ['hard', 'easy'] as const) {
+      const { sim, bot, player, rival } = setup(CORRIDOR, level);
+      player.tool = 'flare';
+      expect(bot.input().useTool).toBe(false); // nobody leads
+      rival.cores = 1;
+      let used = false;
+      for (let i = 0; i < 120 && !used; i++) {
+        used = bot.input().useTool;
+        sim.step(IDLE_INPUT, DT);
+      }
+      expect(used, level).toBe(level === 'hard');
+    }
+  });
+
+  it('sees the rival during its own flare', () => {
+    const { sim, bot, rival } = setup();
+    sim.state.duel!.revealRivalUntil = sim.state.time + 1;
+    bot.input();
+    expect(bot.lastKnownRival).toMatchObject({ x: rival.x, y: rival.y });
+  });
+
+  it('sets a trap at the beacon the rival is coming to', () => {
+    const { sim, bot, player, rival } = setup([
+      '##################',
+      '#BP.............P#',
+      '##################',
+    ]);
+    rival.cores = 2;
+    sim.step(IDLE_INPUT, DT);
+    player.tool = 'trapKit';
+    expect(bot.input().useTool).toBe(true);
+  });
+
   it('hunts a rival who carries more cores once it hears them nearby (Phase 28)', () => {
     const { sim, bot, player, rival } = setup([
       '##################',
@@ -273,13 +326,15 @@ describe('duel balance', () => {
       leadChanges: 0,
       firstCore: 1,
       drops: 0,
+      tools: {},
+      toolUses: 0,
       ...r,
     });
     const stats = summarize([
-      round({ seconds: 10 }),
-      round({ seconds: 30, winner: 2, leadChanges: 2, drops: 1 }),
+      round({ seconds: 10, tools: { flare: 1 }, toolUses: 2 }),
+      round({ seconds: 30, winner: 2, leadChanges: 2, drops: 1, tools: { flare: 1, trapKit: 2 } }),
       round({ seconds: 20, winner: 2, firstCore: 2 }),
-      round({ seconds: 300, winner: null, leadChanges: 2 }),
+      round({ seconds: 300, winner: null, leadChanges: 2, tools: { trapKit: 1 } }),
     ]);
     expect(stats).toEqual({
       rounds: 4,
@@ -292,11 +347,20 @@ describe('duel balance', () => {
       firstCoreWins: 2 / 3,
       meanDrops: 0.25,
       timeouts: 1,
+      meanToolUses: 0.5,
+      // Per tool, the decided rounds in which it was picked up, and how often its picker won.
+      toolWins: {
+        trapKit: { rounds: 1, pickerWins: 1 },
+        flare: { rounds: 2, pickerWins: 0.5 },
+        decoySteps: { rounds: 0, pickerWins: NaN },
+      },
     });
     const table = formatDuelTable(stats);
     expect(table).toContain('| Host wins | 33% |');
     expect(table).toContain('| Past 5 min | 25% |');
     expect(table).not.toContain('beats');
+    expect(table).toContain('| FLARE picker wins | 50% of 2 |');
+    expect(table).toContain('| DECOY STEPS picker wins | – of 0 |');
   });
 
   it('compares two levels, each hosting half the rounds', () => {
@@ -309,6 +373,8 @@ describe('duel balance', () => {
       leadChanges: 0,
       firstCore: 1,
       drops: 0,
+      tools: {},
+      toolUses: 0,
     });
     const stats = summarize(
       [round(['hard', 'easy'], 1), round(['easy', 'hard'], 2), round(['easy', 'hard'], 1)],

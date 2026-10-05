@@ -15,6 +15,8 @@ export interface PlayerInput {
   pingHeld: boolean;
   throwStone: boolean;
   shockwave: boolean;
+  /** Use the duel tool in hand (Phase 29). */
+  useTool: boolean;
   /** Aim point in world px, or null when there is no pointer (touch). */
   aim: Vec2 | null;
 }
@@ -27,5 +29,6 @@ export const IDLE_INPUT: Readonly<PlayerInput> = {
   pingHeld: false,
   throwStone: false,
   shockwave: false,
+  useTool: false,
   aim: null,
 };

@@ -118,6 +118,30 @@ export const RIVAL_KEY = 'rival';
  * The duel rival is never drawn directly (GDD §8), only as a pale outline
  * where one of *your* sounds touched them, fading like a hunter's silhouette.
  */
+/** Your own duel traps (Phase 29): a faint red cross where each waits. The rival's are never drawn. */
+export function drawTraps(
+  ctx: CanvasRenderingContext2D,
+  traps: readonly { owner: number; x: number; y: number }[],
+  me: number,
+  pixel: number,
+): void {
+  ctx.save();
+  ctx.strokeStyle = THEME.colors.red;
+  ctx.globalAlpha = 0.55;
+  ctx.lineWidth = 1.5 * pixel;
+  const r = 5;
+  for (const t of traps) {
+    if (t.owner !== me) continue;
+    ctx.beginPath();
+    ctx.moveTo(t.x - r, t.y - r);
+    ctx.lineTo(t.x + r, t.y + r);
+    ctx.moveTo(t.x + r, t.y - r);
+    ctx.lineTo(t.x - r, t.y + r);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 export function drawRivalOutline(
   ctx: CanvasRenderingContext2D,
   seen: { time: number; x: number; y: number } | undefined,
