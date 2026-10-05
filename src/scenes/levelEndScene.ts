@@ -107,7 +107,7 @@ export class LevelEndScene implements Scene {
       this.isNewHigh ? THEME.colors.green : white,
     );
 
-    if (this.time >= INPUT_GRACE) drawMenu(ctx, this.menu, cx, y + 60, 300);
+    if (this.time >= INPUT_GRACE) drawMenu(ctx, this.menu, cx, y + 60, 300, height - 8);
   }
 
   private row(

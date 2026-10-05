@@ -2,6 +2,7 @@ import { DIFFICULTIES, type DifficultyId } from '@/config/difficulty';
 import { THEME } from '@/config/theme';
 import type { InputFrame } from '@/input/inputFrame';
 import { randomSeed, seedFromUrl } from '@/platform/seed';
+import { isTouchDevice } from '@/platform/device';
 import { loadSave, updateSave } from '@/platform/storage';
 import { drawText } from '@/render/text';
 import { MenuList, ROW_HEIGHT } from '@/ui/menuList';
@@ -78,7 +79,7 @@ export class MenuScene implements Scene {
     });
 
     const menuTop = titleY + 90;
-    drawMenu(ctx, this.menu, cx, menuTop, Math.min(MENU_WIDTH, width - 32));
+    drawMenu(ctx, this.menu, cx, menuTop, Math.min(MENU_WIDTH, width - 32), height - 8);
     const below = menuTop + this.menu.items.length * ROW_HEIGHT;
     drawText(ctx, DIFFICULTIES[this.difficulty].hint, cx, below, {
       size: 11,
@@ -92,6 +93,15 @@ export class MenuScene implements Scene {
         color: THEME.colors.cyan,
         align: 'center',
         alpha: 0.7,
+      });
+    }
+    // Phase 12: a phone held upright sees a narrow slice of the maze.
+    if (height > width && (this.app.input.usingTouch || isTouchDevice())) {
+      drawText(ctx, 'Tip: turn your phone sideways for a wider view.', cx, height - 48, {
+        size: 11,
+        color: THEME.colors.cyan,
+        align: 'center',
+        alpha: 0.6,
       });
     }
     drawText(ctx, 'HEADPHONES RECOMMENDED', cx, height - 28, {

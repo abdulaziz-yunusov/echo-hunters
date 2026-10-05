@@ -10,7 +10,9 @@ import { loadSave, updateSave } from '@/platform/storage';
 import { Viewport } from '@/platform/viewport';
 import { DebugLayer } from '@/render/debugLayer';
 import { applyPalette } from '@/render/palette';
+import { glow, installGlowSwitch } from '@/render/quality';
 import { drawText } from '@/render/text';
+import { drawTouchControls } from '@/render/touchOverlay';
 import { createScene } from '@/scenes/registry';
 import type { AppContext, SceneArgs, SceneId } from '@/scenes/scene';
 import { SceneManager } from '@/scenes/sceneManager';
@@ -23,6 +25,9 @@ export function startApp(canvas: HTMLCanvasElement): void {
   const viewport = new Viewport(canvas, GAME.camera.viewSize, GAME.render.maxDpr);
   const save = loadSave();
   applyPalette(save.display.palette);
+  // Phase 12: glow can switch itself off on slow devices (render/quality.ts).
+  glow.set(save.display.glow);
+  installGlowSwitch(ctx, () => glow.enabled);
   const input = new InputManager(canvas, withOverrides(save.bindings));
   const debug = new DebugLayer();
   const scenes = new SceneManager();
@@ -57,6 +62,8 @@ export function startApp(canvas: HTMLCanvasElement): void {
     step: 1 / GAME.loop.tickRate,
     maxFrameDelta: GAME.loop.maxFrameDelta,
     update: (dt) => {
+      const scene = scenes.current;
+      input.setTouchMode(scene?.touchControls ?? null, viewport.width, viewport.height);
       const frame = input.sample();
       if (frame.toggleDebug) debug.toggle();
       if (frame.toggleMute) {
@@ -68,8 +75,11 @@ export function startApp(canvas: HTMLCanvasElement): void {
     },
     render: (alpha, frameDelta) => {
       debug.frame(frameDelta);
+      glow.frame(frameDelta);
       viewport.beginFrame(ctx, THEME.background);
       scenes.render(ctx, alpha);
+      // Phase 12: the on-screen controls, over the game, when playing by touch.
+      if (input.usingTouch) drawTouchControls(ctx, input.touch, viewport.height);
       if (audio.muted) {
         drawText(ctx, 'MUTED (M)', 12, viewport.height - 12, {
           size: 11,

@@ -26,6 +26,8 @@ export const GAME = {
   render: {
     /** Cap on devicePixelRatio: 3x phones cost 2.25x the pixels of 2x for little gain. */
     maxDpr: 2,
+    /** At most this many sound rings are drawn at once, the newest (Phase 12: a cheap cap for busy moments). */
+    maxDrawnWaves: 48,
   },
 
   map: {

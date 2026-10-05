@@ -129,7 +129,7 @@ describe('screen flow', () => {
     t.app.goTo('menu');
     t.choose(4); // PLAY, DUEL, DIFFICULTY, HOW TO PLAY, SETTINGS
     expect(t.current()).toBe('Settings');
-    t.choose(8); // … SOUND, SOUND CUES, SCREEN SHAKE, FLASHES, COLORS, CONTROLS
+    t.choose(9); // … SOUND, SOUND CUES, SCREEN SHAKE, FLASHES, COLORS, GLOW, CONTROLS
     expect(t.current()).toBe('Controls');
     t.press({ back: true });
     expect(t.current()).toBe('Settings');

@@ -3,6 +3,8 @@ import { PALETTES, THEME, type PaletteId } from '@/config/theme';
 import type { InputFrame } from '@/input/inputFrame';
 import { loadSave, updateSave, type AudioSettings } from '@/platform/storage';
 import { applyPalette } from '@/render/palette';
+import { glow } from '@/render/quality';
+import { GLOW_SETTINGS } from '@/config/display';
 import { levelBar, MenuList } from '@/ui/menuList';
 import { drawMenu, drawTitle } from '@/ui/menuRenderer';
 import type { AppContext, Scene } from './scene';
@@ -69,6 +71,22 @@ export class SettingsScene implements Scene {
           this.changeDisplay({ palette });
         },
       },
+      {
+        kind: 'adjust',
+        label: 'GLOW',
+        value: () =>
+          this.display().glow === 'auto'
+            ? glow.autoOff
+              ? 'AUTO (OFF: SLOW DEVICE)'
+              : 'AUTO'
+            : this.display().glow.toUpperCase(),
+        onChange: (step: 1 | -1) => {
+          const i = GLOW_SETTINGS.indexOf(this.display().glow);
+          const next = GLOW_SETTINGS[(i + step + GLOW_SETTINGS.length) % GLOW_SETTINGS.length];
+          glow.set(next);
+          this.changeDisplay({ glow: next });
+        },
+      },
       { kind: 'action', label: 'CONTROLS', onSelect: () => app.open('controls') },
       { kind: 'action', label: 'BACK', onSelect: () => app.close() },
     ]);
@@ -87,7 +105,14 @@ export class SettingsScene implements Scene {
     ctx.fillStyle = THEME.background;
     ctx.fillRect(0, 0, width, height);
     drawTitle(ctx, 'SETTINGS', width / 2, height * 0.2);
-    drawMenu(ctx, this.menu, width / 2, height * 0.2 + 70, Math.min(MENU_WIDTH, width - 32));
+    drawMenu(
+      ctx,
+      this.menu,
+      width / 2,
+      height * 0.2 + 70,
+      Math.min(MENU_WIDTH, width - 32),
+      height - 8,
+    );
   }
 
   private settings(): AudioSettings {

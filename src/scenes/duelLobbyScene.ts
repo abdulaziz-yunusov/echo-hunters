@@ -114,7 +114,14 @@ export class DuelLobbyScene implements Scene {
     } else if (p.kind === 'error') {
       say(p.message, THEME.colors.red, 14);
     }
-    drawMenu(ctx, this.menu, cx, Math.max(y + 20, height * 0.55), Math.min(MENU_WIDTH, width - 32));
+    drawMenu(
+      ctx,
+      this.menu,
+      cx,
+      Math.max(y + 20, height * 0.55),
+      Math.min(MENU_WIDTH, width - 32),
+      height - 8,
+    );
   }
 
   private setPhase(phase: Phase): void {

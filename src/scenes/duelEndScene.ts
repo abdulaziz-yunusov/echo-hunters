@@ -155,7 +155,7 @@ export class DuelEndScene implements Scene {
     y += 22;
     y = this.drawStats(ctx, cx, y);
     if (this.time >= INPUT_GRACE) {
-      drawMenu(ctx, this.menu, cx, y + 24, Math.min(MENU_WIDTH, width - 32));
+      drawMenu(ctx, this.menu, cx, y + 24, Math.min(MENU_WIDTH, width - 32), height - 8);
     }
   }
 

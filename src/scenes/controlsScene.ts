@@ -53,7 +53,7 @@ export class ControlsScene implements Scene {
     ctx.fillRect(0, 0, width, height);
     const top = Math.max(60, height * 0.12);
     drawTitle(ctx, 'CONTROLS', width / 2, top);
-    drawMenu(ctx, this.menu, width / 2, top + 56, Math.min(MENU_WIDTH, width - 32));
+    drawMenu(ctx, this.menu, width / 2, top + 56, Math.min(MENU_WIDTH, width - 32), height - 8);
 
     const note = this.waiting
       ? `PRESS A KEY OR MOUSE BUTTON FOR ${ACTION_LABELS[this.waiting].toUpperCase()} · ESC CANCELS`

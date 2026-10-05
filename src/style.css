@@ -8,6 +8,10 @@ body {
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
+  /* Phase 12: no pull-to-refresh, no long-press menu, no grey tap flash. */
+  overscroll-behavior: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 #game {

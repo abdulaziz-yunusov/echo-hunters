@@ -1,3 +1,4 @@
+import { GAME } from '@/config/game';
 import { SOUND_KINDS } from '@/config/sounds';
 import { THEME, type ColorKey } from '@/config/theme';
 import type { SoundWave } from '@/sim/sound/soundWave';
@@ -19,7 +20,10 @@ export function drawWaves(
   sinceTick: number,
   pixel: number,
 ): void {
-  for (const w of waves) {
+  // Phase 12: on a crowded moment, draw only the newest rings (the sim still has them all).
+  const drawn =
+    waves.length > GAME.render.maxDrawnWaves ? waves.slice(-GAME.render.maxDrawnWaves) : waves;
+  for (const w of drawn) {
     const radius = Math.min(w.maxRadius, w.radius + w.speed * sinceTick);
     if (radius <= 0) continue;
     const progress = radius / w.maxRadius;

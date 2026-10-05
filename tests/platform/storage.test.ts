@@ -127,7 +127,13 @@ describe('save data', () => {
 
   it('remembers display settings, and replaces broken ones with defaults', () => {
     vi.stubGlobal('localStorage', fakeStorage());
-    const display = { shake: 0, flash: 0.5, soundCues: true, palette: 'colorblind' as const };
+    const display = {
+      shake: 0,
+      flash: 0.5,
+      soundCues: true,
+      palette: 'colorblind' as const,
+      glow: 'off' as const,
+    };
     updateSave({ display });
     expect(loadSave().display).toEqual(display);
 
@@ -136,7 +142,7 @@ describe('save data', () => {
       fakeStorage({
         'pulse-echo-hunters': JSON.stringify({
           version: 3,
-          display: { shake: 3, flash: 0, soundCues: 'yes', palette: 'sepia' },
+          display: { shake: 3, flash: 0, soundCues: 'yes', palette: 'sepia', glow: 'max' },
         }),
       }),
     );

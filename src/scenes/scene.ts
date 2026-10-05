@@ -1,4 +1,5 @@
 import type { InputFrame } from '@/input/inputFrame';
+import type { TouchMode } from '@/config/touch';
 import type { Viewport } from '@/platform/viewport';
 import type { AudioEngine } from '@/audio/audioEngine';
 import type { InputManager } from '@/input/inputManager';
@@ -16,6 +17,8 @@ export interface Scene {
   readonly name: string;
   /** If true, the scene below is drawn first (e.g. a pause menu over the game). */
   readonly overlay?: boolean;
+  /** On-screen touch controls this scene shows right now (Phase 12); none = taps are clicks. */
+  readonly touchControls?: TouchMode | null;
   enter?(): void;
   exit?(): void;
   /** Another scene opened on top of this one. */

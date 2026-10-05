@@ -9,20 +9,32 @@ import { drawText } from './text';
 
 const BAR_BLOCKS = 4;
 const SIZE = 14;
+/** Height of a wrapped HUD row (px). */
+const ROW = 20;
 
 /**
  * Heads-up display, top-left, monospace (GDD §9):
  * HP ●●○  CORES 1/3  STONES 2  PING ▓▓▓░  BEAM ▓░░░  SHOCK ▓▓░░
  */
-export function drawHud(ctx: CanvasRenderingContext2D, state: GameState): void {
+export function drawHud(
+  ctx: CanvasRenderingContext2D,
+  state: GameState,
+  /** Wrap onto another row past this x (narrow phone screens, Phase 12). */
+  maxX = Infinity,
+): void {
   const { player, cores, beacon } = state;
   const white = THEME.colors.white;
-  const y = 22;
+  let y = 22;
   let x = 12;
 
   const part = (text: string, color: string, alpha = 1, glow = 0): void => {
+    const w = ctx.measureText(text).width;
+    if (x > 12 && x + w > maxX) {
+      x = 12;
+      y += ROW;
+    }
     drawText(ctx, text, x, y, { size: SIZE, color, alpha, glow });
-    x += ctx.measureText(text).width + 22;
+    x += w + 22;
   };
   /** A share (0..1) as blocks; bright when ready. */
   const meter = (label: string, share: number, ready: boolean, readyColor: string): void => {

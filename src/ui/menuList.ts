@@ -33,6 +33,8 @@ export type HitZone = 'left' | 'right' | 'body';
 
 /** Space for each row, in CSS pixels. */
 export const ROW_HEIGHT = 34;
+/** Rows may shrink to this on a short screen (a phone on its side), still big enough to tap. */
+export const MIN_ROW_HEIGHT = 26;
 /** Clicks this close to an adjustable row's ends hit its ◀ / ▶ arrows. */
 const ARROW_ZONE = 60;
 
@@ -53,13 +55,24 @@ export class MenuList {
     this.selected = this.firstEnabled(selected);
   }
 
-  /** Place the rows: centered on `centerX`, the first row's middle at `top`. */
-  layout(centerX: number, top: number, width: number): readonly ItemRect[] {
+  /**
+   * Place the rows: centered on `centerX`, the first row's middle at `top`.
+   * If they would run past `bottom` (a short screen, Phase 12), the rows
+   * shrink (down to MIN_ROW_HEIGHT), and if that's not enough the menu moves up.
+   */
+  layout(centerX: number, top: number, width: number, bottom = Infinity): readonly ItemRect[] {
+    const n = this.items.length;
+    let row = ROW_HEIGHT;
+    let first = top;
+    if (first - row / 2 + n * row > bottom) {
+      row = Math.max(MIN_ROW_HEIGHT, (bottom - (first - row / 2)) / n);
+      first = Math.min(first, bottom - n * row + row / 2);
+    }
     this.rects = this.items.map((_, i) => ({
       x: centerX - width / 2,
-      y: top + i * ROW_HEIGHT - ROW_HEIGHT / 2,
+      y: first + i * row - row / 2,
       w: width,
-      h: ROW_HEIGHT,
+      h: row,
     }));
     return this.rects;
   }

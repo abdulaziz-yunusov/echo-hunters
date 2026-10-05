@@ -8,7 +8,7 @@ import { randomSeed } from '@/platform/seed';
 import { Camera } from '@/render/camera';
 import { drawHud } from '@/render/hud';
 import { drawAimGuide, playerDrawPosition } from '@/render/playerRenderer';
-import { drawText } from '@/render/text';
+import { drawText, wrapLines } from '@/render/text';
 import { ReplayRecorder } from '@/replay/recorder';
 import { WorldRenderer } from '@/render/worldRenderer';
 import { roundResult, scoreRound } from '@/sim/scoring';
@@ -26,12 +26,17 @@ const BANNER_TIME = 3;
 const OVERVIEW_MARGIN = 0.92;
 /** Seconds to linger on the world after extraction before the score screen. */
 const END_DELAY = 1.2;
+/** Tutorial prompt line height, and its top when playing by touch (CSS px). */
+const PROMPT_LINE = 20;
+const PROMPT_TOP_TOUCH = 100;
 /** Seconds a popup such as "CLOSE CALL +25" stays up. */
 const POPUP_TIME = 1.4;
 
 /** One level of a run: the dark maze, seen only through sound. */
 export class PlayScene implements Scene {
   readonly name = 'Play';
+  /** On-screen controls when playing by touch (Phase 12). */
+  readonly touchControls = 'solo' as const;
   private readonly app: AppContext;
   private readonly camera: Camera;
   private run: RunState;
@@ -132,7 +137,8 @@ export class PlayScene implements Scene {
     ctx.restore();
 
     this.display.draw(ctx, width, height, playerDrawPosition(state.player, alpha));
-    drawHud(ctx, state);
+    // Leave room for the touch pause button at the top right.
+    drawHud(ctx, state, width - 64);
     if (!this.covered) {
       this.drawLevelBanner(ctx, state.time);
       this.drawTutorial(ctx);
@@ -146,7 +152,9 @@ export class PlayScene implements Scene {
     });
     const hint = debug
       ? 'T warp · H hearing · O overview · N new map · F1 hide debug · ESC menu'
-      : 'WASD move · SHIFT sneak · SPACE ping (hold: beam) · Q stone · CLICK/E shockwave · M mute · ESC pause';
+      : this.app.input.usingTouch
+        ? '' // the on-screen controls speak for themselves (Phase 12)
+        : 'WASD move · SHIFT sneak · SPACE ping (hold: beam) · Q stone · CLICK/E shockwave · M mute · ESC pause';
     drawText(ctx, hint, width / 2, height - 12, {
       size: 12,
       color: THEME.colors.white,
@@ -187,7 +195,7 @@ export class PlayScene implements Scene {
     this.popup = null;
     this.recorder = new ReplayRecorder(this.sim, this.run.seed);
     const prompts = levelDef(this.run.level).tutorial;
-    if (prompts) this.tutorial = new Tutorial(this.sim, prompts);
+    if (prompts) this.tutorial = new Tutorial(this.sim, prompts, () => this.app.input.usingTouch);
     this.endedAt = null;
     this.sim.events.on('roundEnded', (e) => (this.endedAt = e.time));
     this.sim.events.on('closeCall', (e) => {
@@ -259,22 +267,28 @@ export class PlayScene implements Scene {
     if (!tutorial || !text) return;
     const { width, height } = this.app.viewport;
     const alpha = tutorial.opacity;
-    const y = height - 56;
     ctx.save();
     ctx.font = `14px ${THEME.font}`;
-    const w = ctx.measureText(text).width + 32;
+    // Wrapped to the screen (a phone held upright is narrow, Phase 12).
+    const lines = wrapLines(ctx, text, Math.min(720, width - 48));
+    const w = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 32;
+    const boxH = lines.length * PROMPT_LINE + 12;
+    // By touch the bottom of the screen belongs to the controls: prompts go up, under the HUD.
+    const top = this.app.input.usingTouch ? PROMPT_TOP_TOUCH : height - 36 - boxH;
     ctx.globalAlpha = alpha * 0.7;
     ctx.fillStyle = '#000';
-    ctx.fillRect(width / 2 - w / 2, y - 20, w, 30);
+    ctx.fillRect(width / 2 - w / 2, top, w, boxH);
     ctx.globalAlpha = alpha * 0.6;
     ctx.strokeStyle = THEME.colors.cyan;
-    ctx.strokeRect(width / 2 - w / 2 + 0.5, y - 19.5, w - 1, 29);
+    ctx.strokeRect(width / 2 - w / 2 + 0.5, top + 0.5, w - 1, boxH - 1);
     ctx.restore();
-    drawText(ctx, text, width / 2, y, {
-      size: 14,
-      color: THEME.colors.white,
-      align: 'center',
-      alpha,
+    lines.forEach((line, i) => {
+      drawText(ctx, line, width / 2, top + 6 + (i + 1) * PROMPT_LINE - 5, {
+        size: 14,
+        color: THEME.colors.white,
+        align: 'center',
+        alpha,
+      });
     });
   }
 

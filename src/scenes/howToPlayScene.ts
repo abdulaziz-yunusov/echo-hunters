@@ -170,6 +170,7 @@ export class HowToPlayScene implements Scene {
       `Ping ${k('ping')} (hold: beam)   ·   Stone ${k('throwStone')} (aim with mouse)   ·   Shockwave ${k('shockwave')}`,
     );
     line('Pause ESC   ·   Mute M');
+    line('Touch: left stick (a light push sneaks) · PING (hold: beam) · STONE · SHOCK · II pause');
     y += 8;
     line('HUNTERS', THEME.colors.cyan, 1, 14);
     for (const [type, text] of HUNTERS) {

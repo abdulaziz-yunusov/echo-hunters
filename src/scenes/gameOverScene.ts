@@ -87,6 +87,6 @@ export class GameOverScene implements Scene {
       },
     );
 
-    if (this.time >= INPUT_GRACE) drawMenu(ctx, this.menu, cx, cy + 96, 260);
+    if (this.time >= INPUT_GRACE) drawMenu(ctx, this.menu, cx, cy + 96, 260, height - 8);
   }
 }

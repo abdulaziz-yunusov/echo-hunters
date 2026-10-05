@@ -9,8 +9,10 @@ export function drawMenu(
   centerX: number,
   top: number,
   width: number,
+  /** Keep the menu above this y (short screens, Phase 12). */
+  bottom = Infinity,
 ): void {
-  const rects = menu.layout(centerX, top, width);
+  const rects = menu.layout(centerX, top, width, bottom);
   menu.items.forEach((item, i) => {
     const r = rects[i];
     const y = r.y + r.h / 2 + 5;

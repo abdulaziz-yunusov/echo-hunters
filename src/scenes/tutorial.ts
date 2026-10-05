@@ -22,6 +22,8 @@ interface Progress {
 interface Step {
   id: string;
   text: string;
+  /** The same prompt for the on-screen touch controls (Phase 12), if it names keys. */
+  touchText?: string;
   /** Becomes relevant. */
   when(p: Progress): boolean;
   /** Can be dismissed (after being shown `shown` seconds). */
@@ -33,6 +35,7 @@ const BASICS: readonly Step[] = [
   {
     id: 'ping',
     text: 'SPACE: sonar ping. Sound shows the walls, but hunters hear it too.',
+    touchText: 'PING: sonar ping. Sound shows the walls, but hunters hear it too.',
     when: () => true,
     done: (p) => p.pings > 0,
   },
@@ -45,18 +48,21 @@ const BASICS: readonly Step[] = [
   {
     id: 'sneak',
     text: 'Hunters are blind but hear everything. Hold SHIFT to sneak silently.',
+    touchText: 'Hunters are blind but hear everything. Push the stick lightly to sneak silently.',
     when: (p) => p.hunterHeard || p.cores > 0,
     done: (p, shown) => p.sneakTime > 1 || shown > 10,
   },
   {
     id: 'shockwave',
     text: 'Too close? CLICK or E: a shockwave stuns hunters around you.',
+    touchText: 'Too close? SHOCK: a shockwave stuns hunters around you.',
     when: (p) => p.hits > 0 || p.hunterClose,
     done: (p, shown) => p.shockwaves > 0 || shown > 8,
   },
   {
     id: 'stone',
     text: 'Q: throw a decoy stone at the cursor. Hunters go where it lands.',
+    touchText: 'STONE: throw a decoy stone the way you face. Hunters go where it lands.',
     when: (p) => p.cores >= 2 || p.hits > 0,
     done: (p, shown) => p.stonesThrown > 0 || shown > 10,
   },
@@ -73,6 +79,8 @@ const BEAM: readonly Step[] = [
   {
     id: 'beam',
     text: 'New: hold SPACE to charge a beam. Aim, release: it reaches far, but only ahead.',
+    touchText:
+      'New: hold PING to charge a beam. Release: it reaches far, but only the way you face.',
     when: (p) => p.pings > 0,
     done: (p, shown) => p.beams > 0 || shown > 12,
   },
@@ -112,8 +120,12 @@ export class Tutorial {
   private current: Step | null = null;
   private shown = 0;
 
-  constructor(sim: Simulation, set: TutorialId) {
+  /** Playing by touch (Phase 12): prompts name the on-screen buttons. */
+  private readonly touch: () => boolean;
+
+  constructor(sim: Simulation, set: TutorialId, touch: () => boolean = () => false) {
     this.sim = sim;
+    this.touch = touch;
     this.steps = STEP_SETS[set];
     const p = this.progress;
     const on = sim.events.on.bind(sim.events);
@@ -135,7 +147,9 @@ export class Tutorial {
 
   /** The prompt to show now, if any. */
   get text(): string | null {
-    return this.current?.text ?? null;
+    const step = this.current;
+    if (!step) return null;
+    return this.touch() ? (step.touchText ?? step.text) : step.text;
   }
 
   /** Fade-in of the current prompt, 0..1. */

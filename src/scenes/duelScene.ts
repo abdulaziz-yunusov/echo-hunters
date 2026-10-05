@@ -53,6 +53,11 @@ export type DuelParams =
  */
 export class DuelScene implements Scene {
   readonly name = 'Duel';
+
+  /** On-screen controls when playing by touch (Phase 12); none while the menu is open. */
+  get touchControls(): 'duel' | null {
+    return this.menuOpen ? null : 'duel';
+  }
   private readonly app: AppContext;
   private readonly sim: Simulation;
   private readonly net: NetSession;
@@ -375,7 +380,8 @@ export class DuelScene implements Scene {
     ctx.restore();
 
     this.display.draw(ctx, width, height, focus);
-    drawHud(ctx, state);
+    // Leave room for the touch pause button at the top right.
+    drawHud(ctx, state, width - 64);
     this.drawCue(ctx, width, state.time);
     this.drawOvertime(ctx, width, height);
     if (state.time < BANNER_TIME && !this.menuOpen) {
@@ -419,7 +425,14 @@ export class DuelScene implements Scene {
         align: 'center',
         alpha: 0.6,
       });
-      drawMenu(ctx, this.menu, width / 2, height * 0.32 + 80, Math.min(320, width - 32));
+      drawMenu(
+        ctx,
+        this.menu,
+        width / 2,
+        height * 0.32 + 80,
+        Math.min(320, width - 32),
+        height - 8,
+      );
     }
   }
 }

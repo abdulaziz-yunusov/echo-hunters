@@ -39,6 +39,13 @@ export class PauseScene implements Scene {
     ctx.fillRect(0, 0, width, height);
     ctx.restore();
     drawTitle(ctx, 'PAUSED', width / 2, height * 0.32);
-    drawMenu(ctx, this.menu, width / 2, height * 0.32 + 64, Math.min(MENU_WIDTH, width - 32));
+    drawMenu(
+      ctx,
+      this.menu,
+      width / 2,
+      height * 0.32 + 64,
+      Math.min(MENU_WIDTH, width - 32),
+      height - 8,
+    );
   }
 }

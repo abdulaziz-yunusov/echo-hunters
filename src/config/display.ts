@@ -9,10 +9,29 @@ export interface DisplaySettings {
   /** Arcs showing where heard sounds come from (for playing without sound). */
   soundCues: boolean;
   palette: PaletteId;
+  /** Glow on everything (Phase 12): AUTO turns it off on slow devices. */
+  glow: GlowSetting;
 }
 
+export type GlowSetting = 'auto' | 'on' | 'off';
+
+export const GLOW_SETTINGS: readonly GlowSetting[] = ['auto', 'on', 'off'];
+
 export const DISPLAY = {
-  defaults: { shake: 1, flash: 1, soundCues: false, palette: 'standard' } as DisplaySettings,
+  defaults: {
+    shake: 1,
+    flash: 1,
+    soundCues: false,
+    palette: 'standard',
+    glow: 'auto',
+  } as DisplaySettings,
+  /**
+   * Glow governor (Phase 12, render/quality.ts): frames averaging slower than
+   * slowFrame (s) for judgeSeconds turn glow off on AUTO. Frame gaps longer
+   * than ignoreAbove (a hidden tab) don't count. smoothing: share of each
+   * new frame in the running average.
+   */
+  glow: { slowFrame: 1 / 45, judgeSeconds: 2, ignoreAbove: 0.25, smoothing: 0.1 },
   /** Steps offered for shake and flash strength. */
   levels: [0, 0.5, 1],
 

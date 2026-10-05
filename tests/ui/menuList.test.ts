@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { EMPTY_INPUT, type InputFrame } from '@/input/inputFrame';
-import { levelBar, MenuList, ROW_HEIGHT, type MenuItem } from '@/ui/menuList';
+import { levelBar, MenuList, MIN_ROW_HEIGHT, ROW_HEIGHT, type MenuItem } from '@/ui/menuList';
 
 const frame = (f: Partial<InputFrame>): InputFrame => ({ ...EMPTY_INPUT, ...f });
 
@@ -19,6 +19,28 @@ function setup() {
 }
 
 describe('MenuList', () => {
+  it('fits a short screen: rows shrink, then the menu moves up (Phase 12)', () => {
+    const items: MenuItem[] = Array.from({ length: 11 }, (_, i) => ({
+      kind: 'action' as const,
+      label: `ROW ${i}`,
+      onSelect: () => {},
+    }));
+    const menu = new MenuList(items);
+    const roomy = menu.layout(400, 150, 300, 1000);
+    expect(roomy[0].h).toBe(ROW_HEIGHT);
+    expect(roomy[0].y + ROW_HEIGHT / 2).toBe(150);
+
+    const bottom = 404; // a phone on its side
+    const tight = menu.layout(400, 150, 300, bottom);
+    const last = tight[tight.length - 1];
+    expect(last.y + last.h).toBeLessThanOrEqual(bottom + 0.01);
+    expect(tight[0].h).toBeGreaterThanOrEqual(MIN_ROW_HEIGHT);
+    expect(tight[0].h).toBeLessThan(ROW_HEIGHT);
+    // Taps still find the right row.
+    const middle = tight[5];
+    expect(menu.hitTest(400, middle.y + middle.h / 2)?.index).toBe(5);
+  });
+
   it('moves with up/down, skipping disabled rows and wrapping around', () => {
     const { menu } = setup();
     expect(menu.selected).toBe(0);

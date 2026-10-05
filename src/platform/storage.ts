@@ -1,6 +1,6 @@
 import { AUDIO } from '@/config/audio';
 import { DEFAULT_DIFFICULTY, DIFFICULTIES, type DifficultyId } from '@/config/difficulty';
-import { DISPLAY, type DisplaySettings } from '@/config/display';
+import { DISPLAY, GLOW_SETTINGS, type DisplaySettings } from '@/config/display';
 import { DEFAULT_VARIANT_CHOICE, VARIANT_CHOICES, type VariantChoice } from '@/config/duel';
 import { GAME } from '@/config/game';
 import { DEFAULT_DUEL_BOT, DUEL_BOTS, type DuelBotId } from '@/config/duelBots';
@@ -131,6 +131,9 @@ function validDisplay(value: unknown): DisplaySettings {
   if (level(d.shake)) result.shake = d.shake as number;
   if (level(d.flash)) result.flash = d.flash as number;
   if (typeof d.soundCues === 'boolean') result.soundCues = d.soundCues;
+  if ((GLOW_SETTINGS as readonly unknown[]).includes(d.glow)) {
+    result.glow = d.glow as DisplaySettings['glow'];
+  }
   if (typeof d.palette === 'string' && d.palette in PALETTES) {
     result.palette = d.palette as DisplaySettings['palette'];
   }
