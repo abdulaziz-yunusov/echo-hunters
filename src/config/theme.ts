@@ -1,5 +1,15 @@
+import type { HunterTypeId } from './hunters';
+
+/** A hunter's silhouette: a spiky star (`hollow`: outline only). */
+export interface HunterShape {
+  spikes: number;
+  outer: number;
+  inner: number;
+  hollow?: boolean;
+}
+
 /** Color names, as used by sound kinds and renderers (see sounds.ts). */
-type ColorName = 'dim' | 'white' | 'cyan' | 'red' | 'orange' | 'green';
+type ColorName = 'dim' | 'white' | 'cyan' | 'red' | 'orange' | 'green' | 'mimic';
 
 /**
  * Color palettes. Keys are named after the standard look; the colorblind
@@ -16,6 +26,8 @@ export const PALETTES = {
     red: '#ff2a4a',
     orange: '#ff9a2a',
     green: '#39ff88',
+    // The Mimic's hum (Phase 19): a core's cyan, a shade toward green. Meant to be subtle.
+    mimic: '#4dffd2',
   },
   colorblind: {
     dim: 'rgba(255, 255, 255, 0.45)',
@@ -24,6 +36,7 @@ export const PALETTES = {
     red: '#ff2a4a',
     orange: '#c050ff',
     green: '#ffd400',
+    mimic: '#4dffd2',
   },
 } as const satisfies Record<string, Record<ColorName, string>>;
 
@@ -48,7 +61,12 @@ export const THEME = {
     stalker: { spikes: 11, outer: 15, inner: 8 },
     sprinter: { spikes: 6, outer: 18, inner: 6 },
     listener: { spikes: 18, outer: 15, inner: 12 },
-  },
+    tracker: { spikes: 8, outer: 16, inner: 9 },
+    // The Echo is only ever an outline.
+    echo: { spikes: 14, outer: 16, inner: 10, hollow: true },
+    // Drawn as a core (in the mimic tint) while it waits; this shape when it lunges.
+    mimic: { spikes: 4, outer: 17, inner: 5 },
+  } as Record<HunterTypeId, HunterShape>,
   /** Screen shake: peak offset (CSS px) and length (s). */
   shake: {
     hit: { strength: 7, duration: 0.35 },

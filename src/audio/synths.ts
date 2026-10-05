@@ -1,4 +1,4 @@
-import type { SynthName } from '@/config/audio';
+import { AUDIO, type SynthName } from '@/config/audio';
 
 /**
  * A synthesized sound: schedules its nodes into `out`, starting now.
@@ -81,6 +81,11 @@ function noiseBurst(
 const ping: Synth = (ctx, out, _n, p) =>
   tone(ctx, out, 'sine', 1200 * p, 400 * p, 0.3, 0.5, 0.005, 0.5);
 
+const coreHum: Synth = (ctx, out, _n, p) => {
+  tone(ctx, out, 'sine', 520 * p, 520 * p, 0, 0.25, 0.1, 0.5);
+  tone(ctx, out, 'sine', 780 * p, 776 * p, 0.6, 0.08, 0.1, 0.45);
+};
+
 export const SYNTHS: Record<SynthName, Synth> = {
   // GDD: sine sweep from 1200 Hz down to 400 Hz over 0.3 s.
   ping,
@@ -143,9 +148,30 @@ export const SYNTHS: Record<SynthName, Synth> = {
     noiseBurst(ctx, out, n, 'lowpass', 500, 0.7, 0.4, 0.002, 0.06);
   },
 
-  coreHum: (ctx, out, _n, p) => {
-    tone(ctx, out, 'sine', 520 * p, 520 * p, 0, 0.25, 0.1, 0.5);
-    tone(ctx, out, 'sine', 780 * p, 776 * p, 0.6, 0.08, 0.1, 0.45);
+  coreHum,
+
+  // The Mimic (Phase 19): a core's hum, detuned. A careful ear hears it.
+  mimicHum: (ctx, out, n, p) => coreHum(ctx, out, n, p * 2 ** (AUDIO.mimicDetuneCents / 1200)),
+
+  // The Tracker on a trail: a short, rising sniff.
+  sniff: (ctx, out, n, p) =>
+    noiseBurst(ctx, out, n, 'bandpass', 1800 * p, 3, 0.5, 0.04, 0.12, 3400 * p),
+
+  // The Echo starting to move: a sound played backwards (swells, then cuts off).
+  rewind: (ctx, out, _n, p) => {
+    const t = ctx.currentTime;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(SILENT, t);
+    g.gain.exponentialRampToValueAtTime(0.5, t + 0.35);
+    g.gain.linearRampToValueAtTime(SILENT, t + 0.38);
+    g.connect(out);
+    const osc = ctx.createOscillator();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(220 * p, t);
+    osc.frequency.exponentialRampToValueAtTime(660 * p, t + 0.35);
+    osc.connect(g);
+    osc.start(t);
+    osc.stop(t + 0.42);
   },
 
   // Cores being carried (Phase 28): the core's two notes, lower and with a wobble, so a

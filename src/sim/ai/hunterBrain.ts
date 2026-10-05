@@ -4,6 +4,7 @@ import type { Hunter, HunterStateId } from '../entities/hunter';
 import type { SimContext } from '../gameState';
 import { BEHAVIOURS } from './behaviours';
 import type { HunterContext } from './hunterContext';
+import { pruneTrail } from './trail';
 
 function contextFor(sim: SimContext, hunter: Hunter): HunterContext {
   return { sim, hunter, def: HUNTER_TYPES[hunter.type] };
@@ -11,6 +12,7 @@ function contextFor(sim: SimContext, hunter: Hunter): HunterContext {
 
 /** Think and move for every hunter. Sounds heard last tick are handled, then forgotten. */
 export function updateHunters(sim: SimContext, dt: number): void {
+  pruneTrail(sim.state);
   for (const hunter of sim.state.hunters) {
     const c = contextFor(sim, hunter);
     hunter.cooldown = Math.max(0, hunter.cooldown - dt);

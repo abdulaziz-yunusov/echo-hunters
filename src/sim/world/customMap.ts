@@ -34,6 +34,9 @@ const HUNTER_CELLS: Partial<Record<CellCode, HunterTypeId>> = {
   [CELLS.stalker]: 'stalker',
   [CELLS.sprinter]: 'sprinter',
   [CELLS.listener]: 'listener',
+  [CELLS.tracker]: 'tracker',
+  [CELLS.echo]: 'echo',
+  [CELLS.mimic]: 'mimic',
 };
 const PICKUP_CELLS: Partial<Record<CellCode, PickupTypeId>> = {
   [CELLS.stoneBag]: 'stoneBag',

@@ -1,7 +1,6 @@
 import { DUEL_VARIANT_ORDER, DUEL_VARIANTS } from '@/config/duel';
 import { GAME } from '@/config/game';
 import { TOOLS } from '@/config/pickups';
-import type { HunterTypeId } from '@/config/hunters';
 import type { Action } from '@/config/input';
 import { THEME } from '@/config/theme';
 import { inputLabel, withOverrides } from '@/input/bindings';
@@ -9,15 +8,11 @@ import type { InputFrame } from '@/input/inputFrame';
 import { loadSave } from '@/platform/storage';
 import { drawHunterShape } from '@/render/hunterRenderer';
 import { drawText } from '@/render/text';
+import { firstLevelWith } from '@/sim/level';
+import { HUNTER_INFO, HUNTER_ORDER } from '@/ui/hunterInfo';
 import { MenuList } from '@/ui/menuList';
 import { drawMenu, drawTitle } from '@/ui/menuRenderer';
 import type { AppContext, Scene } from './scene';
-
-const HUNTERS: readonly [HunterTypeId, string][] = [
-  ['stalker', 'Slow. Walks to any sound it hears, then searches the spot.'],
-  ['sprinter', 'Faster than you. Reacts only to pings, stones and shockwaves.'],
-  ['listener', 'Never moves. Screams when it hears you, calling the others.'],
-];
 
 const TIPS = [
   'Sneaking is silent. Walking leaves footsteps; hitting a wall is loud.',
@@ -88,15 +83,16 @@ const VARIANT_RULES: readonly [string, readonly string[]][] = [
   ],
 ];
 
-type Page = 'solo' | 'duel' | 'variants';
-const PAGES: readonly Page[] = ['solo', 'duel', 'variants'];
+type Page = 'solo' | 'hunters' | 'duel' | 'variants';
+const PAGES: readonly Page[] = ['solo', 'hunters', 'duel', 'variants'];
 const PAGE_LABELS: Record<Page, { title: string; button: string }> = {
   solo: { title: 'HOW TO PLAY', button: 'SOLO RULES' },
+  hunters: { title: 'HUNTERS', button: 'HUNTERS' },
   duel: { title: 'DUEL IN THE DARK', button: 'DUEL RULES' },
   variants: { title: 'DUEL VARIANTS', button: 'DUEL VARIANTS' },
 };
 
-/** Rules, controls (as currently bound), the three hunters, and a few tips; then the duel pages. */
+/** Rules, controls (as currently bound) and a few tips; the hunters; then the duel pages. */
 export class HowToPlayScene implements Scene {
   readonly name = 'HowToPlay';
   private readonly app: AppContext;
@@ -150,6 +146,10 @@ export class HowToPlayScene implements Scene {
       drawText(ctx, text, left, y, { size, color, alpha });
       y += size + 9;
     };
+    if (this.page === 'hunters') {
+      this.drawHunters(ctx, left, y);
+      return;
+    }
     if (this.page !== 'solo') {
       for (const [heading, lines] of this.page === 'duel' ? DUEL_RULES : VARIANT_RULES) {
         line(heading, THEME.colors.cyan, 1, 14);
@@ -173,17 +173,38 @@ export class HowToPlayScene implements Scene {
     line('Pause ESC   ·   Mute M');
     line('Touch: left stick (a light push sneaks) · PING (hold: beam) · STONE · SHOCK · II pause');
     y += 8;
-    line('HUNTERS', THEME.colors.cyan, 1, 14);
-    for (const [type, text] of HUNTERS) {
-      drawHunterShape(ctx, left + 14, y - 5, type, 0.8);
-      drawText(ctx, type.toUpperCase(), left + 40, y, { size: 13, color: THEME.colors.red });
-      drawText(ctx, text, left + 130, y, { size: 13, color: white, alpha: 0.85 });
-      y += 30;
-    }
-    y += 4;
+    line('Hunters are blind: they find you by sound and by touch. See HUNTERS.', white, 0.85);
+    y += 8;
     line('TIPS', THEME.colors.cyan, 1, 14);
     for (const tip of TIPS) line(`· ${tip}`, white, 0.7, 12);
 
     drawMenu(ctx, this.menu, cx, Math.min(height - 70, y + 30), 220);
+  }
+
+  /** Every hunter type, in the order they are met (Phase 19): silhouette, name, first level, what it does. */
+  private drawHunters(ctx: CanvasRenderingContext2D, left: number, top: number): void {
+    const { width, height } = this.app.viewport;
+    let y = top;
+    for (const type of HUNTER_ORDER) {
+      drawHunterShape(ctx, left + 14, y + 4, type, 0.8);
+      drawText(ctx, type.toUpperCase(), left + 40, y, { size: 13, color: THEME.colors.red });
+      const from = firstLevelWith(type);
+      if (from !== null) {
+        drawText(ctx, `LEVEL ${from}+`, left + 40, y + 16, {
+          size: 10,
+          color: THEME.colors.white,
+          alpha: 0.5,
+        });
+      }
+      HUNTER_INFO[type].lines.forEach((text, i) =>
+        drawText(ctx, text ?? '', left + 130, y + i * 17, {
+          size: 13,
+          color: THEME.colors.white,
+          alpha: 0.85,
+        }),
+      );
+      y += 46;
+    }
+    drawMenu(ctx, this.menu, width / 2, Math.min(height - 70, y + 24), 220);
   }
 }

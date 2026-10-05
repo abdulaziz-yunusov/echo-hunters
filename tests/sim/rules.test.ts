@@ -85,13 +85,13 @@ describe('arena variants act only through rules and map settings', () => {
     expect(slow).toBeGreaterThan(normal);
   });
 
-  it('Core Rush: 5 cores, carry 3; Hunted: two Stalkers; both sides get the same', () => {
+  it('Core Rush: 5 cores, carry 3; Hunted: two Stalkers and a Tracker; both sides get the same', () => {
     for (const role of ['host', 'client'] as const) {
       const rush = createDuelSimulation({ seed: 8, role, variant: 'coreRush' }).state;
       expect(rush.cores).toHaveLength(5);
       expect(rush.duel!.coresToWin).toBe(3);
       const hunted = createDuelSimulation({ seed: 8, role, variant: 'hunted' }).state;
-      expect(hunted.hunters.map((h) => h.type)).toEqual(['stalker', 'stalker']);
+      expect(hunted.hunters.map((h) => h.type)).toEqual(['stalker', 'stalker', 'tracker']);
     }
     const a = createDuelSimulation({ seed: 8, role: 'host', variant: 'coreRush' }).state;
     const b = createDuelSimulation({ seed: 8, role: 'client', variant: 'coreRush' }).state;

@@ -16,6 +16,7 @@ export const SYNTHS = [
   'beacon',
   'wallBump',
   'coreHum',
+  'mimicHum',
   'carryHum',
   'trapSnap',
   'hiss',
@@ -23,6 +24,8 @@ export const SYNTHS = [
   'vent',
   'drip',
   'scream',
+  'sniff',
+  'rewind',
   'coreCollected',
   'beaconOn',
   'hit',
@@ -61,6 +64,11 @@ export const AUDIO_SOUNDS = {
   beacon: { synth: 'beacon', range: 1600, volume: 0.8 },
   wallBump: { synth: 'wallBump', range: 320, volume: 0.6 },
   coreHum: { synth: 'coreHum', range: 280, volume: 0.4 },
+  // Phase 19 hunters. The Mimic's hum is played as far as a core's; its fake ping like a ping.
+  mimicHum: { synth: 'mimicHum', range: 280, volume: 0.4 },
+  mimicPing: { synth: 'ping', range: 600, volume: 0.45 },
+  trackerSniff: { synth: 'sniff', range: 420, volume: 0.7 },
+  echoRewind: { synth: 'rewind', range: 520, volume: 0.75 },
   // The rival hears a carrier as far as hunters do (Phase 28).
   carriedHum: { synth: 'carryHum', range: 220, volume: 0.5 },
   carriedHumHeavy: { synth: 'carryHum', range: 308, volume: 0.65 },
@@ -95,6 +103,8 @@ export const AUDIO = {
   volumes: { master: 0.8, sfx: 1, ambient: 0.6 },
   /** A sound this far to the side (px) is fully in one ear. */
   panRange: 320,
+  /** The Mimic's hum is a core's, this many cents sharp (Phase 19). */
+  mimicDetuneCents: 30,
   /** Sounds from behind a wall: quieter and dull. */
   muffled: { gain: 0.45, lowpassHz: 700 },
   /** Ambient drone (GDD §10): rises in pitch as the nearest hunter comes within `range`. */

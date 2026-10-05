@@ -40,9 +40,9 @@ export const DUEL_VARIANTS = {
   },
   hunted: {
     label: 'HUNTED',
-    blurb: 'Two Stalkers hunt you both.',
+    blurb: 'Two Stalkers and a Tracker hunt you both. The Tracker follows footsteps.',
     effects: [],
-    map: { hunters: ['stalker', 'stalker'] },
+    map: { hunters: ['stalker', 'stalker', 'tracker'] },
   },
   blackout: {
     label: 'BLACKOUT',

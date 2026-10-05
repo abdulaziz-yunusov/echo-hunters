@@ -19,8 +19,6 @@ export function drawHunterSilhouettes(
   fadeSeconds: number,
 ): void {
   ctx.save();
-  ctx.fillStyle = THEME.hunterSilhouette;
-  ctx.shadowColor = THEME.hunterSilhouette;
   ctx.shadowBlur = THEME.glowBlur;
   for (const h of hunters) {
     const seen = reveal.objectReveal(hunterKey(h));
@@ -28,8 +26,8 @@ export function drawHunterSilhouettes(
     const a = 1 - (now - seen.time) / fadeSeconds;
     if (a <= 0) continue;
     ctx.globalAlpha = a;
-    jagged(ctx, seen.x, seen.y, h.type, h.id);
-    ctx.fill();
+    if (disguised(h)) drawDisguise(ctx, seen.x, seen.y);
+    else drawJagged(ctx, seen.x, seen.y, h.type, h.id);
   }
   ctx.restore();
 }
@@ -98,12 +96,46 @@ export function drawHunterShape(
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(scale, scale);
-  ctx.fillStyle = THEME.hunterSilhouette;
-  ctx.shadowColor = THEME.hunterSilhouette;
   ctx.shadowBlur = THEME.glowBlur;
-  jagged(ctx, 0, 0, type, 1);
-  ctx.fill();
+  drawJagged(ctx, 0, 0, type, 1);
   ctx.restore();
+}
+
+/** A Mimic waiting at its spot looks like a core (Phase 19c), a shade off in color. */
+function disguised(h: Hunter): boolean {
+  return h.type === 'mimic' && h.state === 'idle';
+}
+
+/** Core-sized diamond, as drawCores draws one, in the mimic tint. */
+function drawDisguise(ctx: CanvasRenderingContext2D, x: number, y: number): void {
+  const size = 7;
+  ctx.fillStyle = THEME.colors.mimic;
+  ctx.shadowColor = THEME.colors.mimic;
+  ctx.beginPath();
+  ctx.moveTo(x, y - size);
+  ctx.lineTo(x + size, y);
+  ctx.lineTo(x, y + size);
+  ctx.lineTo(x - size, y);
+  ctx.closePath();
+  ctx.fill();
+}
+
+/** The type's silhouette, filled (or outlined, for a hollow one like the Echo). */
+function drawJagged(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  type: HunterTypeId,
+  seed: number,
+): void {
+  ctx.fillStyle = THEME.hunterSilhouette;
+  ctx.strokeStyle = THEME.hunterSilhouette;
+  ctx.shadowColor = THEME.hunterSilhouette;
+  jagged(ctx, x, y, type, seed);
+  if (THEME.hunterShapes[type].hollow) {
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  } else ctx.fill();
 }
 
 /**

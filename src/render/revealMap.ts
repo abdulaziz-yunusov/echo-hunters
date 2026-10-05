@@ -1,3 +1,4 @@
+import { SOUND_KINDS, type SoundKindDef } from '@/config/sounds';
 import { pointSegmentDistance } from '@/core/geometry';
 import type { EntityId } from '@/sim/entities/entity';
 import { frontPassedOver, waveFaces, type SoundWave } from '@/sim/sound/soundWave';
@@ -64,8 +65,9 @@ export class RevealMap {
   ): void {
     for (const o of objects) {
       for (const w of waves) {
-        // A hunter's own footsteps do not show it.
-        if (o.owner !== undefined && w.owner === o.owner) continue;
+        // A hunter's own footsteps do not show it (a Mimic's hum does, like a core's).
+        const sound: SoundKindDef = SOUND_KINDS[w.kind];
+        if (o.owner !== undefined && w.owner === o.owner && !sound.showsSource) continue;
         if (frontPassedOver(w, o.x, o.y, dt)) {
           this.objectReveals.set(o.key, { time: now, x: o.x, y: o.y });
           break;

@@ -46,11 +46,20 @@ export const ENDLESS = {
   extraHuntersPerLevel: 1,
   maxHunters: 8,
   /**
-   * Added one per level, in this order. Sprinters are the only hunters faster
-   * than the player, so they come last: measured with a bot over 40 maps per
-   * level, adding a Sprinter first made level 6 a cliff (78% → 50% success).
+   * Added one per level, in this order, up to maxHunters. The Phase 19 hunters
+   * come first, one new kind per level (5 Tracker, 6 Echo, 7 Mimic), then more
+   * of the old ones. Sprinters are the only hunters faster than the player, so
+   * they come last: measured with a bot over 40 maps per level, adding a
+   * Sprinter first made level 6 a cliff (78% → 50% success).
    */
-  hunterPool: ['stalker', 'listener', 'sprinter'] as readonly HunterTypeId[],
+  hunterPool: [
+    'tracker',
+    'echo',
+    'mimic',
+    'stalker',
+    'listener',
+    'sprinter',
+  ] as readonly HunterTypeId[],
   mapGrowthPerLevel: 0.1,
   maxMapScale: 1.6,
   pickups: { stoneBag: 2, heart: 1, silentBoots: 1 } as LevelDef['pickups'],

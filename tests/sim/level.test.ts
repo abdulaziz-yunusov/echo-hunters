@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { GAME } from '@/config/game';
 import { ENDLESS, LEVELS } from '@/config/levels';
-import { levelDef, levelMapScale } from '@/sim/level';
+import { firstLevelWith, levelDef, levelMapScale, newHunterTypes } from '@/sim/level';
 import { IDLE_INPUT } from '@/sim/playerInput';
 import { createSimulation } from '@/sim/simulation';
 
@@ -60,5 +60,30 @@ describe('level progression (GDD §7)', () => {
       sim.step({ ...IDLE_INPUT, ping: true }, 1 / 60);
       expect(sim.state.player.pingCooldown).toBeCloseTo(cooldown, 5);
     }
+  });
+});
+
+describe('meeting the hunters (Phase 19)', () => {
+  it('one new kind per level from 3 to 7, then more of the same', () => {
+    expect([2, 3, 4, 5, 6, 7, 8, 9].map(newHunterTypes)).toEqual([
+      [],
+      ['listener'],
+      ['sprinter'],
+      ['tracker'],
+      ['echo'],
+      ['mimic'],
+      [],
+      [],
+    ]);
+    expect(newHunterTypes(1)).toEqual([]);
+    expect(firstLevelWith('stalker')).toBe(1);
+    expect(firstLevelWith('mimic')).toBe(7);
+  });
+
+  it('every hunter type is met in the endless levels', () => {
+    const types = new Set(levelDef(12).hunters);
+    for (const t of ENDLESS.hunterPool)
+      expect(types.has(t) || firstLevelWith(t) !== null).toBe(true);
+    expect(levelDef(12).hunters).toHaveLength(ENDLESS.maxHunters);
   });
 });

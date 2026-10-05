@@ -12,7 +12,8 @@ import { drawText, wrapLines } from '@/render/text';
 import { ReplayRecorder } from '@/replay/recorder';
 import { WorldRenderer } from '@/render/worldRenderer';
 import { roundResult, scoreRound } from '@/sim/scoring';
-import { levelDef } from '@/sim/level';
+import { levelDef, newHunterTypes } from '@/sim/level';
+import { HUNTER_INFO } from '@/ui/hunterInfo';
 import { createCustomSimulation, createSimulation, type Simulation } from '@/sim/simulation';
 import { decodeMap } from '@/sim/world/customMap';
 import { warpToObjective } from './debugWarp';
@@ -21,8 +22,9 @@ import { Tutorial } from './tutorial';
 import { RoundDisplay } from './roundDisplay';
 import type { AppContext, Scene } from './scene';
 
-/** Seconds the "LEVEL n" banner stays up. */
+/** Seconds the "LEVEL n" banner stays up (longer when it names a new hunter). */
 const BANNER_TIME = 3;
+const BANNER_TIME_NEW_HUNTER = 5;
 /** Share of the screen the debug overview map may fill. */
 const OVERVIEW_MARGIN = 0.92;
 /** Seconds to linger on the world after extraction before the score screen. */
@@ -225,10 +227,15 @@ export class PlayScene implements Scene {
     this.app.debug.watch('seed', `${this.run.seed} (map ${this.sim.state.layout.seed})`);
   }
 
-  /** "LEVEL 4 · 3 HUNTERS · PING 3s" for the first seconds of a level. */
+  /**
+   * "LEVEL 4 · 3 HUNTERS · PING 3s" for the first seconds of a level, and
+   * a line for each hunter type met for the first time (Phase 19).
+   */
   private drawLevelBanner(ctx: CanvasRenderingContext2D, time: number): void {
-    if (time > BANNER_TIME) return;
-    const alpha = Math.min(1, (BANNER_TIME - time) / 0.6, time / 0.3);
+    const met = this.run.custom ? [] : newHunterTypes(this.run.level);
+    const shown = met.length > 0 ? BANNER_TIME_NEW_HUNTER : BANNER_TIME;
+    if (time > shown) return;
+    const alpha = Math.min(1, (shown - time) / 0.6, time / 0.3);
     const { width, height } = this.app.viewport;
     const { hunters, rules, layout } = this.sim.state;
     const title = this.run.custom
@@ -256,6 +263,22 @@ export class PlayScene implements Scene {
       color: THEME.colors.white,
       align: 'center',
       alpha: alpha * 0.8,
+    });
+    // Two short lines each, so they fit a phone held upright.
+    met.forEach((type, i) => {
+      const y = height * 0.3 + 60 + i * 44;
+      drawText(ctx, `NEW HUNTER: ${type.toUpperCase()}`, width / 2, y, {
+        size: 16,
+        color: THEME.colors.red,
+        align: 'center',
+        alpha,
+      });
+      drawText(ctx, HUNTER_INFO[type].short, width / 2, y + 20, {
+        size: 13,
+        color: THEME.colors.white,
+        align: 'center',
+        alpha,
+      });
     });
   }
 

@@ -1,3 +1,4 @@
+import type { HunterTypeId } from '@/config/hunters';
 import { ENDLESS, LEVELS, type LevelDef } from '@/config/levels';
 
 /**
@@ -26,4 +27,18 @@ export function levelDef(level: number): LevelDef {
 export function levelMapScale(level: number): number {
   const beyond = Math.max(0, level - LEVELS.length);
   return Math.min(ENDLESS.maxMapScale, 1 + beyond * ENDLESS.mapGrowthPerLevel);
+}
+
+/** The first level a hunter type appears in (null if it never does by `upTo`). */
+export function firstLevelWith(type: HunterTypeId, upTo = 30): number | null {
+  for (let level = 1; level <= upTo; level++) {
+    if (levelDef(level).hunters.includes(type)) return level;
+  }
+  return null;
+}
+
+/** Hunter types met for the first time on this level (level 1's are the tutorial's). */
+export function newHunterTypes(level: number): HunterTypeId[] {
+  if (level <= 1) return [];
+  return [...new Set(levelDef(level).hunters)].filter((t) => firstLevelWith(t, level) === level);
 }

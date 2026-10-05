@@ -1,6 +1,7 @@
 import { HUNTER_COMMON, type HunterTypeId } from '@/config/hunters';
 import type { Vec2 } from '@/core/geometry';
 import type { MachineState } from '@/core/fsm';
+import type { TrailPoint } from '../ai/trail';
 import type { EntityId } from './entity';
 
 /** Hunter AI states (GDD §5 state machine). */
@@ -39,8 +40,18 @@ export interface Hunter extends MachineState<HunterStateId> {
   closeCallSince: number | null;
   /** Close call already counted (or spoiled by a hit) for this approach. */
   closeCallDone: boolean;
-  /** Seconds until the hunter's special ability (the Listener's scream) is ready. */
+  /** Seconds until the hunter's special ability (the Listener's scream, the Mimic's lunge) is ready. */
   cooldown: number;
+  /** Where it was placed. The Mimic keeps going back there. */
+  readonly home: Vec2;
+  /** Tracker: the last trail point it reached; null when not on a trail. */
+  trailAt: TrailPoint | null;
+  /** Echo: seconds since it last moved. */
+  quietTime: number;
+  /** Mimic: sim time at which it answers the ping it heard; null = none to answer. */
+  answerAt: number | null;
+  /** Mimic: seconds until its next hum. */
+  humTimer: number;
 }
 
 export function createHunter(id: EntityId, type: HunterTypeId, x: number, y: number): Hunter {
@@ -67,5 +78,10 @@ export function createHunter(id: EntityId, type: HunterTypeId, x: number, y: num
     closeCallSince: null,
     closeCallDone: false,
     cooldown: 0,
+    home: { x, y },
+    trailAt: null,
+    quietTime: Infinity,
+    answerAt: null,
+    humTimer: 0,
   };
 }

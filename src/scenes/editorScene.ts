@@ -267,7 +267,7 @@ export class EditorScene implements Scene {
       ctx.fillStyle = fill ?? colors.dim;
       if (fill || id !== 'floor') ctx.fillRect(cx, cy, cell, cell);
       if (!isTerrain(code)) {
-        // A marker: its tool's color and first letter.
+        // A marker: its tool's color and its letter (the cell code, unique to it).
         const tool = EDITOR_TOOLS.find((t) => t.cell === id)!;
         ctx.globalAlpha = 1;
         ctx.fillStyle = colors[tool.color];
@@ -278,7 +278,7 @@ export class EditorScene implements Scene {
           ctx.fillStyle = THEME.background;
           ctx.font = `bold ${Math.floor(cell * 0.6)}px ${THEME.font}`;
           ctx.textAlign = 'center';
-          ctx.fillText(tool.label[0], cx + cell / 2, cy + cell * 0.72);
+          ctx.fillText(code, cx + cell / 2, cy + cell * 0.72);
         }
       }
     });

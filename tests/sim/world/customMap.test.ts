@@ -91,6 +91,17 @@ describe('hand-made maps (Phase 13)', () => {
       ['vent', tile(6, 3).x],
       ['drip', tile(8, 3).x],
     ]);
+    // The Phase 19 hunters have cells too; a Mimic stays where it was put (no rooms).
+    const all = { ...map, cells: [...map.cells] };
+    all.cells[map.width * 1 + 7] = CELLS.tracker;
+    all.cells[map.width * 1 + 8] = CELLS.echo;
+    all.cells[map.width * 1 + 9] = CELLS.mimic;
+    expect(createCustomSimulation(all).state.hunters.map((h) => [h.type, h.x])).toEqual([
+      ['stalker', tile(6, 1).x],
+      ['tracker', tile(7, 1).x],
+      ['echo', tile(8, 1).x],
+      ['mimic', tile(9, 1).x],
+    ]);
     // The map's text is its seed: the same map always plays the same.
     expect(customRound(map).layout.seed).toBe(customRound(fromRows(PLAYABLE)).layout.seed);
   });

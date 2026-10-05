@@ -6,6 +6,8 @@ import type { SoundKindId } from '@/config/sounds';
 import { EventBus } from '@/core/events';
 import { deriveSeed, Rng } from '@/core/rng';
 import { setHunterState, updateHunters } from './ai/hunterBrain';
+import { recordTrail } from './ai/trail';
+import { placeMimics } from './world/mimicPlacement';
 import { createHunter } from './entities/hunter';
 import { createBeacon, createCores } from './entities/objectives';
 import { createPlayer } from './entities/player';
@@ -124,9 +126,11 @@ export class Simulation implements SimContext {
             forfeit: false,
           }
         : null,
-      hunters: hunterTypes.slice(0, layout.hunterSpawns.length).map((type, i) => {
-        const at = tiles.center(layout.hunterSpawns[i]);
-        return createHunter(FIRST_HUNTER_ID + i, type, at.x, at.y);
+      hunters: placeMimics(layout, hunterTypes.slice(0, layout.hunterSpawns.length)).map((h, i) => {
+        const at = tiles.center(h.at);
+        const hunter = createHunter(FIRST_HUNTER_ID + i, h.type, at.x, at.y);
+        hunter.humTimer = h.humIn;
+        return hunter;
       }),
       cores: createCores(layout.cores.map((c) => tiles.center(c))),
       beacon: createBeacon(tiles.center(layout.beacon)),
@@ -142,6 +146,7 @@ export class Simulation implements SimContext {
       nextWaveId: 1,
       rng: new Rng(deriveSeed(layout.seed, 'ai')),
       hearings: [],
+      trail: [],
       rules: buildRules({ level, variant: options.variant }),
       hearingModel: GAME.hearing.model,
       stats: { huntersStunned: 0, closeCalls: 0 },
@@ -206,7 +211,10 @@ export class Simulation implements SimContext {
       scale,
     });
     s.waves.push(wave);
-    if (s.status === 'playing' && s.mode !== 'client') scheduleHearing(s, wave);
+    if (s.status === 'playing' && s.mode !== 'client') {
+      scheduleHearing(s, wave);
+      recordTrail(s, wave);
+    }
     this.events.emit('soundEmitted', { kind, x, y, owner, time: s.time, wave });
   }
 }

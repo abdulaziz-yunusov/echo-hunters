@@ -36,6 +36,11 @@ export interface SoundKindDef {
   arc?: number;
   /** Directional sound: hearing range outside the wedge (inside it is `hearRadius`). */
   sideHearRadius?: number;
+  /**
+   * The ring shows what made it, like a core's hum shows the core. Other
+   * sounds never reveal their own maker (a hunter's steps don't show it).
+   */
+  showsSource?: boolean;
 }
 
 /** GDD §4 sound table, plus hearing ranges (see DECISIONS.md, Phase 6). */
@@ -86,12 +91,33 @@ export const SOUND_KINDS = {
     color: 'white',
     tags: ['footstep', 'impact'],
   },
-  coreHum: { maxRadius: 40, hearRadius: 40, speed: 120, color: 'cyan', tags: ['ambient'] },
+  coreHum: {
+    maxRadius: 40,
+    hearRadius: 40,
+    speed: 120,
+    color: 'cyan',
+    tags: ['ambient'],
+    showsSource: true,
+  },
   // Phase 28 carrier pressure: cores you carry hum; with enough to win, 1.4x louder.
   carriedHum: { maxRadius: 60, hearRadius: 220, speed: 160, color: 'cyan', tags: ['carry'] },
   // Phase 29: a trap springing shut. Loud: it lights the area and hunters come.
   trapSnap: { maxRadius: 260, hearRadius: 600, speed: 420, color: 'red', tags: ['impact'] },
   carriedHumHeavy: { maxRadius: 84, hearRadius: 308, speed: 160, color: 'cyan', tags: ['carry'] },
+  // Phase 19 hunters' tells. No hunter reacts to them.
+  trackerSniff: { maxRadius: 50, hearRadius: 50, speed: 150, color: 'orange', tags: ['hunter'] },
+  echoRewind: { maxRadius: 70, hearRadius: 70, speed: 180, color: 'orange', tags: ['hunter'] },
+  // The Mimic's lure: a core's hum, a shade off in color (and detuned, see audio.ts).
+  mimicHum: {
+    maxRadius: 40,
+    hearRadius: 40,
+    speed: 120,
+    color: 'mimic',
+    tags: ['ambient'],
+    showsSource: true,
+  },
+  // Its answer to a ping: a smaller fake ping from its own spot.
+  mimicPing: { maxRadius: 250, hearRadius: 250, speed: 350, color: 'cyan', tags: ['ambient'] },
   // Phase 17 sound cover: machine noise no hunter reacts to, lighting the walls nearby.
   ventHum: { maxRadius: 150, hearRadius: 150, speed: 110, color: 'dim', tags: ['ambient'] },
   drip: { maxRadius: 70, hearRadius: 70, speed: 160, color: 'dim', tags: ['ambient'] },

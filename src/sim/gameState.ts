@@ -3,6 +3,7 @@ import type { DuelVariantId } from '@/config/duel';
 import type { Rules } from '@/config/rules';
 import type { SoundKindId } from '@/config/sounds';
 import type { EventBus } from '@/core/events';
+import type { TrailPoint } from './ai/trail';
 import type { Rng } from '@/core/rng';
 import type { EntityId } from './entities/entity';
 import type { Hunter } from './entities/hunter';
@@ -102,6 +103,8 @@ export interface GameState {
   rng: Rng;
   /** Sounds on their way to hunters (see sound/hearing.ts). */
   hearings: PendingHearing[];
+  /** Players' recent footsteps, oldest first, for the Tracker (Phase 19). Host and solo only. */
+  trail: TrailPoint[];
   /** Level-specific rule values (GAME defaults plus the level's overrides). */
   rules: LevelRules;
   /** How hunters hear (GAME.hearing.model by default; debug can switch it live). */

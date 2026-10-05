@@ -1,8 +1,13 @@
 import { HUNTER_COMMON, type HunterBehaviourId } from '@/config/hunters';
 import type { State, StateTable } from '@/core/fsm';
+import type { Vec2 } from '@/core/geometry';
 import type { HunterStateId } from '../entities/hunter';
+import type { GameState } from '../gameState';
+import { moveCircle } from '../world/collision';
+import { hasLineOfSight } from '../world/visibility';
 import type { HunterContext } from './hunterContext';
 import { followPath, randomPointNear, setGoal, stop } from './navigation';
+import { isPlayerId, nextTrailPoint, trailPointAt } from './trail';
 
 type HunterState = State<HunterContext, HunterStateId>;
 type HunterTable = StateTable<HunterContext, HunterStateId>;
@@ -107,18 +112,175 @@ const scream: HunterState = {
   update: (_c, _dt, time) => (time >= SCREAM_HOLD ? 'idle' : undefined),
 };
 
-const backToListening: HunterState = { update: () => 'idle' };
+const backToIdle: HunterState = { update: () => 'idle' };
+
+// ─── Tracker: follows your footsteps, not your noise (Phase 19a) ────────
+
+/**
+ * Go to the step it heard, then from step to step along that player's
+ * trail, in order, sniffing as it goes. It ignores new sounds meanwhile.
+ * Where the trail ends or breaks (a gap: the player went quiet), it searches.
+ */
+const followTrail: HunterState = {
+  enter: (c) => {
+    const h = c.hunter;
+    h.trailAt = h.heard ? trailPointAt(c.sim.state, h.heard.x, h.heard.y) : null;
+    h.cooldown = 0;
+    headForHeardSound(c);
+  },
+  update: (c, dt) => {
+    const h = c.hunter;
+    if (h.cooldown === 0) {
+      c.sim.emitSound('trackerSniff', h.x, h.y, h.id);
+      h.cooldown = c.def.sniffInterval ?? 1;
+    }
+    const travel = followPath(c, c.def.speed, dt);
+    if (travel === 'moving') return;
+    const next =
+      travel === 'arrived' && h.trailAt
+        ? nextTrailPoint(c.sim.state, h.trailAt, c.def.trailGap ?? 0)
+        : null;
+    if (!next || !setGoal(c, next)) return 'search';
+    h.trailAt = next;
+  },
+  exit: ({ hunter }) => {
+    hunter.trailAt = null;
+  },
+};
+
+// ─── Echo: moves only while a sound you made is still spreading (19b) ───
+
+/** Frozen. It still listens, and remembers where the last sound came from. */
+const frozen: HunterState = {
+  update: (c, dt) => {
+    const h = c.hunter;
+    if (h.heard) aimAtHeardSound(c);
+    h.quietTime += dt;
+    if (h.goal && playerSoundSpreading(c.sim.state)) return 'investigate';
+  },
+};
+
+/** Rush at the last sound heard, for as long as a player's ring is still growing. */
+const rush: HunterState = {
+  enter: (c) => {
+    const h = c.hunter;
+    if (h.quietTime >= (c.def.wakeQuiet ?? 0)) c.sim.emitSound('echoRewind', h.x, h.y, h.id);
+  },
+  update: (c, dt) => {
+    const h = c.hunter;
+    if (h.heard) aimAtHeardSound(c);
+    if (!playerSoundSpreading(c.sim.state)) return 'idle';
+    h.quietTime = 0;
+    return followPath(c, c.def.speed, dt) === 'moving' ? undefined : 'idle';
+  },
+};
+
+// ─── Mimic: a lure that pretends to be a core (19c) ─────────────────────
+
+/** A Mimic this close to its spot is home (px). */
+const HOME_REACH = 4;
+
+/**
+ * At home it hums like a core. It answers a ping with a fake one,
+ * `echoDelay` s later, from where it stands. Away from home (after a
+ * lunge), it walks back. A player close by and in sight: lunge.
+ */
+const lurk: HunterState = {
+  enter: ({ hunter }) => stop(hunter),
+  update: (c, dt) => {
+    const h = c.hunter;
+    const { state } = c.sim;
+    if (h.heard) h.answerAt ??= state.time + (c.def.echoDelay ?? 0);
+    if (h.answerAt !== null && state.time >= h.answerAt) {
+      c.sim.emitSound('mimicPing', h.x, h.y, h.id);
+      h.answerAt = null;
+    }
+    if (Math.hypot(h.x - h.home.x, h.y - h.home.y) > HOME_REACH) {
+      if (h.goal || setGoal(c, h.home)) followPath(c, c.def.speed, dt);
+    } else {
+      h.humTimer -= dt;
+      if (h.humTimer <= 0) {
+        c.sim.emitSound('mimicHum', h.x, h.y, h.id);
+        h.humTimer += state.rules.coreHumInterval;
+      }
+    }
+    if (h.cooldown === 0 && lungeTarget(c)) return 'investigate';
+  },
+};
+
+/** A short, straight dash at the player it saw, then back home. */
+const lunge: HunterState = {
+  enter: (c) => {
+    const h = c.hunter;
+    stop(h);
+    const target = lungeTarget(c);
+    if (target) h.facing = Math.atan2(target.y - h.y, target.x - h.x);
+  },
+  update: (c, dt, time) => {
+    const h = c.hunter;
+    if (time >= (c.def.lungeTime ?? 0)) return 'search';
+    const step = (c.def.lungeSpeed ?? 0) * dt;
+    const tiles = c.sim.state.layout.tiles;
+    const moved = moveCircle(
+      tiles,
+      h.x,
+      h.y,
+      h.radius,
+      Math.cos(h.facing) * step,
+      Math.sin(h.facing) * step,
+    );
+    h.x = moved.x;
+    h.y = moved.y;
+  },
+  exit: (c) => {
+    c.hunter.cooldown = c.def.lungeCooldown ?? 0;
+  },
+};
 
 export const BEHAVIOURS: Readonly<Record<HunterBehaviourId, HunterTable>> = {
   stalker: { idle: wander, investigate, search, attack, stunned },
   // "investigate" is the Listener's scream; it never walks anywhere.
-  listener: { idle: listen, investigate: scream, search: backToListening, attack, stunned },
+  listener: { idle: listen, investigate: scream, search: backToIdle, attack, stunned },
+  // "investigate" is following a trail.
+  tracker: { idle: wander, investigate: followTrail, search, attack, stunned },
+  // "idle" is frozen, "investigate" is rushing; it never searches.
+  echo: { idle: frozen, investigate: rush, search: backToIdle, attack, stunned },
+  // "idle" is waiting at (or going back to) its spot, "investigate" is the lunge.
+  mimic: { idle: lurk, investigate: lunge, search: backToIdle, attack, stunned },
 };
 
 function headForHeardSound(c: HunterContext): void {
   const h = c.hunter;
   if (h.heard) setGoal(c, h.heard);
   h.heard = null;
+}
+
+/** Echo: plan a route to the sound just heard, without moving yet. */
+function aimAtHeardSound(c: HunterContext): void {
+  const h = c.hunter;
+  if (h.heard) setGoal(c, h.heard);
+  h.heard = null;
+}
+
+/** Is a sound a player made still spreading (a ring still growing)? */
+export function playerSoundSpreading(state: GameState): boolean {
+  return state.waves.some((w) => isPlayerId(w.owner) && w.radius < w.maxRadius);
+}
+
+/** Mimic: the nearest player within lunge range and in line of sight, if any. */
+function lungeTarget(c: HunterContext): Vec2 | null {
+  const h = c.hunter;
+  const { state } = c.sim;
+  const range = c.def.lungeRange ?? 0;
+  let best: Vec2 | null = null;
+  let bestDistance = range;
+  for (const p of state.rival ? [state.player, state.rival] : [state.player]) {
+    const d = Math.hypot(p.x - h.x, p.y - h.y);
+    if (d > bestDistance || !hasLineOfSight(state.walls, h.x, h.y, p.x, p.y)) continue;
+    best = p;
+    bestDistance = d;
+  }
+  return best;
 }
 
 function pauseLength(c: HunterContext): number {
