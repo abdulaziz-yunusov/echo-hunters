@@ -20,6 +20,14 @@ export type BotProfile = 'basic' | 'careful';
 
 export const BOT_PROFILES: readonly BotProfile[] = ['basic', 'careful'];
 
+/** Limits on top of a profile (the practice rival's levels, Phase 26). */
+export interface BotLimits {
+  /** Share of HEARING within which hunters are noticed (default 1). */
+  hearing?: number;
+  /** Throws decoy stones (default true). */
+  stones?: boolean;
+}
+
 /** Tuning of the two profiles. Distances in px, times in s. */
 const PROFILE = {
   basic: { pingEvery: 4, quietRange: 0, sneakRange: 0, stoneRange: 0, stoneEvery: 0 },
@@ -44,6 +52,8 @@ export class Bot {
   protected readonly sim: Simulation;
   private readonly tune: (typeof PROFILE)[BotProfile];
   private readonly careful: boolean;
+  private readonly hearing: number;
+  private readonly stones: boolean;
   private route: Vec2[] = [];
   /** Where the bot is heading now (kept while still valid, so it doesn't dither). */
   protected target: Vec2 | null = null;
@@ -51,10 +61,12 @@ export class Bot {
   private lastPing = -Infinity;
   private lastStone = -Infinity;
 
-  constructor(sim: Simulation, profile: BotProfile) {
+  constructor(sim: Simulation, profile: BotProfile, limits: BotLimits = {}) {
     this.sim = sim;
     this.tune = PROFILE[profile];
     this.careful = profile === 'careful';
+    this.hearing = HEARING * (limits.hearing ?? 1);
+    this.stones = limits.stones ?? true;
   }
 
   input(): PlayerInput {
@@ -99,6 +111,7 @@ export class Bot {
       ) {
         input.shockwave = true;
       } else if (
+        this.stones &&
         threat.state === 'investigate' &&
         threatDistance < this.tune.stoneRange &&
         player.stones > 0 &&
@@ -164,7 +177,7 @@ export class Bot {
   private nearestHeardHunter(): Hunter | null {
     const { player, hunters } = this.sim.state;
     let best: Hunter | null = null;
-    let bestDistance = HEARING;
+    let bestDistance = this.hearing;
     for (const h of hunters) {
       if (h.state === 'stunned') continue;
       const d = dist(player, h);

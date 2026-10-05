@@ -155,5 +155,7 @@ export const GAME = {
     /** Room code length and alphabet (no look-alike characters). */
     codeLength: 5,
     codeAlphabet: 'ABCDEFGHJKMNPQRSTUVWXYZ23456789',
+    /** Practice vs bot: ticks of lag each way on the in-memory link (3 ≈ 50 ms, a good connection). */
+    practiceLagTicks: 3,
   },
 };

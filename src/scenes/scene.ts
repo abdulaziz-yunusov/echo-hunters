@@ -5,9 +5,9 @@ import type { InputManager } from '@/input/inputManager';
 import type { SoundOutput } from '@/audio/soundOutput';
 import type { DebugLayer } from '@/render/debugLayer';
 import type { ScoreBreakdown } from '@/sim/scoring';
-import type { Transport } from '@/net/transport';
 import type { Replay } from '@/replay/replay';
 import type { DuelEndParams } from './duelEndScene';
+import type { DuelParams } from './duelScene';
 import type { RunState } from './run';
 
 /** A screen of the game: menu, gameplay, level end, … */
@@ -46,7 +46,7 @@ export interface SceneParams {
   controls: undefined;
   pause: undefined;
   duelLobby: undefined;
-  duel: { transport: Transport; role: 'host' | 'client'; seed: number };
+  duel: DuelParams;
   duelEnd: DuelEndParams;
 }
 

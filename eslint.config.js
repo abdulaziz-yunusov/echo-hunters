@@ -19,9 +19,15 @@ export default tseslint.config(
     },
   },
   {
-    // The simulation must stay deterministic (multiplayer seed sync, replays)
+    // The simulation (and the bots that play it) must stay deterministic (multiplayer seed sync, replays, balance tables)
     // and must not depend on the browser.
-    files: ['src/sim/**/*.ts', 'src/config/**/*.ts', 'src/core/**/*.ts', 'src/replay/**/*.ts'],
+    files: [
+      'src/sim/**/*.ts',
+      'src/config/**/*.ts',
+      'src/core/**/*.ts',
+      'src/replay/**/*.ts',
+      'src/bot/**/*.ts',
+    ],
     rules: {
       'no-restricted-properties': [
         'error',

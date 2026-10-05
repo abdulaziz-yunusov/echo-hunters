@@ -24,7 +24,19 @@ describe('save data', () => {
       difficulty: 'easy',
       bindings: {},
       display: DISPLAY.defaults,
+      duelBot: 'normal',
     });
+  });
+
+  it('remembers the practice bot level, ignoring unknown ones', () => {
+    vi.stubGlobal('localStorage', fakeStorage());
+    updateSave({ duelBot: 'hard' });
+    expect(loadSave().duelBot).toBe('hard');
+    vi.stubGlobal(
+      'localStorage',
+      fakeStorage({ 'pulse-echo-hunters': JSON.stringify({ version: 3, duelBot: 'genius' }) }),
+    );
+    expect(loadSave().duelBot).toBe('normal');
   });
 
   it('remembers rebound keys, keeping only valid ones', () => {

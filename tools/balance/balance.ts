@@ -1,8 +1,9 @@
 import { GAME } from '@/config/game';
 import { HUNTER_TYPES, type HunterTypeId } from '@/config/hunters';
 import { createSimulation } from '@/sim/simulation';
-import { Bot, BOT_PROFILES, type BotProfile } from './bot';
-import { formatDuelTable, MAX_LAG, measureDuels } from './duelBalance';
+import { Bot, BOT_PROFILES, type BotProfile } from '@/bot/bot';
+import { DUEL_BOTS, type DuelBotId } from '@/config/duelBots';
+import { formatDuelTable, MAX_LAG, measureDuels, type BotPair } from './duelBalance';
 
 /** A round the bot hasn't finished by then counts as failed (s). */
 export const ROUND_LIMIT = 300;
@@ -126,7 +127,7 @@ export function parseLevels(text: string): number[] {
 }
 
 const USAGE = `npm run balance -- [--levels 1-8] [--maps 40] [--profile basic|careful|all] [--hunters stalker,listener]
-       npm run balance -- --duel [--maps 40]`;
+       npm run balance -- --duel [--maps 40] [--bots hard,easy]`;
 
 export interface CliOptions {
   levels: number[];
@@ -135,6 +136,8 @@ export interface CliOptions {
   hunters?: HunterTypeId[];
   /** Measure duels (two duel bots) instead of solo levels. */
   duel: boolean;
+  /** Duel bot levels to compare (the same one twice by default). */
+  bots: BotPair;
 }
 
 export function parseArgs(argv: readonly string[]): CliOptions {
@@ -143,6 +146,7 @@ export function parseArgs(argv: readonly string[]): CliOptions {
     maps: 40,
     profiles: ['basic'],
     duel: false,
+    bots: ['hard', 'hard'],
   };
   for (let i = 0; i < argv.length; i++) {
     const flag = argv[i];
@@ -166,6 +170,14 @@ export function parseArgs(argv: readonly string[]): CliOptions {
         if (!(t in HUNTER_TYPES)) throw new Error(`Unknown hunter type ${t}.`);
       }
       options.hunters = types as HunterTypeId[];
+    } else if (flag === '--bots') {
+      const levels = value.split(',');
+      if (levels.length !== 2 || !levels.every((l) => l in DUEL_BOTS)) {
+        throw new Error(
+          `--bots needs two levels (${Object.keys(DUEL_BOTS).join(', ')}).\n${USAGE}`,
+        );
+      }
+      options.bots = levels as BotPair;
     } else throw new Error(`Unknown option ${flag}.\n${USAGE}`);
   }
   return options;
@@ -176,8 +188,9 @@ export function main(argv: readonly string[], log: (line: string) => void = cons
   const cli = parseArgs(argv);
   if (cli.duel) {
     const started = Date.now();
-    const stats = measureDuels(cli.maps);
-    log(`\nduel bot vs duel bot · ${cli.maps} maps · lag 0–${MAX_LAG} ticks\n`);
+    const stats = measureDuels(cli.maps, cli.bots);
+    const [a, b] = cli.bots.map((id: DuelBotId) => DUEL_BOTS[id].label.toLowerCase());
+    log(`\n${a} duel bot vs ${b} · ${cli.maps} maps · lag 0–${MAX_LAG} ticks\n`);
     log(formatDuelTable(stats));
     log(`\n(${((Date.now() - started) / 1000).toFixed(1)} s)`);
     return;

@@ -1,10 +1,11 @@
+import { DUEL_BOTS, type DuelBotId } from '@/config/duelBots';
 import { GAME } from '@/config/game';
 import { deriveSeed, Rng } from '@/core/rng';
 import { createLoopbackPair } from '@/net/loopback';
 import { NetSession } from '@/net/netSession';
 import { GUEST_ID, PLAYER_ID, type EntityId } from '@/sim/entities/entity';
 import { createDuelSimulation } from '@/sim/simulation';
-import { DuelBot } from './duelBot';
+import { DuelBot } from '@/bot/duelBot';
 
 /** A duel nobody has won by then counts as a stalemate (s): rounds should end well before. */
 export const DUEL_ROUND_LIMIT = 300;
@@ -12,8 +13,12 @@ export const DUEL_ROUND_LIMIT = 300;
 export const MAX_LAG = 8;
 
 /** How one bot-vs-bot duel went, judged by the host. */
+/** Two bot levels: [host, client] in a round, [first, second] in a table. */
+export type BotPair = [DuelBotId, DuelBotId];
+
 export interface DuelRound {
   seed: number;
+  bots: BotPair;
   /** Ticks of lag each way. */
   lag: number;
   /** Player id of the winner (1 = host, 2 = client); null = nobody by the limit. */
@@ -30,6 +35,10 @@ export interface DuelRound {
 
 export interface DuelStats {
   rounds: number;
+  /** The levels compared (the same one twice for a plain bot-vs-bot table). */
+  bots: BotPair;
+  /** Share of decided rounds the first level won, 0..1. */
+  firstBotWin: number;
   /** Share of decided rounds the host won, 0..1 (spawn fairness: 0.5 is fair). */
   hostWin: number;
   /** Round time of the decided rounds (s); NaN if none. */
@@ -53,14 +62,18 @@ export function lagFor(seed: number): number {
  * the in-memory loopback, exactly like a real duel. Deterministic: the same
  * seed and lag always give the same round.
  */
-export function playDuel(seed: number, lag = lagFor(seed)): DuelRound {
+export function playDuel(
+  seed: number,
+  lag = lagFor(seed),
+  bots: BotPair = ['hard', 'hard'],
+): DuelRound {
   const link = createLoopbackPair(lag);
   const host = createDuelSimulation({ seed, role: 'host' });
   const client = createDuelSimulation({ seed, role: 'client' });
   const hostNet = new NetSession(host, link.a);
   const clientNet = new NetSession(client, link.b);
-  const hostBot = new DuelBot(host);
-  const clientBot = new DuelBot(client);
+  const hostBot = new DuelBot(host, { level: bots[0], seed: deriveSeed(seed, 'host-bot') });
+  const clientBot = new DuelBot(client, { level: bots[1], seed: deriveSeed(seed, 'client-bot') });
 
   let firstCore: EntityId | null = null;
   let drops = 0;
@@ -94,6 +107,7 @@ export function playDuel(seed: number, lag = lagFor(seed)): DuelRound {
   clientNet.dispose();
   return {
     seed,
+    bots,
     lag,
     winner: duel.winner,
     seconds: duel.winner === null ? DUEL_ROUND_LIMIT : state.time,
@@ -103,21 +117,33 @@ export function playDuel(seed: number, lag = lagFor(seed)): DuelRound {
   };
 }
 
-/** Play seeds 1..maps and sum them up. */
-export function measureDuels(maps: number): DuelStats {
+/**
+ * Play seeds 1..maps and sum them up. Two different levels take turns
+ * hosting (the first hosts the odd seeds), so neither gets the host's side.
+ */
+export function measureDuels(maps: number, bots: BotPair = ['hard', 'hard']): DuelStats {
   const rounds: DuelRound[] = [];
-  for (let seed = 1; seed <= maps; seed++) rounds.push(playDuel(seed));
-  return summarize(rounds);
+  for (let seed = 1; seed <= maps; seed++) {
+    const pair: BotPair = seed % 2 === 1 ? bots : [bots[1], bots[0]];
+    rounds.push(playDuel(seed, lagFor(seed), pair));
+  }
+  return summarize(rounds, bots);
 }
 
-export function summarize(rounds: readonly DuelRound[]): DuelStats {
+export function summarize(
+  rounds: readonly DuelRound[],
+  bots: BotPair = ['hard', 'hard'],
+): DuelStats {
   const decided = rounds.filter((r) => r.winner !== null);
   const times = decided.map((r) => r.seconds).sort((a, b) => a - b);
   const share = (n: number) => (decided.length ? n / decided.length : NaN);
   const mean = (f: (r: DuelRound) => number) =>
     rounds.reduce((s, r) => s + f(r), 0) / Math.max(1, rounds.length);
+  const winnerLevel = (r: DuelRound) => r.bots[r.winner === PLAYER_ID ? 0 : 1];
   return {
     rounds: rounds.length,
+    bots,
+    firstBotWin: share(decided.filter((r) => winnerLevel(r) === bots[0]).length),
     hostWin: share(decided.filter((r) => r.winner === PLAYER_ID).length),
     medianSeconds: percentile(times, 0.5),
     p90Seconds: percentile(times, 0.9),
@@ -138,8 +164,10 @@ function percentile(sorted: readonly number[], p: number): number {
 export function formatDuelTable(s: DuelStats): string {
   const pct = (v: number) => (isNaN(v) ? '–' : `${Math.round(v * 100)}%`);
   const sec = (v: number) => (isNaN(v) ? '–' : v.toFixed(0));
+  const [a, b] = s.bots.map((id) => DUEL_BOTS[id].label);
   const rows: [string, string][] = [
     ['Rounds', `${s.rounds}`],
+    ...(a === b ? [] : ([[`${a} beats ${b}`, pct(s.firstBotWin)]] as [string, string][])),
     ['Host wins', pct(s.hostWin)],
     ['Median round (s)', sec(s.medianSeconds)],
     ['90th percentile (s)', sec(s.p90Seconds)],

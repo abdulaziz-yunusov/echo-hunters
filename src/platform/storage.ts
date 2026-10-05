@@ -1,6 +1,7 @@
 import { AUDIO } from '@/config/audio';
 import { DEFAULT_DIFFICULTY, DIFFICULTIES, type DifficultyId } from '@/config/difficulty';
 import { DISPLAY, type DisplaySettings } from '@/config/display';
+import { DEFAULT_DUEL_BOT, DUEL_BOTS, type DuelBotId } from '@/config/duelBots';
 import { PALETTES } from '@/config/theme';
 import { REMAPPABLE } from '@/config/input';
 import type { BindingOverrides } from '@/input/bindings';
@@ -24,6 +25,8 @@ export interface SaveData {
   bindings: BindingOverrides;
   /** Shake, flashes, sound cues, colors (v3). */
   display: DisplaySettings;
+  /** Last practice bot level picked in the duel lobby. */
+  duelBot: DuelBotId;
 }
 
 const KEY = 'pulse-echo-hunters';
@@ -36,6 +39,7 @@ function defaults(): SaveData {
     difficulty: DEFAULT_DIFFICULTY,
     bindings: {},
     display: { ...DISPLAY.defaults },
+    duelBot: DEFAULT_DUEL_BOT,
   };
 }
 
@@ -82,6 +86,9 @@ function migrate(data: Record<string, unknown>): SaveData {
   if (data.version !== 1 && isAudioSettings(data.audio)) result.audio = data.audio;
   if (typeof data.difficulty === 'string' && data.difficulty in DIFFICULTIES) {
     result.difficulty = data.difficulty as DifficultyId;
+  }
+  if (typeof data.duelBot === 'string' && data.duelBot in DUEL_BOTS) {
+    result.duelBot = data.duelBot as DuelBotId;
   }
   result.bindings = validBindings(data.bindings);
   result.display = validDisplay(data.display);

@@ -1,5 +1,7 @@
 import { AudioDirector } from '@/audio/audioDirector';
+import { PracticeRival } from '@/bot/practiceRival';
 import { DIFFICULTIES } from '@/config/difficulty';
+import { DUEL_BOTS, type DuelBotId } from '@/config/duelBots';
 import { THEME } from '@/config/theme';
 import type { InputFrame } from '@/input/inputFrame';
 import { toPlayerInput } from '@/input/toPlayerInput';
@@ -24,10 +26,18 @@ const END_DELAY = 2;
 /** Seconds the rules banner stays up. */
 const BANNER_TIME = 4;
 
+/** An online duel (one side of a real link), or practice against a bot (Phase 26). */
+export type DuelParams =
+  | { transport: Transport; role: 'host' | 'client'; seed: number }
+  | { practice: DuelBotId; seed: number };
+
 /**
  * One duel (GDD §8). Like a solo level, but the other player is out there,
- * seen only through their sounds, and the host is the referee. The game
- * cannot be paused: the menu (ESC) keeps the world running.
+ * seen only through their sounds, and the host is the referee. An online
+ * duel cannot be paused: the menu (ESC) keeps the world running.
+ *
+ * Practice: this side hosts, and a bot plays the client's side on this
+ * machine (PracticeRival). Nobody else is waiting, so the menu pauses.
  */
 export class DuelScene implements Scene {
   readonly name = 'Duel';
@@ -40,6 +50,9 @@ export class DuelScene implements Scene {
   private readonly display: RoundDisplay;
   private readonly menu: MenuList;
   private readonly role: 'host' | 'client';
+  /** The bot's side of a practice duel; null online. */
+  private readonly rival: PracticeRival | null;
+  private readonly practice: DuelBotId | null;
   /** The host records the round for both players' debrief (Phase 25). */
   private readonly recorder: ReplayRecorder | null;
   private replay: Replay | null = null;
@@ -49,19 +62,19 @@ export class DuelScene implements Scene {
   private endedAt: number | null = null;
   private aimScreen: InputFrame['aim'] = null;
 
-  constructor(
-    app: AppContext,
-    params: { transport: Transport; role: 'host' | 'client'; seed: number },
-  ) {
+  constructor(app: AppContext, params: DuelParams) {
     this.app = app;
-    this.role = params.role;
+    this.practice = 'practice' in params ? params.practice : null;
+    this.rival = this.practice ? new PracticeRival(params.seed, this.practice) : null;
+    const transport = 'transport' in params ? params.transport : this.rival!.transport;
+    this.role = 'role' in params ? params.role : 'host';
     this.camera = new Camera(app.viewport);
-    this.sim = createDuelSimulation({ seed: params.seed, role: params.role });
+    this.sim = createDuelSimulation({ seed: params.seed, role: this.role });
     this.world = new WorldRenderer(this.sim, DIFFICULTIES.easy.ghostAlpha);
     this.display = new RoundDisplay(this.camera, this.world);
     this.audio = new AudioDirector(this.sim, this.display.output(app.sound));
-    this.net = new NetSession(this.sim, params.transport);
-    this.recorder = params.role === 'host' ? new ReplayRecorder(this.sim, params.seed) : null;
+    this.net = new NetSession(this.sim, transport);
+    this.recorder = this.role === 'host' ? new ReplayRecorder(this.sim, params.seed) : null;
     this.net.onDisconnect(() => {
       if (this.sim.state.status === 'playing') app.goTo('duelEnd', { outcome: 'disconnected' });
     });
@@ -73,9 +86,19 @@ export class DuelScene implements Scene {
     });
     this.menu = new MenuList([
       { kind: 'action', label: 'RESUME', onSelect: () => (this.menuOpen = false) },
-      { kind: 'action', label: 'LEAVE DUEL', onSelect: () => app.goTo('menu') },
+      {
+        kind: 'action',
+        label: this.practice ? 'LEAVE PRACTICE' : 'LEAVE DUEL',
+        onSelect: () => app.goTo('menu'),
+      },
     ]);
-    app.debug.watch('duel', `${params.role}, seed ${params.seed}`);
+    const who = this.practice ? `practice vs ${this.practice} bot` : this.role;
+    app.debug.watch('duel', `${who}, seed ${params.seed}`);
+  }
+
+  /** Practice only: a hidden tab opens the menu, which pauses. */
+  onHidden(): void {
+    if (this.rival) this.menuOpen = true;
   }
 
   update(dt: number, input: InputFrame): void {
@@ -84,13 +107,15 @@ export class DuelScene implements Scene {
     if (this.app.debug.enabled && input.debugWarp) warpToObjective(this.sim.state);
 
     this.aimScreen = input.aim;
-    // The world never pauses in a duel; with the menu open the player just stands still.
+    // Online the world never pauses; with the menu open the player just stands still.
+    if (this.rival && this.menuOpen) return;
     this.net.tick(dt);
     this.sim.step(
       toPlayerInput(input, (x, y) => this.camera.screenToWorld(x, y), this.menuOpen),
       dt,
     );
     this.recorder?.afterStep();
+    this.rival?.step(dt);
     this.world.tick(dt);
     this.audio.tick();
     this.display.update(dt);
@@ -108,6 +133,7 @@ export class DuelScene implements Scene {
         net: this.net,
         replay: this.replay ?? undefined,
         viewerId: state.player.id,
+        practice: this.practice ?? undefined,
       });
       return;
     }
@@ -117,7 +143,9 @@ export class DuelScene implements Scene {
   }
 
   exit(): void {
+    // The player's side first: closing the bot's side would look like the rival leaving.
     if (!this.handedOver) this.net.dispose();
+    this.rival?.dispose();
     this.audio.dispose();
   }
 
@@ -141,7 +169,8 @@ export class DuelScene implements Scene {
     drawHud(ctx, state);
     if (state.time < BANNER_TIME && !this.menuOpen) {
       const a = Math.min(1, (BANNER_TIME - state.time) / 0.6);
-      drawText(ctx, 'DUEL', width / 2, height * 0.3, {
+      const title = this.practice ? `PRACTICE · ${DUEL_BOTS[this.practice].label} BOT` : 'DUEL';
+      drawText(ctx, title, width / 2, height * 0.3, {
         size: 34,
         color: THEME.colors.cyan,
         align: 'center',
@@ -161,7 +190,8 @@ export class DuelScene implements Scene {
         },
       );
     }
-    drawText(ctx, this.role === 'host' ? 'HOSTING' : 'JOINED', width - 12, height - 12, {
+    const corner = this.practice ? 'PRACTICE' : this.role === 'host' ? 'HOSTING' : 'JOINED';
+    drawText(ctx, corner, width - 12, height - 12, {
       size: 11,
       color: THEME.colors.white,
       align: 'right',
@@ -175,7 +205,8 @@ export class DuelScene implements Scene {
       ctx.fillRect(0, 0, width, height);
       ctx.restore();
       drawTitle(ctx, 'DUEL MENU', width / 2, height * 0.32);
-      drawText(ctx, 'The duel keeps going while this is open.', width / 2, height * 0.32 + 28, {
+      const note = this.rival ? 'Paused.' : 'The duel keeps going while this is open.';
+      drawText(ctx, note, width / 2, height * 0.32 + 28, {
         size: 12,
         color: THEME.colors.white,
         align: 'center',

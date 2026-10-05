@@ -1,6 +1,8 @@
+import { DUEL_BOTS, type DuelBotId } from '@/config/duelBots';
 import { THEME } from '@/config/theme';
 import type { InputFrame } from '@/input/inputFrame';
 import type { NetSession } from '@/net/netSession';
+import { randomSeed } from '@/platform/seed';
 import { drawText } from '@/render/text';
 import type { Replay } from '@/replay/replay';
 import { MenuList, type MenuItem } from '@/ui/menuList';
@@ -17,6 +19,8 @@ export interface DuelEndParams {
   replay?: Replay;
   /** This machine's player id, so the debrief knows which path is "you". */
   viewerId?: number;
+  /** The bot's level, if this was a practice duel (Phase 26). */
+  practice?: DuelBotId;
 }
 
 const TEXT: Record<DuelOutcome, { title: string; color: string; line: string }> = {
@@ -78,19 +82,29 @@ export class DuelEndScene implements Scene {
     const cx = width / 2;
     const cy = height / 2;
     const t = TEXT[this.params.outcome];
+    const line = this.practiceLine() ?? t.line;
     drawText(ctx, t.title, cx, cy - 60, {
       size: 44,
       color: t.color,
       align: 'center',
       glow: THEME.glowBlur * 2,
     });
-    drawText(ctx, t.line, cx, cy - 24, {
+    drawText(ctx, line, cx, cy - 24, {
       size: 14,
       color: THEME.colors.white,
       align: 'center',
       alpha: 0.7,
     });
     if (this.time >= INPUT_GRACE) drawMenu(ctx, this.menu, cx, cy + 40, 260);
+  }
+
+  private practiceLine(): string | null {
+    const { practice, outcome } = this.params;
+    if (!practice) return null;
+    const bot = `${DUEL_BOTS[practice].label} bot`;
+    if (outcome === 'won') return `You extracted before the ${bot}.`;
+    if (outcome === 'lost') return `The ${bot} extracted first.`;
+    return null;
   }
 
   private currentMapState(): DuelEndScene['mapState'] {
@@ -115,12 +129,19 @@ export class DuelEndScene implements Scene {
       const note = this.mapState === 'waiting' ? 'RECEIVING…' : 'NOT RECEIVED';
       map.push({ kind: 'action', label: 'MAP', onSelect: () => {}, disabled: true, note });
     }
+    const practice = this.params.practice;
+    const next: MenuItem[] = practice
+      ? [
+          {
+            kind: 'action',
+            label: 'PLAY AGAIN',
+            onSelect: () => app.goTo('duel', { practice, seed: randomSeed() }),
+          },
+          { kind: 'action', label: 'DUEL MENU', onSelect: () => app.goTo('duelLobby') },
+        ]
+      : [{ kind: 'action', label: 'NEW DUEL', onSelect: () => app.goTo('duelLobby') }];
     return new MenuList(
-      [
-        ...map,
-        { kind: 'action', label: 'NEW DUEL', onSelect: () => app.goTo('duelLobby') },
-        { kind: 'action', label: 'MAIN MENU', onSelect: () => app.goTo('menu') },
-      ],
+      [...map, ...next, { kind: 'action', label: 'MAIN MENU', onSelect: () => app.goTo('menu') }],
       selected,
     );
   }

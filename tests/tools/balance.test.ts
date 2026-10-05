@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Bot } from '../../tools/balance/bot';
+import { Bot } from '@/bot/bot';
 import {
   formatTable,
   measureLevel,

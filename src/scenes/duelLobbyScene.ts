@@ -1,10 +1,11 @@
+import { DUEL_BOT_ORDER, DUEL_BOTS, type DuelBotId } from '@/config/duelBots';
 import { GAME } from '@/config/game';
 import { THEME } from '@/config/theme';
 import type { InputFrame } from '@/input/inputFrame';
 import { PROTOCOL_VERSION } from '@/net/protocol';
 import type { Transport } from '@/net/transport';
 import { randomSeed } from '@/platform/seed';
-import { loadSave } from '@/platform/storage';
+import { loadSave, updateSave } from '@/platform/storage';
 import { drawText } from '@/render/text';
 import { MenuList } from '@/ui/menuList';
 import { drawMenu, drawTitle } from '@/ui/menuRenderer';
@@ -24,6 +25,7 @@ const MENU_WIDTH = 320;
 /**
  * Set up a 1v1 duel (GDD §8): host a room and share its code, or join one
  * by code. PeerJS is loaded only here, so solo play never touches the network.
+ * Or practice offline against a bot, at the level picked here (Phase 26).
  */
 export class DuelLobbyScene implements Scene {
   readonly name = 'DuelLobby';
@@ -34,9 +36,11 @@ export class DuelLobbyScene implements Scene {
   private cancelHosting: (() => void) | null = null;
   /** Set once the scene is left, so late network answers are ignored. */
   private left = false;
+  private bot: DuelBotId;
 
   constructor(app: AppContext) {
     this.app = app;
+    this.bot = loadSave().duelBot;
     this.setPhase({ kind: 'choose' });
   }
 
@@ -101,6 +105,11 @@ export class DuelLobbyScene implements Scene {
       this.field = null;
     }
     const back = { kind: 'action' as const, label: 'BACK', onSelect: () => this.goBack() };
+    const practice = {
+      kind: 'action' as const,
+      label: 'PRACTICE VS BOT',
+      onSelect: () => this.app.goTo('duel', { practice: this.bot, seed: randomSeed() }),
+    };
     switch (phase.kind) {
       case 'choose':
         this.menu = new MenuList([
@@ -109,6 +118,13 @@ export class DuelLobbyScene implements Scene {
             kind: 'action',
             label: 'JOIN A DUEL',
             onSelect: () => this.setPhase({ kind: 'enterCode' }),
+          },
+          practice,
+          {
+            kind: 'adjust',
+            label: 'BOT',
+            value: () => DUEL_BOTS[this.bot].label,
+            onChange: (step) => this.cycleBot(step),
           },
           back,
         ]);
@@ -138,6 +154,7 @@ export class DuelLobbyScene implements Scene {
             onSelect: () =>
               this.app.goTo('play', { run: newRun(randomSeed(), loadSave().difficulty) }),
           },
+          practice,
           back,
         ]);
         break;
@@ -152,6 +169,12 @@ export class DuelLobbyScene implements Scene {
     this.cancelHosting?.();
     this.cancelHosting = null;
     this.setPhase({ kind: 'choose' });
+  }
+
+  private cycleBot(step: number): void {
+    const n = DUEL_BOT_ORDER.length;
+    this.bot = DUEL_BOT_ORDER[(DUEL_BOT_ORDER.indexOf(this.bot) + step + n) % n];
+    updateSave({ duelBot: this.bot });
   }
 
   private async host(): Promise<void> {

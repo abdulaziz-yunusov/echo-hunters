@@ -17,6 +17,7 @@ import type { AppContext, SceneArgs, SceneId } from '@/scenes/scene';
 import { SceneManager } from '@/scenes/sceneManager';
 import { ROW_HEIGHT, type MenuList } from '@/ui/menuList';
 import type { DuelEndScene } from '@/scenes/duelEndScene';
+import { GUEST_ID } from '@/sim/entities/entity';
 import { flushLink, recordedDuel } from '../helpers/duel';
 import { createLoopbackPair } from '@/net/loopback';
 import { ReplayRecorder } from '@/replay/recorder';
@@ -394,6 +395,79 @@ describe('screen flow', () => {
     expect(toWire(clientDebrief!)).toEqual(toWire(hostDebrief!));
   });
 
+  it('duel lobby → pick the bot level → PRACTICE VS BOT starts an offline duel', () => {
+    const data = new Map<string, string>();
+    vi.stubGlobal('localStorage', {
+      getItem: (k: string) => data.get(k) ?? null,
+      setItem: (k: string, v: string) => void data.set(k, v),
+    });
+    try {
+      const t = testApp();
+      t.app.goTo('menu');
+      t.choose(1); // DUEL
+      expect(t.current()).toBe('DuelLobby');
+      t.press({ navY: 1 });
+      t.press({ navY: 1 });
+      t.press({ navY: 1 }); // HOST, JOIN, PRACTICE, BOT
+      t.press({ navX: 1 }); // NORMAL → HARD
+      expect(loadSave().duelBot).toBe('hard');
+      t.press({ navY: -1 });
+      t.press({ confirm: true }); // PRACTICE VS BOT
+      expect(t.current()).toBe('Duel');
+      const duel = t.scenes.current as unknown as { practice: string; rival: unknown };
+      expect(duel.practice).toBe('hard');
+      expect(duel.rival).not.toBeNull();
+      t.render();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('a practice duel pauses with the menu or a hidden tab', () => {
+    const t = testApp();
+    t.app.goTo('duel', { practice: 'normal', seed: 3 });
+    const duel = t.scenes.current as unknown as {
+      sim: Simulation;
+      rival: { sim: Simulation };
+    };
+    t.idle(0.5);
+    const time = duel.sim.state.time;
+    const botTime = duel.rival.sim.state.time;
+    expect(botTime).toBeGreaterThan(0);
+    t.press({ pause: true });
+    t.idle(2);
+    expect(duel.sim.state.time).toBe(time);
+    expect(duel.rival.sim.state.time).toBe(botTime);
+    t.render();
+    t.press({ confirm: true }); // RESUME
+    t.idle(0.5);
+    expect(duel.sim.state.time).toBeGreaterThan(time);
+
+    const paused = duel.sim.state.time;
+    t.scenes.current?.onHidden?.();
+    t.idle(1);
+    expect(duel.sim.state.time).toBe(paused);
+  });
+
+  it('a practice duel plays to the end, shows the debrief, and PLAY AGAIN starts another', () => {
+    const t = testApp();
+    t.app.goTo('duel', { practice: 'easy', seed: 8 });
+    const duel = t.scenes.current as unknown as { sim: Simulation };
+    // Standing still: the bot takes the cores and extracts.
+    for (let i = 0; i < 300 / DT && t.current() === 'Duel'; i++) t.press({});
+    expect(duel.sim.state.duel!.winner).toBe(GUEST_ID);
+    expect(t.current()).toBe('DuelEnd');
+    t.idle(1);
+    t.render();
+    const end = t.scenes.current as DuelEndScene;
+    expect(end.debrief?.duel?.winner).toBe(GUEST_ID);
+    const labels = (end as unknown as { menu: MenuList }).menu.items.map((i) => i.label);
+    expect(labels).toEqual(['MAP', 'PLAY AGAIN', 'DUEL MENU', 'MAIN MENU']);
+    t.choose(1); // PLAY AGAIN
+    expect(t.current()).toBe('Duel');
+    expect((t.scenes.current as unknown as { practice: string }).practice).toBe('easy');
+  });
+
   it('every screen renders without errors', () => {
     const t = testApp();
     const score = {
@@ -420,8 +494,10 @@ describe('screen flow', () => {
       ['duelLobby'],
       ['duel', { transport: createLoopbackPair().a, role: 'host', seed: 5 }],
       ['duel', { transport: createLoopbackPair().b, role: 'client', seed: 5 }],
+      ['duel', { practice: 'normal', seed: 5 }],
       ['duelEnd', { outcome: 'won' }],
       ['duelEnd', { outcome: 'lost', replay: duelReplay, viewerId: 1 }],
+      ['duelEnd', { outcome: 'won', replay: duelReplay, viewerId: 1, practice: 'hard' }],
       ['replay', { replay: duelReplay, viewerId: 2 }],
     ];
     for (const [id, params] of screens) {
