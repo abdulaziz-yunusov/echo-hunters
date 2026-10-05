@@ -12,6 +12,7 @@ import { PlayScene } from './playScene';
 import { ReplayScene } from './replayScene';
 import type { AppContext, Scene, SceneArgs, SceneId } from './scene';
 import { SettingsScene } from './settingsScene';
+import { UpgradePickScene } from './upgradePickScene';
 
 type SceneFactory<K extends SceneId> = (app: AppContext, ...args: SceneArgs<K>) => Scene;
 
@@ -24,7 +25,8 @@ const FACTORIES: { [K in SceneId]: SceneFactory<K> } = {
   howToPlay: (app) => new HowToPlayScene(app),
   settings: (app) => new SettingsScene(app),
   controls: (app) => new ControlsScene(app),
-  pause: (app) => new PauseScene(app),
+  pause: (app, params) => new PauseScene(app, params),
+  upgradePick: (app, params) => new UpgradePickScene(app, params),
   replay: (app, params) => new ReplayScene(app, params),
   duelLobby: (app) => new DuelLobbyScene(app),
   duel: (app, params) => new DuelScene(app, params),

@@ -7,6 +7,7 @@ import { MenuList, type MenuItem } from '@/ui/menuList';
 import { drawMenu } from '@/ui/menuRenderer';
 import type { Replay } from '@/replay/replay';
 import type { ScoreBreakdown } from '@/sim/scoring';
+import { offerUpgrades } from '@/sim/upgrades';
 import { customMapItems, replayItem } from './menuItems';
 import { nextLevel, type RunState } from './run';
 import type { AppContext, Scene } from './scene';
@@ -49,7 +50,11 @@ export class LevelEndScene implements Scene {
           {
             kind: 'action',
             label: `NEXT: LEVEL ${this.next.level}`,
-            onSelect: () => app.goTo('play', { run: this.next }),
+            // Pick an upgrade first (Phase 20), unless every one is maxed out.
+            onSelect: () =>
+              offerUpgrades(this.next.seed, this.next.level, this.next.upgrades).length > 0
+                ? app.goTo('upgradePick', { run: this.next })
+                : app.goTo('play', { run: this.next }),
           },
         ];
     this.menu = new MenuList([

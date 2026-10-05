@@ -70,13 +70,14 @@ export function drawHud(
   }
   cooldown('PING', player.pingCooldown, state.rules.pingCooldown, THEME.colors.cyan);
   // While the ping key is held with the beam ready, the beam meter shows the charge.
-  const { chargeTime, cooldown: beamTotal } = GAME.abilities.beam;
+  const { chargeTime } = GAME.abilities.beam;
+  const beamTotal = state.rules.beamCooldown;
   if (player.pingHold !== null && beamReady(player)) {
     meter('BEAM', player.pingHold / chargeTime, beamCharged(player), THEME.colors.cyan);
   } else {
     meter('BEAM', 1 - player.beamCooldown / beamTotal, beamReady(player), THEME.colors.cyan);
   }
-  cooldown('SHOCK', player.shockCooldown, GAME.abilities.shockwave.cooldown, THEME.colors.red);
+  cooldown('SHOCK', player.shockCooldown, state.rules.shockCooldown, THEME.colors.red);
 
   let line = y + 22;
   if (playerMasked(state) && !player.sneaking && player.silentTime <= 0) {

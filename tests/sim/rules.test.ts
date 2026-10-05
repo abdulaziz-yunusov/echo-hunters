@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DUEL_VARIANT_ORDER, DUEL_VARIANTS } from '@/config/duel';
 import { GAME } from '@/config/game';
+import { PICKUP_TYPES } from '@/config/pickups';
 import { SOUND_KINDS } from '@/config/sounds';
 import { setHunterState } from '@/sim/ai/hunterBrain';
 import { IDLE_INPUT } from '@/sim/playerInput';
@@ -14,6 +15,15 @@ describe('rules pipeline (Phase 30)', () => {
   it('defaults come from GAME, and a level overrides its own', () => {
     expect(buildRules()).toEqual({
       pingCooldown: GAME.abilities.ping.cooldown,
+      beamCooldown: GAME.abilities.beam.cooldown,
+      beamArc: SOUND_KINDS.pingBeam.arc,
+      shockCooldown: GAME.abilities.shockwave.cooldown,
+      shockRadius: GAME.abilities.shockwave.effectRadius,
+      startStones: GAME.player.startStones,
+      maxHp: GAME.player.hp,
+      bootsSeconds: PICKUP_TYPES.silentBoots.duration,
+      sneakSpeed: GAME.player.sneakSpeed,
+      stepHearing: 1,
       soundRings: 1,
       soundHearing: 1,
       soundSpeed: 1,

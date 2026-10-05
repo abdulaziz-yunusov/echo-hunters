@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { Bot } from '@/bot/bot';
+import { UPGRADE_IDS } from '@/config/upgrades';
 import {
   formatTable,
+  formatUpgradeTable,
   measureLevel,
+  measureUpgrades,
   parseArgs,
   parseLevels,
   playRound,
@@ -74,5 +77,25 @@ describe('balance command line', () => {
     expect(() => parseArgs(['--hunters', 'ghost'])).toThrow();
     expect(() => parseArgs(['--wat', '1'])).toThrow();
     expect(() => parseArgs(['--maps'])).toThrow();
+  });
+
+  it('takes upgrades (Phase 20) and the upgrade table', () => {
+    expect(parseArgs(['--upgrades', 'quickPing,quickPing'])).toMatchObject({
+      upgrades: ['quickPing', 'quickPing'],
+      upgradeTable: false,
+    });
+    expect(parseArgs(['--upgrade-table', '--levels', '4-8'])).toMatchObject({
+      upgradeTable: true,
+      levels: [4, 5, 6, 7, 8],
+    });
+    expect(() => parseArgs(['--upgrades', 'jetpack'])).toThrow();
+  });
+
+  it('the upgrade table lists every upgrade against none', () => {
+    const stats = measureUpgrades([1], 1, 'basic');
+    expect(stats.map((s) => s.upgrade)).toEqual([null, ...UPGRADE_IDS]);
+    const table = formatUpgradeTable(stats);
+    expect(table.split('\n')).toHaveLength(UPGRADE_IDS.length + 3);
+    expect(table).toContain('THICK SKIN');
   });
 });

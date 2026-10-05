@@ -217,7 +217,7 @@ export class DuelBot extends Bot {
     const { player, walls, time } = this.sim.state;
     const r = this.rivalAt;
     if (input.shockwave || !r || time - r.time > SHOCK_FRESH || player.shockCooldown > 0) return;
-    const reach = GAME.abilities.shockwave.effectRadius;
+    const reach = this.sim.state.rules.shockRadius;
     const d = dist(player, r);
     if (d <= reach && hasLineOfSight(walls, player.x, player.y, r.x, r.y)) {
       input.shockwave = true;

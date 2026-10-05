@@ -3,6 +3,7 @@ import { GAME } from '@/config/game';
 import type { HunterTypeId } from '@/config/hunters';
 import type { LevelDef } from '@/config/levels';
 import type { SoundKindId } from '@/config/sounds';
+import type { UpgradeId } from '@/config/upgrades';
 import { EventBus } from '@/core/events';
 import { deriveSeed, Rng } from '@/core/rng';
 import { setHunterState, updateHunters } from './ai/hunterBrain';
@@ -57,6 +58,8 @@ export interface SimulationOptions {
   variant?: DuelVariantId;
   /** Duel: cores to carry to the beacon (default GAME.duel.coresToWin). */
   coresToWin?: number;
+  /** The run's upgrades (Phase 20), in the order picked; their effects go into state.rules. */
+  upgrades?: readonly UpgradeId[];
   /** A hand-made map (Phase 13): pickups and emitters exactly where they were put. */
   placed?: Pick<CustomRound, 'pickups' | 'emitters'>;
 }
@@ -94,6 +97,8 @@ export class Simulation implements SimContext {
         }))
       : placePickups(layout, options.pickups ?? def.pickups);
     const pickupTiles = pickups.map((p) => ({ tx: tiles.toTile(p.x), ty: tiles.toTile(p.y) }));
+    const rules = buildRules({ level, variant: options.variant, upgrades: options.upgrades });
+    const start = { hp: rules.maxHp, stones: rules.startStones };
 
     this.state = {
       level,
@@ -102,11 +107,11 @@ export class Simulation implements SimContext {
       tick: 0,
       layout,
       walls,
-      player: createPlayer(localId, spawnOf(localId).x, spawnOf(localId).y),
+      player: createPlayer(localId, spawnOf(localId).x, spawnOf(localId).y, start),
       rival: duel
         ? (() => {
             const id = localId === PLAYER_ID ? GUEST_ID : PLAYER_ID;
-            return createPlayer(id, spawnOf(id).x, spawnOf(id).y);
+            return createPlayer(id, spawnOf(id).x, spawnOf(id).y, start);
           })()
         : null,
       mode,
@@ -147,7 +152,7 @@ export class Simulation implements SimContext {
       rng: new Rng(deriveSeed(layout.seed, 'ai')),
       hearings: [],
       trail: [],
-      rules: buildRules({ level, variant: options.variant }),
+      rules,
       hearingModel: GAME.hearing.model,
       stats: { huntersStunned: 0, closeCalls: 0 },
     };
@@ -232,15 +237,18 @@ export function createSimulation({
   seed,
   level,
   hunters,
+  upgrades,
 }: {
   seed: number;
   level: number;
   /** Override the level's hunters (tests, sandbox). */
   hunters?: readonly HunterTypeId[];
+  /** The run's upgrades so far (Phase 20). */
+  upgrades?: readonly UpgradeId[];
 }): Simulation {
   const options = mapOptionsFromConfig(levelSeed(seed, level), { scale: levelMapScale(level) });
   const layout = generateMap(options);
-  return new Simulation(layout, buildWallGeometry(layout.tiles), { level, hunters });
+  return new Simulation(layout, buildWallGeometry(layout.tiles), { level, hunters, upgrades });
 }
 
 /**

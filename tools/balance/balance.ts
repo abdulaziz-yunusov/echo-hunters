@@ -5,6 +5,7 @@ import { Bot, BOT_PROFILES, type BotProfile } from '@/bot/bot';
 import { DUEL_VARIANTS, VARIANT_CHOICES, type VariantChoice } from '@/config/duel';
 import { DUEL_BOTS, type DuelBotId } from '@/config/duelBots';
 import { formatDuelTable, MAX_LAG, measureDuels, type BotPair } from './duelBalance';
+import { UPGRADE_IDS, UPGRADES, type UpgradeId } from '@/config/upgrades';
 
 /** A round the bot hasn't finished by then counts as failed (s). */
 export const ROUND_LIMIT = 300;
@@ -16,6 +17,8 @@ export interface MeasureOptions {
   profile: BotProfile;
   /** Replace every level's hunters (e.g. to measure one type). */
   hunters?: readonly HunterTypeId[];
+  /** Upgrades the bot has on every level (Phase 20), one entry per stack. */
+  upgrades?: readonly UpgradeId[];
 }
 
 export interface RoundOutcome {
@@ -43,8 +46,9 @@ export function playRound(
   seed: number,
   profile: BotProfile,
   hunters?: readonly HunterTypeId[],
+  upgrades?: readonly UpgradeId[],
 ): RoundOutcome {
-  const sim = createSimulation({ seed, level, hunters });
+  const sim = createSimulation({ seed, level, hunters, upgrades });
   const bot = new Bot(sim, profile);
   let hits = 0;
   sim.events.on('playerHit', (e) => {
@@ -65,7 +69,7 @@ export function playRound(
 export function measureLevel(level: number, options: MeasureOptions): LevelStats {
   const outcomes: RoundOutcome[] = [];
   for (let seed = 1; seed <= options.maps; seed++) {
-    outcomes.push(playRound(level, seed, options.profile, options.hunters));
+    outcomes.push(playRound(level, seed, options.profile, options.hunters, options.upgrades));
   }
   const won = outcomes.filter((o) => o.extracted);
   return {
@@ -114,6 +118,51 @@ export function formatTable(stats: readonly LevelStats[], title: string): string
   return lines.join('\n');
 }
 
+/** One row of the upgrade table: an upgrade (or none), over every measured level together. */
+export interface UpgradeStats {
+  upgrade: UpgradeId | null;
+  success: number;
+  meanHits: number;
+}
+
+/**
+ * Phase 20: each upgrade alone (one stack) against none, over the same
+ * levels and maps. Shows whether one of them dominates.
+ */
+export function measureUpgrades(
+  levels: readonly number[],
+  maps: number,
+  profile: BotProfile,
+): UpgradeStats[] {
+  const options: MeasureOptions = { levels, maps, profile };
+  const pooled = (upgrade: UpgradeId | null): UpgradeStats => {
+    const upgrades = upgrade ? [upgrade] : [];
+    const stats = levels.map((level) => measureLevel(level, { ...options, upgrades }));
+    const mean = (pick: (s: LevelStats) => number) =>
+      stats.reduce((sum, s) => sum + pick(s), 0) / stats.length;
+    return { upgrade, success: mean((s) => s.success), meanHits: mean((s) => s.meanHits) };
+  };
+  return [pooled(null), ...UPGRADE_IDS.map(pooled)];
+}
+
+/** The upgrade table, with each row's change from no upgrade. */
+export function formatUpgradeTable(stats: readonly UpgradeStats[]): string {
+  const base = stats[0];
+  const pct = (v: number) => `${Math.round(v * 100)}%`;
+  const signed = (v: number, digits: number, scale = 1) =>
+    `${v >= 0 ? '+' : '−'}${Math.abs(v * scale).toFixed(digits)}`;
+  const lines = [
+    '| Upgrade | Success | Δ | Mean hits | Δ |',
+    '| --- | --- | --- | --- | --- |',
+    ...stats.map((s) => {
+      const name = s.upgrade ? UPGRADES[s.upgrade].label : '(none)';
+      if (!s.upgrade) return `| ${name} | ${pct(s.success)} | | ${s.meanHits.toFixed(2)} | |`;
+      return `| ${name} | ${pct(s.success)} | ${signed(s.success - base.success, 1, 100)} | ${s.meanHits.toFixed(2)} | ${signed(s.meanHits - base.meanHits, 2)} |`;
+    }),
+  ];
+  return lines.join('\n');
+}
+
 /** "1-8" or "2,4,6" or "5" → level numbers. */
 export function parseLevels(text: string): number[] {
   const levels: number[] = [];
@@ -127,7 +176,8 @@ export function parseLevels(text: string): number[] {
   return levels;
 }
 
-const USAGE = `npm run balance -- [--levels 1-8] [--maps 40] [--profile basic|careful|all] [--hunters stalker,listener]
+const USAGE = `npm run balance -- [--levels 1-8] [--maps 40] [--profile basic|careful|all] [--hunters stalker,listener] [--upgrades quickPing,quickPing]
+       npm run balance -- --upgrade-table [--levels 4-8] [--maps 40] [--profile all]
        npm run balance -- --duel [--maps 40] [--bots hard,easy] [--variant classic|…|random|all]`;
 
 export interface CliOptions {
@@ -135,6 +185,10 @@ export interface CliOptions {
   maps: number;
   profiles: BotProfile[];
   hunters?: HunterTypeId[];
+  /** The bot's upgrades on every level (Phase 20). */
+  upgrades?: UpgradeId[];
+  /** Compare each upgrade alone against none (Phase 20). */
+  upgradeTable: boolean;
   /** Measure duels (two duel bots) instead of solo levels. */
   duel: boolean;
   /** Duel bot levels to compare (the same one twice by default). */
@@ -148,6 +202,7 @@ export function parseArgs(argv: readonly string[]): CliOptions {
     levels: parseLevels('1-8'),
     maps: 40,
     profiles: ['basic'],
+    upgradeTable: false,
     duel: false,
     bots: ['hard', 'hard'],
     variants: ['classic'],
@@ -156,6 +211,10 @@ export function parseArgs(argv: readonly string[]): CliOptions {
     const flag = argv[i];
     if (flag === '--duel') {
       options.duel = true;
+      continue;
+    }
+    if (flag === '--upgrade-table') {
+      options.upgradeTable = true;
       continue;
     }
     const value = argv[i + 1];
@@ -174,6 +233,12 @@ export function parseArgs(argv: readonly string[]): CliOptions {
         if (!(t in HUNTER_TYPES)) throw new Error(`Unknown hunter type ${t}.`);
       }
       options.hunters = types as HunterTypeId[];
+    } else if (flag === '--upgrades') {
+      const ids = value.split(',');
+      for (const id of ids) {
+        if (!(id in UPGRADES)) throw new Error(`Unknown upgrade ${id}.`);
+      }
+      options.upgrades = ids as UpgradeId[];
     } else if (flag === '--variant') {
       if (value === 'all') options.variants = [...VARIANT_CHOICES];
       else if ((VARIANT_CHOICES as readonly string[]).includes(value)) {
@@ -207,11 +272,30 @@ export function main(argv: readonly string[], log: (line: string) => void = cons
     }
     return;
   }
-  const note = cli.hunters ? ` · hunters ${cli.hunters.join(',')}` : '';
+  if (cli.upgradeTable) {
+    for (const profile of cli.profiles) {
+      const started = Date.now();
+      const stats = measureUpgrades(cli.levels, cli.maps, profile);
+      const levels = `levels ${cli.levels[0]}–${cli.levels[cli.levels.length - 1]}`;
+      log(`\n${profile} bot · each upgrade alone · ${levels} · ${cli.maps} maps per level\n`);
+      log(formatUpgradeTable(stats));
+      log(`\n(${((Date.now() - started) / 1000).toFixed(1)} s)`);
+    }
+    return;
+  }
+  const note =
+    (cli.hunters ? ` · hunters ${cli.hunters.join(',')}` : '') +
+    (cli.upgrades ? ` · upgrades ${cli.upgrades.join(',')}` : '');
   for (const profile of cli.profiles) {
     const started = Date.now();
     const stats = cli.levels.map((level) =>
-      measureLevel(level, { levels: cli.levels, maps: cli.maps, profile, hunters: cli.hunters }),
+      measureLevel(level, {
+        levels: cli.levels,
+        maps: cli.maps,
+        profile,
+        hunters: cli.hunters,
+        upgrades: cli.upgrades,
+      }),
     );
     log(`\n${profile} bot · ${cli.maps} maps per level${note}\n`);
     log(formatTable(stats, 'Level'));

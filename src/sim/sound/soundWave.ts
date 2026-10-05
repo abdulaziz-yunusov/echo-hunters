@@ -42,6 +42,8 @@ export interface SoundOptions {
   focus?: Vec2;
   /** Aim of a directional sound kind (radians); ignored by the others. */
   dir?: number;
+  /** A directional sound's wedge width (degrees), instead of its kind's (Phase 20: Wide Beam). */
+  arc?: number;
   /** A fake footstep from Decoy Steps. */
   decoy?: boolean;
   /** The round's sound rules (Phase 30): × on the ring radius and on the speed. */
@@ -56,10 +58,17 @@ export function createWave(
   y: number,
   owner: EntityId | null,
   time: number,
-  { focus = { x, y }, dir = 0, decoy = false, scale = { rings: 1, speed: 1 } }: SoundOptions = {},
+  {
+    focus = { x, y },
+    dir = 0,
+    arc: width,
+    decoy = false,
+    scale = { rings: 1, speed: 1 },
+  }: SoundOptions = {},
 ): SoundWave {
   const def = SOUND_KINDS[kind];
-  const halfAngle = arcHalfAngle(kind);
+  const kindHalf = arcHalfAngle(kind);
+  const halfAngle = kindHalf === null || width === undefined ? kindHalf : (width * Math.PI) / 360;
   const arc = halfAngle === null ? null : { dir, halfAngle };
   return {
     id,

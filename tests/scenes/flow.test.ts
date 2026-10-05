@@ -30,6 +30,9 @@ import type { RunState } from '@/scenes/run';
 import { toWire } from '@/replay/wire';
 import { IDLE_INPUT } from '@/sim/playerInput';
 import { createSimulation, type Simulation } from '@/sim/simulation';
+import { UPGRADE_IDS, UPGRADE_OFFER_SIZE, UPGRADES, type UpgradeId } from '@/config/upgrades';
+import { buildRules } from '@/sim/rules';
+import { offerUpgrades } from '@/sim/upgrades';
 
 const DT = 1 / 60;
 
@@ -821,6 +824,72 @@ describe('screen flow', () => {
     });
   });
 
+  describe('upgrades between levels (Phase 20)', () => {
+    const score = {
+      cores: 300,
+      extraction: 500,
+      timeBonus: 0,
+      ghostBonus: 0,
+      stuns: 0,
+      closeCalls: 0,
+      total: 800,
+    };
+    type Pick = { offers: UpgradeId[]; cards: { x: number; y: number; w: number; h: number }[] };
+    const pickScene = (t: ReturnType<typeof testApp>) => t.scenes.current as unknown as Pick;
+    const playing = (t: ReturnType<typeof testApp>) =>
+      t.scenes.current as unknown as { run: RunState; sim: Simulation };
+
+    it('NEXT leads to three cards; the one picked is kept and changes the rules', () => {
+      const t = testApp();
+      t.app.goTo('levelEnd', { run: newRun(9, 'easy'), score, seconds: 30 });
+      t.idle(1);
+      t.choose(0); // NEXT: LEVEL 2
+      expect(t.current()).toBe('UpgradePick');
+      const { offers } = pickScene(t);
+      expect(offers).toEqual(offerUpgrades(9, 2, []));
+      expect(offers).toHaveLength(UPGRADE_OFFER_SIZE);
+      t.render();
+      t.press({ confirm: true }); // too soon: the Enter that left Level End
+      expect(t.current()).toBe('UpgradePick');
+      t.idle(1);
+      t.press({ back: true }); // no skipping
+      expect(t.current()).toBe('UpgradePick');
+      t.press({ navX: 1 });
+      t.press({ confirm: true });
+      expect(t.current()).toBe('Play');
+      const { run, sim } = playing(t);
+      expect(run).toMatchObject({ level: 2, score: 800, upgrades: [offers[1]] });
+      expect(sim.state.rules).toEqual(buildRules({ level: 2, upgrades: [offers[1]] }));
+    });
+
+    it('a click (or tap) on a card picks it; pause lists what the run has', () => {
+      const t = testApp();
+      const run = { ...newRun(4, 'easy'), level: 3, upgrades: ['thickSkin'] as UpgradeId[] };
+      t.app.goTo('upgradePick', { run });
+      t.render();
+      t.idle(1);
+      const { offers, cards } = pickScene(t);
+      const c = cards[2];
+      t.press({ click: true, aim: { x: 1, y: 1 } }); // beside the cards: nothing
+      expect(t.current()).toBe('UpgradePick');
+      t.press({ click: true, aim: { x: c.x + c.w / 2, y: c.y + c.h / 2 } });
+      expect(playing(t).run.upgrades).toEqual(['thickSkin', offers[2]]);
+      expect(playing(t).sim.state.player.hp).toBe(GAME.player.hp + 1);
+      t.press({ pause: true });
+      expect(t.current()).toBe('Pause');
+      expect((t.scenes.current as unknown as { build: string }).build).toContain('THICK SKIN');
+    });
+
+    it('with every upgrade maxed out, NEXT goes straight to the level', () => {
+      const t = testApp();
+      const all = UPGRADE_IDS.flatMap((id) => Array<UpgradeId>(UPGRADES[id].maxStacks).fill(id));
+      t.app.goTo('levelEnd', { run: { ...newRun(9, 'easy'), upgrades: all }, score, seconds: 30 });
+      t.idle(1);
+      t.choose(0);
+      expect(t.current()).toBe('Play');
+    });
+  });
+
   it('every screen renders without errors', () => {
     const t = testApp();
     const score = {
@@ -840,7 +909,10 @@ describe('screen flow', () => {
       ['settings'],
       ['controls'],
       ['play', { run }],
-      ['pause'],
+      ['pause', { upgrades: [] }],
+      ['pause', { upgrades: ['quickPing', 'quickPing', 'thickSkin'] }],
+      ['upgradePick', { run: { ...run, level: 2, upgrades: ['quickPing'] } }],
+      ['play', { run: { ...run, level: 3, upgrades: ['softSoles', 'wideBeam'] } }],
       ['levelEnd', { run, score, seconds: 71 }],
       ['gameOver', { run, score }],
       ['replay', { replay: recordedRound() }],

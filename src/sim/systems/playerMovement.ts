@@ -18,7 +18,7 @@ export function updatePlayerMovement(
 ): void {
   const cfg = GAME.player;
   const sneaking = input.sneak;
-  const speed = sneaking || beamCharged(player) ? cfg.sneakSpeed : cfg.speed;
+  const speed = sneaking || beamCharged(player) ? ctx.state.rules.sneakSpeed : cfg.speed;
   // Sneaking is silent but slow; Silent Boots are silent at any speed.
   // Decoy Steps (Phase 29): while fake steps walk elsewhere, your own are silent.
   const silent = sneaking || player.silentTime > 0 || player.decoy !== null;

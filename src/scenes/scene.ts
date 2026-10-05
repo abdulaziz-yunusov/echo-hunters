@@ -10,6 +10,7 @@ import type { Replay } from '@/replay/replay';
 import type { DuelEndParams } from './duelEndScene';
 import type { DuelParams } from './duelScene';
 import type { RunState } from './run';
+import type { UpgradeId } from '@/config/upgrades';
 
 /** A screen of the game: menu, gameplay, level end, … */
 export interface Scene {
@@ -49,7 +50,10 @@ export interface SceneParams {
   howToPlay: undefined;
   settings: undefined;
   controls: undefined;
-  pause: undefined;
+  /** Over a solo level: the run's upgrades are listed (Phase 20). */
+  pause: { upgrades: readonly UpgradeId[] };
+  /** Between levels (Phase 20): `run` is about to play its next level. */
+  upgradePick: { run: RunState };
   duelLobby: undefined;
   duel: DuelParams;
   duelEnd: DuelEndParams;

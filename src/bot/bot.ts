@@ -1,4 +1,3 @@
-import { GAME } from '@/config/game';
 import type { Vec2 } from '@/core/geometry';
 import type { Hunter } from '@/sim/entities/hunter';
 import { IDLE_INPUT, type PlayerInput } from '@/sim/playerInput';
@@ -104,7 +103,7 @@ export class Bot {
       const onMetal = state.layout.tiles.surfaceAt(player.x, player.y) === 'metal';
       // In running cover, walking is silent anyway: go at full speed.
       input.sneak = (threatDistance < this.tune.sneakRange || onMetal) && !playerMasked(state);
-      const reach = GAME.abilities.shockwave.effectRadius - threat.radius;
+      const reach = state.rules.shockRadius - threat.radius;
       if (
         threatDistance < reach &&
         player.shockCooldown <= 0 &&

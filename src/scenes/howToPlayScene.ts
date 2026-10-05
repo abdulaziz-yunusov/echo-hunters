@@ -22,6 +22,7 @@ const TIPS = [
   'While a vent roars or a pipe drips, footsteps near it are lost in the noise.',
   'Let a hunter pass close without being hit: CLOSE CALL, bonus points.',
   'The drone rises when a hunter is near. Headphones help: steps come from their side.',
+  'After each level, pick 1 of 3 upgrades. It stays for the rest of the run.',
   "DAILY RUN: today's run is the same for everyone. MAP EDITOR: build a maze, share it as a link.",
 ];
 

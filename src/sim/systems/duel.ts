@@ -1,3 +1,4 @@
+import type { Rules } from '@/config/rules';
 import { GAME } from '@/config/game';
 import { HUNTER_COMMON } from '@/config/hunters';
 import { isTool, PICKUP_TYPES, type ToolId } from '@/config/pickups';
@@ -78,7 +79,7 @@ export function grant(ctx: SimContext, kind: TakeKind, id: number, by: EntityId)
     const pickup = item as Pickup;
     if (isTool(pickup.type)) {
       if (holder) takeTool(ctx, holder, pickup.type, item.x, item.y);
-    } else if (holder === state.player) applyPickup(holder, pickup);
+    } else if (holder === state.player) applyPickup(holder, pickup, state.rules);
     ctx.events.emit('pickupCollected', {
       pickupId: id,
       type: pickup.type,
@@ -105,7 +106,7 @@ export function canUse(player: Player, p: Pickup): boolean {
   return p.type !== 'heart' || player.hp < player.maxHp;
 }
 
-function applyPickup(player: Player, p: Pickup): void {
+function applyPickup(player: Player, p: Pickup, rules: Rules): void {
   switch (p.type) {
     case 'stoneBag':
       player.stones += PICKUP_TYPES.stoneBag.stones;
@@ -114,7 +115,7 @@ function applyPickup(player: Player, p: Pickup): void {
       player.hp = Math.min(player.maxHp, player.hp + PICKUP_TYPES.heart.hp);
       break;
     case 'silentBoots':
-      player.silentTime = PICKUP_TYPES.silentBoots.duration;
+      player.silentTime = rules.bootsSeconds;
       break;
   }
 }
@@ -419,7 +420,7 @@ function scatter(state: GameState, x: number, y: number): { x: number; y: number
  */
 export function resolveShockwave(ctx: SimContext, x: number, y: number, by: EntityId): void {
   const { state } = ctx;
-  const reach = GAME.abilities.shockwave.effectRadius;
+  const reach = state.rules.shockRadius;
   for (const h of state.hunters) {
     if (Math.hypot(h.x - x, h.y - y) > reach + h.radius) continue;
     if (!hasLineOfSight(state.walls, x, y, h.x, h.y)) continue;

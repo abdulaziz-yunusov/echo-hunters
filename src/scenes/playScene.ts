@@ -14,6 +14,7 @@ import { WorldRenderer } from '@/render/worldRenderer';
 import { roundResult, scoreRound } from '@/sim/scoring';
 import { levelDef, newHunterTypes } from '@/sim/level';
 import { HUNTER_INFO } from '@/ui/hunterInfo';
+import { upgradeSummary } from '@/ui/format';
 import { createCustomSimulation, createSimulation, type Simulation } from '@/sim/simulation';
 import { decodeMap } from '@/sim/world/customMap';
 import { warpToObjective } from './debugWarp';
@@ -67,7 +68,7 @@ export class PlayScene implements Scene {
 
   update(dt: number, input: InputFrame): void {
     if (input.back || input.pause) {
-      this.app.open('pause');
+      this.app.open('pause', { upgrades: this.run.upgrades });
       return;
     }
     const debug = this.app.debug;
@@ -182,7 +183,8 @@ export class PlayScene implements Scene {
   }
 
   onHidden(): void {
-    if (this.sim.state.status === 'playing') this.app.open('pause');
+    if (this.sim.state.status === 'playing')
+      this.app.open('pause', { upgrades: this.run.upgrades });
   }
 
   exit(): void {
@@ -198,7 +200,11 @@ export class PlayScene implements Scene {
     const custom = this.run.custom ? decodeMap(this.run.custom) : null;
     this.sim = custom
       ? createCustomSimulation(custom)
-      : createSimulation({ seed: this.run.seed, level: this.run.level });
+      : createSimulation({
+          seed: this.run.seed,
+          level: this.run.level,
+          upgrades: this.run.upgrades,
+        });
     this.world = new WorldRenderer(this.sim, DIFFICULTIES[this.run.difficulty].ghostAlpha);
     this.display = new RoundDisplay(this.camera, this.world);
     this.audio = new AudioDirector(this.sim, this.display.output(this.app.sound));
@@ -254,7 +260,7 @@ export class PlayScene implements Scene {
     for (const h of hunters) counts.set(h.type, (counts.get(h.type) ?? 0) + 1);
     const parts = [...counts].map(([type, n]) => `${n} ${type.toUpperCase()}${n > 1 ? 'S' : ''}`);
     if (rules.pingCooldown !== GAME.abilities.ping.cooldown)
-      parts.push(`PING ${rules.pingCooldown}s`);
+      parts.push(`PING ${Number(rules.pingCooldown.toFixed(1))}s`);
     const scale = layout.tiles.width / (GAME.map.cellsX * 2 + 1);
     if (scale > 1.01 && !this.run.custom) parts.push(`MAP +${Math.round((scale - 1) * 100)}%`);
     parts.push(DIFFICULTIES[this.run.difficulty].label);
@@ -264,9 +270,27 @@ export class PlayScene implements Scene {
       align: 'center',
       alpha: alpha * 0.8,
     });
+    let below = height * 0.3 + 60;
+    const build = upgradeSummary(this.run.upgrades);
+    if (build) {
+      ctx.save();
+      ctx.font = `12px ${THEME.font}`;
+      const lines = wrapLines(ctx, `UPGRADES: ${build}`, Math.min(720, width - 32));
+      ctx.restore();
+      for (const line of lines) {
+        drawText(ctx, line, width / 2, below - 12, {
+          size: 12,
+          color: THEME.colors.cyan,
+          align: 'center',
+          alpha: alpha * 0.8,
+        });
+        below += 17;
+      }
+      below += 12;
+    }
     // Two short lines each, so they fit a phone held upright.
     met.forEach((type, i) => {
-      const y = height * 0.3 + 60 + i * 44;
+      const y = below + i * 44;
       drawText(ctx, `NEW HUNTER: ${type.toUpperCase()}`, width / 2, y, {
         size: 16,
         color: THEME.colors.red,

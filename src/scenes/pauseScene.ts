@@ -1,5 +1,8 @@
 import { THEME } from '@/config/theme';
 import type { InputFrame } from '@/input/inputFrame';
+import type { UpgradeId } from '@/config/upgrades';
+import { drawText, wrapLines } from '@/render/text';
+import { upgradeSummary } from '@/ui/format';
 import { MenuList } from '@/ui/menuList';
 import { drawMenu, drawTitle } from '@/ui/menuRenderer';
 import type { AppContext, Scene } from './scene';
@@ -13,8 +16,12 @@ export class PauseScene implements Scene {
   private readonly app: AppContext;
   private readonly menu: MenuList;
 
-  constructor(app: AppContext) {
+  /** The run's upgrades in a line (Phase 20). */
+  private readonly build: string;
+
+  constructor(app: AppContext, params: { upgrades: readonly UpgradeId[] }) {
     this.app = app;
+    this.build = upgradeSummary(params.upgrades);
     this.menu = new MenuList([
       { kind: 'action', label: 'RESUME', onSelect: () => app.close() },
       { kind: 'action', label: 'HOW TO PLAY', onSelect: () => app.open('howToPlay') },
@@ -39,13 +46,22 @@ export class PauseScene implements Scene {
     ctx.fillRect(0, 0, width, height);
     ctx.restore();
     drawTitle(ctx, 'PAUSED', width / 2, height * 0.32);
-    drawMenu(
-      ctx,
-      this.menu,
-      width / 2,
-      height * 0.32 + 64,
-      Math.min(MENU_WIDTH, width - 32),
-      height - 8,
-    );
+    let top = height * 0.32 + 64;
+    if (this.build) {
+      ctx.save();
+      ctx.font = `13px ${THEME.font}`;
+      const lines = wrapLines(ctx, `UPGRADES: ${this.build}`, Math.min(640, width - 32));
+      ctx.restore();
+      lines.forEach((line, i) =>
+        drawText(ctx, line, width / 2, top - 22 + i * 18, {
+          size: 13,
+          color: THEME.colors.cyan,
+          align: 'center',
+          alpha: 0.8,
+        }),
+      );
+      top += lines.length * 18 + 4;
+    }
+    drawMenu(ctx, this.menu, width / 2, top, Math.min(MENU_WIDTH, width - 32), height - 8);
   }
 }

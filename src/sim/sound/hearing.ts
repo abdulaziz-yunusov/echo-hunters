@@ -3,6 +3,7 @@ import { HUNTER_TYPES, type HunterTypeDef } from '@/config/hunters';
 import { SOUND_KINDS, type SoundKindDef } from '@/config/sounds';
 import type { EntityId } from '../entities/entity';
 import type { GameState, SimContext } from '../gameState';
+import { isPlayerId } from '../ai/trail';
 import { isMasked } from '../systems/emitters';
 import { distanceField } from '../world/pathfinding';
 import { hasLineOfSight } from '../world/visibility';
@@ -39,6 +40,9 @@ export function scheduleHearing(state: GameState, wave: SoundWave): void {
   if (isMasked(state, wave.x, wave.y, sound.tags)) return;
   const tiles = state.layout.tiles;
   let field: Int32Array | null = null;
+  // Soft Soles (Phase 20): a player's footsteps carry less far.
+  const steps = isPlayerId(wave.owner) && sound.tags.includes('footstep');
+  const scale = state.rules.soundHearing * (steps ? state.rules.stepHearing : 1);
 
   for (const hunter of state.hunters) {
     if (wave.owner === hunter.id) continue;
@@ -48,7 +52,7 @@ export function scheduleHearing(state: GameState, wave: SoundWave): void {
     const ahead = waveFaces(wave, hunter.x, hunter.y);
     const reach = ahead ? sound.hearRadius : (sound.sideHearRadius ?? sound.hearRadius);
     // The round's rules (Phase 30) scale how far everything carries.
-    const range = Math.min(reach, def.hearRange ?? Infinity) * state.rules.soundHearing;
+    const range = Math.min(reach, def.hearRange ?? Infinity) * scale;
     const straight = Math.hypot(hunter.x - wave.x, hunter.y - wave.y);
     if (straight > range) continue;
 

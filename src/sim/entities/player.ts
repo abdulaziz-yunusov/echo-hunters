@@ -67,7 +67,18 @@ export interface Decoy {
   stride: number;
 }
 
-export function createPlayer(id: EntityId, x: number, y: number): Player {
+/** HP and stones a player starts a level with (state.rules: maxHp, startStones). */
+export interface PlayerStart {
+  hp: number;
+  stones: number;
+}
+
+export function createPlayer(
+  id: EntityId,
+  x: number,
+  y: number,
+  start: PlayerStart = { hp: GAME.player.hp, stones: GAME.player.startStones },
+): Player {
   return {
     id,
     x,
@@ -85,9 +96,9 @@ export function createPlayer(id: EntityId, x: number, y: number): Player {
     pingHold: null,
     beamCooldown: 0,
     pingsUsed: 0,
-    hp: GAME.player.hp,
-    maxHp: GAME.player.hp,
-    stones: GAME.player.startStones,
+    hp: start.hp,
+    maxHp: start.hp,
+    stones: start.stones,
     cores: 0,
     invulnerable: 0,
     knockVx: 0,

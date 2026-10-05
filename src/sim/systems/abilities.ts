@@ -35,8 +35,11 @@ function updatePingKey(ctx: SimContext, player: Player, input: PlayerInput, dt: 
   player.pingHold = null;
   if (charged) {
     const { dx, dy } = aimDirection(player, input);
-    ctx.emitSound('pingBeam', player.x, player.y, player.id, { dir: Math.atan2(dy, dx) });
-    player.beamCooldown = GAME.abilities.beam.cooldown;
+    ctx.emitSound('pingBeam', player.x, player.y, player.id, {
+      dir: Math.atan2(dy, dx),
+      arc: ctx.state.rules.beamArc,
+    });
+    player.beamCooldown = ctx.state.rules.beamCooldown;
   } else if (tap && player.pingCooldown === 0) {
     ctx.emitSound('ping', player.x, player.y, player.id);
   } else {
@@ -101,7 +104,7 @@ function aimDirection(
  */
 function shockwave(ctx: SimContext, player: Player): void {
   ctx.emitSound('shockwave', player.x, player.y, player.id);
-  player.shockCooldown = GAME.abilities.shockwave.cooldown;
+  player.shockCooldown = ctx.state.rules.shockCooldown;
   // A duel client only makes the sound; the host resolves what it hits.
   if (ctx.state.mode !== 'client') resolveShockwave(ctx, player.x, player.y, player.id);
 }
